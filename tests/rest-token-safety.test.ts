@@ -6,7 +6,12 @@ import {
 } from "../src/index.ts";
 
 class HeadersLike {
-  constructor(private readonly values: Record<string, string> = {}) {}
+  readonly values: Record<string, string>;
+
+  constructor(values: Record<string, string> = {}) {
+    this.values = values;
+  }
+
   get(name: string): string | null {
     return this.values[name.toLowerCase()] ?? null;
   }
