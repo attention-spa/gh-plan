@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run typecheck"
+    "test:normalization": "node --experimental-strip-types tests/normalize.test.ts",
+    "test": "npm run typecheck && npm run test:normalization"
   },
   "devDependencies": {
     "typescript": "5.9.3"

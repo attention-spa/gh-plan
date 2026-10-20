@@ -1,3 +1,6 @@
+export { normalizeSchema } from "./normalize.ts";
+export type { NormalizationResult } from "./normalize.ts";
+
 export type {
   BlockedByRelationship,
   BlocksRelationship,
