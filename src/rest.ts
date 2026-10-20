@@ -108,7 +108,7 @@ function safePath(urlOrPath: string): string {
 function apiUrl(pathOrUrl: string): string {
   if (pathOrUrl.startsWith("/")) return `${API_BASE}${pathOrUrl}`;
   if (pathOrUrl.startsWith(`${API_BASE}/`)) return pathOrUrl;
-  throw new GithubRestTransportError("UNSAFE_PAGINATION_URL", safePath(pathOrUrl));
+  throw new GithubRestTransportError("UNSAFE_PAGINATION_URL", "/<unsafe-pagination-url>");
 }
 
 function resolveFetch(injected?: FetchLike): FetchLike {
