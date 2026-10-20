@@ -1,6 +1,16 @@
 export { normalizeSchema } from "./normalize.ts";
 export type { NormalizationResult } from "./normalize.ts";
 
+export {
+  createRestDiscoveryTransport,
+  GithubRestTransportError,
+} from "./rest.ts";
+export type {
+  GithubRestTransportErrorCode,
+  GithubRestTransportErrorData,
+  RestDiscoveryTransportConfig,
+} from "./rest.ts";
+
 export type {
   BlockedByRelationship,
   BlocksRelationship,
