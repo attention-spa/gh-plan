@@ -7,7 +7,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:normalization": "node --experimental-strip-types tests/normalize.test.ts",
     "test:rest": "node --experimental-strip-types tests/rest-discovery.test.ts && node --experimental-strip-types tests/rest-global-fetch.test.ts && node --experimental-strip-types tests/rest-token-safety.test.ts",
-    "test": "npm run typecheck && npm run test:normalization && npm run test:rest"
+    "test:identity": "node --experimental-strip-types tests/identity.test.ts",
+    "test": "npm run typecheck && npm run test:normalization && npm run test:rest && npm run test:identity"
   },
   "devDependencies": {
     "typescript": "5.9.3"

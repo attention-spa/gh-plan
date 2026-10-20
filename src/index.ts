@@ -2,6 +2,13 @@ export { normalizeSchema } from "./normalize.ts";
 export type { NormalizationResult } from "./normalize.ts";
 
 export {
+  resolveResourceIdentities,
+} from "./identity.ts";
+export type {
+  IdentityResolutionResult,
+} from "./identity.ts";
+
+export {
   createRestDiscoveryTransport,
   GithubRestTransportError,
 } from "./rest.ts";
