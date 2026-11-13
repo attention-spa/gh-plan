@@ -1,0 +1,601 @@
+{
+  "version": 1,
+  "repository": "attention-spa/gh-plan",
+  "phase": "A",
+  "authoredAt": "2026-11-13",
+  "sourceReviewCommit": "67f8c8b",
+  "invariants": [
+    "Plan only until owner explicitly approves Phase B",
+    "No permanent deletion except demonstrated duplicate/conflict, with reason recorded first",
+    "Pure deterministic planner; only REST transport touches network",
+    "Secrets never appear in plans, errors, logs, or fixtures",
+    "One issue per implementation work unit; PR+green CI+merge+close+report",
+    "Existing issue #10 is reused as M3.0 rather than duplicated",
+    "M8.1 is unscheduled could-have; do not implement in Phase B"
+  ],
+  "milestones": [
+    [
+      "M1",
+      "Correctness fixes",
+      "Safe identity, marker, relationship and schema handling before planner"
+    ],
+    [
+      "M2",
+      "Scoped discovery",
+      "Bound GitHub reads to the desired plan, not entire repository size"
+    ],
+    [
+      "M3",
+      "Planner core",
+      "Pure diff, late-bound executable requests and planGithub() orchestrator"
+    ],
+    [
+      "M4",
+      "Optional issue metadata",
+      "Labels, assignees, and managed repository labels"
+    ],
+    [
+      "M5",
+      "Packaging and developer experience",
+      "Built distribution, schema types and explanatory contracts"
+    ],
+    [
+      "M6",
+      "OKF documentation",
+      "Conformant OKF 0.2 bundle and generated README"
+    ],
+    [
+      "M7",
+      "Extensions",
+      "PRs, reference-only Projects v2, milestone due dates, orphan policy"
+    ],
+    [
+      "M8",
+      "Deferred executor",
+      "Unscheduled, optional future applyPlan(); no due date"
+    ]
+  ],
+  "issues": [
+    [
+      "M1.1",
+      "Rename related to relates_to and map native relationship",
+      "Feature",
+      "Use GitHub's native symmetric relates_to API; remove unpublished aliases; preserve distinction from blockers",
+      [
+        "Record V1: GET/POST /issues/{n}/relates_to and DELETE /issues/{n}/relates_to/{id}; POST uses issue_id (REST id); no preview header in current docs",
+        "Rename RelatedRelationship to RelatesToRelationship (kind relates_to, from/to); inline related to relatesTo without alias",
+        "Normalize symmetric dedup keys using sorted endpoint pair; require both endpoints to be issues",
+        "Discover relatesToNumbers via REST relationship endpoint; keep unsupported diagnostic for unsupported transports",
+        "Fixtures: A↔B dedup, unknown endpoint, unsupported transport path"
+      ],
+      [],
+      [
+        "M3.5"
+      ]
+    ],
+    [
+      "M1.2",
+      "Tighten logicalId validation and marker matching",
+      "Bug",
+      "Prevent marker injection and substring/regex collisions.",
+      [
+        "Restrict logicalId to ^[A-Za-z0-9][A-Za-z0-9._:/-]*$ with specific diagnostics",
+        "Exact full canonical HTML comment; escaped whole-token matching for custom markers, bounded on both sides",
+        "Fixtures for A versus AB and custom regex metacharacter markers"
+      ]
+    ],
+    [
+      "M1.3",
+      "Unknown schema keys produce warnings, not blockers",
+      "Bug",
+      "Preserve forward compatibility: drop unsupported properties and continue valid work.",
+      [
+        "reportUnknownKeys: severity warning, blocking false; discard unknown keys",
+        "ok remains true with warnings only; return sorted diagnostics",
+        "Normalize fixtures and unknown root-key positive case"
+      ]
+    ],
+    [
+      "M1.4",
+      "Make title-based issue adoption opt-in",
+      "Bug",
+      "Protect unmanaged issues from implicit adoption while preserving explicit identity and marker precedence.",
+      [
+        "Add adoptByTitle?: boolean (default false) to resolution options and GithubPlannerConfig",
+        "Without opt-in, matching unmarked unmanaged title emits blocking TITLE_MATCH_REQUIRES_ADOPTION with candidates and resolution instructions",
+        "With opt-in compare trim().toLowerCase() both sides; >1 match emits AMBIGUOUS_IDENTITY listing all",
+        "Milestones retain exact-title identity; explain why in comment",
+        "Fixtures: off blocker, on exact/case/whitespace matches and ambiguous case variants"
+      ],
+      [],
+      [
+        "M3.3"
+      ]
+    ],
+    [
+      "M1.5",
+      "Tolerate unavailable issue-types endpoint",
+      "Bug",
+      "V3: GET on real user-owned octocat/Hello-World returned HTTP 200 with three types; do not assume user-owned always means 404. Tolerate genuine optional 404 where encountered.",
+      [
+        "Use getJsonOptional404 and interpret missing endpoint as empty list without failing other discovery",
+        "Synthetic 404 fixture for a repo without accessible issue-types endpoint; preserve observed 200 behavior"
+      ]
+    ],
+    [
+      "M2.1",
+      "Two-phase discovery with bounded concurrency",
+      "Feature",
+      "List broad issue summaries once; enrich only resolved or relationship target issues; deterministic output.",
+      [
+        "Split GithubDiscoveryTransport into discover(desired) (repo, issue listing, milestones, types, fields) and enrich(snapshot, issueNumbers) (fields, parent, blocked_by, relates_to)",
+        "Orchestrator enriches resolved existing desired issues and referenced relationship endpoints only",
+        "Bound enrichment concurrency to 4 by default, configurable; sort merged output deterministically",
+        "Request-count fixture: 200 available issues, 3 touched, ≤3× per-issue enrichment calls plus list calls"
+      ],
+      [
+        "M1.2"
+      ]
+    ],
+    [
+      "M3.0",
+      "Pure desired-vs-observed semantic diff layer (existing #10)",
+      "Feature",
+      "Preserve existing #10 and its full acceptance criteria; transport-independent semantic deltas feed the M3 request compiler. Scope is pure classifications, not HTTP.",
+      [],
+      [
+        "M1.1",
+        "M1.4"
+      ],
+      [],
+      10
+    ],
+    [
+      "M3.1",
+      "Late-bound references to not-yet-created resources",
+      "Feature",
+      "Requests remain self-describing and executable by external integrations.",
+      [
+        "Define PlanValueRef as {$ref:`${LogicalResourceId}.${number|id|nodeId}`}; allow recursively in REST body and GraphQL variables; path accepts string or template list",
+        "Validate every request ref's producing step appears in dependsOn (step IDs); test invalid and valid DAGs",
+        "Update contract fixtures for parent assignment to a newly created child",
+        "Provide pure bindPlanRequest(request, bindings) with exact binding and unresolved-ref tests"
+      ]
+    ],
+    [
+      "M3.2",
+      "Milestone diff and executable requests",
+      "Feature",
+      "Create, minimal update, noop; retain partial desired-state semantics.",
+      [
+        "Missing milestone yields milestone.create with complete POST request",
+        "Changed title/description/state yield single milestone.update containing only changed keys; equality yields noop",
+        "Description remove maps to empty string; mark reversible partial"
+      ],
+      [
+        "M3.1",
+        "M3.0"
+      ]
+    ],
+    [
+      "M3.3",
+      "Issue core diff and executable requests",
+      "Feature",
+      "Create/update issues with canonical marker, milestone refs, type validation and adoption.",
+      [
+        "issue.create includes title/body canonical marker and milestone binding when new",
+        "issue.update handles only changed title/body/state/milestone; never discard existing identity marker",
+        "Validate requested issue types against observed types; UNKNOWN_ISSUE_TYPE is blocking; issue.type.set",
+        "issue.marker.adopt adds canonical marker on explicitly identified or adoptByTitle existing issues",
+        "Closing is destructive false, reversible true; fixtures for create/update/noop/marker/type"
+      ],
+      [
+        "M3.1",
+        "M3.0"
+      ],
+      [
+        "M1.4"
+      ]
+    ],
+    [
+      "M3.4",
+      "Issue-field diff, validation and REST writes",
+      "Feature",
+      "V2: POST issue-field-values adds/updates specific fields; PUT replaces all; avoid PUT for partial desired state.",
+      [
+        "Validate names/options against issueFields; UNKNOWN_ISSUE_FIELD/UNKNOWN_FIELD_OPTION block; user-owned fields unsupported",
+        "Normalize value comparisons incl. multi-select as sorted sets; respect omitted field untouched",
+        "Plan issue.field.set using supported POST /issues/{n}/issue-field-values; include fixture protecting unrelated field values"
+      ],
+      [
+        "M3.1",
+        "M3.0",
+        "M2.1"
+      ]
+    ],
+    [
+      "M3.5",
+      "Reconcile parent, dependency and relates_to edges",
+      "Feature",
+      "Schema-authoritative owned edges; no changes to reference-only pairs; additive opt-out.",
+      [
+        "issue.parent.set via POST parent/sub_issues and child's REST id; use replace_parent:true when reparenting; reason names old/new parent",
+        "issue.dependency.add for missing blocked_by only; existing edge noop",
+        "issue.relates_to.add for missing native symmetric relation via REST; unsupported only on incapable transports",
+        "For managed owner edges plan parent/dependency/relates_to removals of stale edges; no mutation between reference-only endpoints; relationships config reconcile (default) or additive; report additive extras as info",
+        "New PlanOperationKinds; order removals before adds per issue; removals non-destructive and reversible with reasons",
+        "Fixtures: reparent, stale dependency removal, preserve reference-only edges, additive mode and second pass noops"
+      ],
+      [
+        "M3.1",
+        "M3.0"
+      ],
+      [
+        "M1.1"
+      ]
+    ],
+    [
+      "M3.6",
+      "Implement planGithub() orchestrator",
+      "Feature",
+      "Pure pipeline wiring (only REST module talks to network); deterministic complete GithubPlan.",
+      [
+        "normalize → discover → resolve → enrich → diff → request DAG; sorted warnings/blockers/unsupported and readiness/summary",
+        "Transport errors map to AUTH_FAILED, REPOSITORY_NOT_FOUND, INSUFFICIENT_PERMISSION and rate-limit diagnostics",
+        "Remove octokit config; retain mode type but graphql produces blocking NO_GRAPHQL_TRANSPORT",
+        "E2E fixtures: empty repo full create; simulated applied state only noops; mixed blockers",
+        "Export planGithub from index.ts and use one metadata.version constant"
+      ],
+      [
+        "M2.1",
+        "M3.2",
+        "M3.3",
+        "M3.4",
+        "M3.5"
+      ]
+    ],
+    [
+      "M4.1",
+      "Optional issue labels",
+      "Feature",
+      "Missing labels property means untouched; support exact set and add/remove.",
+      [
+        "Schema labels array or {op:set,value} or {add,remove}",
+        "Discover issue labels and repo label catalog",
+        "Diff label set via PUT labels or targeted add/remove; UNKNOWN_LABEL blocks unless M4.3 defines a managed label",
+        "Synthetic create/update/noop/missing fixtures"
+      ],
+      [
+        "M3.6"
+      ]
+    ],
+    [
+      "M4.2",
+      "Optional issue assignees",
+      "Feature",
+      "Missing assignees means untouched; deterministic set and add/remove semantics.",
+      [
+        "Schema three forms matching issue labels using assignee logins",
+        "Discover assignees[].login for desired issues",
+        "Plan POST/DELETE assignees; verify eligibility during enrichment with GET /assignees/{login} (204/404); UNKNOWN_ASSIGNEE blocks",
+        "Synthetic fixtures for eligibility, noop, add/remove and preservation"
+      ],
+      [
+        "M3.6"
+      ]
+    ],
+    [
+      "M4.3",
+      "Managed repository labels",
+      "Feature",
+      "Optional label objects at root; name is unique identity; no deletion in v0.1.",
+      [
+        "Root labels array: logicalId?, name, color?, description?, management?; identity by repo-unique name",
+        "label.create/label.update only; never label.delete",
+        "Issue label steps reference managed labels; order label.create first; fixtures"
+      ],
+      [
+        "M3.6",
+        "M4.1"
+      ]
+    ],
+    [
+      "M5.1",
+      "Make package buildable and publication-ready",
+      "Feature",
+      "Keep private:true pending owner release decision; MIT license approved.",
+      [
+        "tsc build to dist with rewriteRelativeImportExtensions and declarations; add exports/types/files/engines node>=22; private remains true",
+        "Add standard MIT LICENSE Copyright (c) 2026 Dominik Bošnjak; package license MIT",
+        "CI runs build and imports dist/index.js; preserve npm test"
+      ],
+      [
+        "M3.6"
+      ]
+    ],
+    [
+      "M5.2",
+      "Typed authoring schema and generated JSON Schema",
+      "Feature",
+      "Single-source authoring types, shorthands and schema validation; checked generated artifact.",
+      [
+        "Export GithubPlanSchema describing children, blockedBy, blocks, relatesTo, issue labels/assignees; use in config.schema",
+        "Type-level tests ensure normalize fixtures satisfy GithubPlanSchema",
+        "Generate schema/gh-plan.schema.json draft 2020-12 from one source; CI checks up-to-date; document $schema usage"
+      ],
+      [
+        "M4.1",
+        "M4.2",
+        "M4.3"
+      ]
+    ],
+    [
+      "M5.3",
+      "Add descriptive doc comments for public contract",
+      "Task",
+      "No JSDoc tags; annotate auth runtime-only, mode/adoptByTitle, identity precedence, reference management, absent=set/remove, issue fields/type by names, relationship direction, resolution/readiness, dependsOn step IDs, partial reversibility, PlanValueRef, and all exports' purity/I-O/errors/request volume.",
+      [],
+      [
+        "M5.2"
+      ]
+    ],
+    [
+      "M6.1",
+      "OKF 0.2 skeleton, concepts and decisions",
+      "Feature",
+      "Use GoogleCloudPlatform/knowledge-catalog okf SPEC; slash-root links, timestamps with offset, human:<id>, newest-first log.",
+      [
+        "Create knowledge/index.md (root okf_version 0.2), knowledge/log.md history #2–#9 and M1–M5, overview.md type Overview",
+        "Concepts: desired-state-graph, logical-id, management-modes, identity-resolution, relationships, plan-and-steps, late-binding-refs, diagnostics",
+        "Decisions: markers-in-body, deterministic-output, no-secrets-in-plans, relationship-reconciliation, issue-deletion-policy, title-adoption-opt-in",
+        "New pages status draft; generated.by agent/version and generated.at ISO offset; validate OKF indexes, content and log"
+      ],
+      [
+        "M5.1",
+        "M5.2",
+        "M5.3"
+      ]
+    ],
+    [
+      "M6.2",
+      "OKF schema and API reference",
+      "Feature",
+      "Examples must normalize and typecheck; document verified REST endpoints/permissions.",
+      [
+        "Schema Element pages: repository, issue, milestone, label, relationship, set-remove-operations; # Schema/# Examples; test example extraction and normalizeSchema",
+        "API pages type API with resource source path: one per exported function/type as appropriate",
+        "GitHub Reference pages rest-endpoints mapped to step kinds and verified token-permissions"
+      ],
+      [
+        "M5.2",
+        "M6.1"
+      ],
+      [
+        "M5.2"
+      ]
+    ],
+    [
+      "M6.3",
+      "Generate README from OKF bundle",
+      "Feature",
+      "Leave handwritten install/quickstart untouched; deterministic generated section and CI.",
+      [
+        "scripts/readme.ts reads ordered concept frontmatter title/description and ## Summary; replace only <!-- okf:begin/end --> section",
+        "npm run docs:readme and docs:check; conformance checks for frontmatter/index/log/timestamps/links; CI gate",
+        "From M7 onward updating affected OKF pages and knowledge/log.md becomes definition of done"
+      ],
+      [
+        "M6.1",
+        "M6.2"
+      ]
+    ],
+    [
+      "M7.1",
+      "Plan pull requests without merging",
+      "Feature",
+      "PRs managed by unique head+base open pair; REST draft toggles unsupported.",
+      [
+        "Types ResourceKind pull_request; DesiredPullRequestState title/body/base/state/labels/assignees/reviewers and ObservedPullRequest head/base/draft/merged/requested reviewers",
+        "Root pullRequests, identity head+base; closes logical references",
+        "Discover PRs from issues listing and enrich /pulls/{n} only for relevant PRs",
+        "Create requires head exists and differs from base; update title/body/base/state; reviewers via requested_reviewers, labels/assignees via M4; managed Closes #n body block",
+        "Draft toggles unsupported in REST (GraphQL only); merging explicitly out of scope",
+        "Synthetic fixtures and OKF pages"
+      ],
+      [
+        "M6.3"
+      ]
+    ],
+    [
+      "M7.2",
+      "Plan Projects v2 membership and item fields",
+      "Feature",
+      "Reference existing Projects and fields only, no project/field creation in planner, even though V6 confirms REST can add fields.",
+      [
+        "Root projects reference owner+number; per issue/PR projects field map",
+        "REST discover referenced project, fields and scoped existing items",
+        "Plan project.item.add and project.item.fields.set for text/number/date/single-select/iteration only; project/field creation deliberately unsupported",
+        "Fixtures and OKF pages; do not require an existing board"
+      ],
+      [
+        "M6.3"
+      ]
+    ],
+    [
+      "M7.3",
+      "Add milestone due_on",
+      "Task",
+      "Schema, REST discovery, diff, clear/compare semantics as ISO date, fixtures, OKF updates.",
+      [
+        "Implement due_on schema/discovery/diff with ISO date comparison and synthetic fixtures; update OKF/log"
+      ],
+      [
+        "M6.3"
+      ]
+    ],
+    [
+      "M7.4",
+      "Orphan and duplicate detection with safe close policy",
+      "Feature",
+      "Default report; close is reversible; deletion explicitly opt-in and duplicate/conflict-only.",
+      [
+        "Report managed gh-plan marker issues absent from schema as info",
+        "prune report (default) or close (state_reason:not_planned; non-destructive reversible)",
+        "Identify duplicate marker/title clashes; close duplicates with canonical link/reason; only if deleteDuplicates:true plan irreversible GraphQL deleteIssue, unsupported in REST"
+      ],
+      [
+        "M6.3"
+      ]
+    ],
+    [
+      "M8.1",
+      "Optional idempotent applyPlan() (unscheduled)",
+      "Feature",
+      "Could-have. No assignee, no milestone due date. DO NOT execute in Phase B without separate authorization.",
+      [
+        "Topological execution of complete planned requests; pure late binding via bindPlanRequest",
+        "Before every step re-read postconditions; skip already-applied steps",
+        "Create recovery by marker; interrupted run must not create duplicate issue",
+        "Stop on first failure, verification read after every mutation, secret-free apply log and skipped-step record",
+        "Fixtures: successful rerun zero writes; resume simulated mid-run failure without duplicate creates"
+      ],
+      [
+        "M3.6"
+      ]
+    ]
+  ],
+  "extras": {
+    "blocking": [
+      [
+        "M2.1",
+        "M1.2"
+      ],
+      [
+        "M3.2",
+        "M3.1"
+      ],
+      [
+        "M3.3",
+        "M3.1"
+      ],
+      [
+        "M3.4",
+        "M3.1"
+      ],
+      [
+        "M3.5",
+        "M3.1"
+      ],
+      [
+        "M3.4",
+        "M2.1"
+      ],
+      [
+        "M3.6",
+        "M2.1"
+      ],
+      [
+        "M3.6",
+        "M3.2"
+      ],
+      [
+        "M3.6",
+        "M3.3"
+      ],
+      [
+        "M3.6",
+        "M3.4"
+      ],
+      [
+        "M3.6",
+        "M3.5"
+      ],
+      [
+        "M4.1",
+        "M3.6"
+      ],
+      [
+        "M4.2",
+        "M3.6"
+      ],
+      [
+        "M4.3",
+        "M3.6"
+      ],
+      [
+        "M5.2",
+        "M4.1"
+      ],
+      [
+        "M5.2",
+        "M4.2"
+      ],
+      [
+        "M6.2",
+        "M5.2"
+      ],
+      [
+        "M6.3",
+        "M6.1"
+      ],
+      [
+        "M6.3",
+        "M6.2"
+      ],
+      [
+        "M7.1",
+        "M6.3"
+      ],
+      [
+        "M7.2",
+        "M6.3"
+      ],
+      [
+        "M7.3",
+        "M6.3"
+      ],
+      [
+        "M7.4",
+        "M6.3"
+      ],
+      [
+        "M8.1",
+        "M3.6"
+      ]
+    ],
+    "relates": [
+      [
+        "M1.1",
+        "M3.5"
+      ],
+      [
+        "M1.4",
+        "M3.3"
+      ],
+      [
+        "M5.2",
+        "M6.2"
+      ]
+    ]
+  },
+  "verification": {
+    "V1": "REST GET/POST /issues/{n}/relates_to and DELETE /issues/{n}/relates_to/{issue_id}; POST body {issue_id}; no preview media type documented",
+    "V2": "REST POST and PUT /issues/{n}/issue-field-values; POST targeted values, PUT all-replace",
+    "V3": "Authenticated read /repos/octocat/Hello-World/issue-types returned HTTP 200, three types for a user-owned repository; 404 is not universal",
+    "V4": "POST /issues/{n}/sub_issues {sub_issue_id: REST id, replace_parent?: true}; DELETE /sub_issue {sub_issue_id}; POST /dependencies/blocked_by {issue_id}; DELETE /blocked_by/{issue_id}; relates_to DELETE /{issue_id}; permanent deleteIssue only documented GraphQL",
+    "V5": "PR draft toggle is GraphQL convertPullRequestToDraft and markPullRequestReadyForReview; no REST switch",
+    "V6": "REST list/get Projects v2 and fields/items; POST item {type:Issue,id:REST id}; PATCH item fields; no REST project creation; POST project fields DOES exist as of API 2026-03-10, but field creation is out of scope",
+    "V7": "attention-spa org types: Task, Bug, Feature, Epic"
+  },
+  "sources": [
+    "https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10",
+    "https://docs.github.com/en/rest/issues/issue-field-values?apiVersion=2026-03-10",
+    "https://docs.github.com/en/rest/issues/sub-issues?apiVersion=2026-03-10",
+    "https://docs.github.com/en/rest/issues/issue-dependencies?apiVersion=2026-03-10",
+    "https://docs.github.com/en/rest/projects/projects?apiVersion=2026-03-10",
+    "https://docs.github.com/en/rest/projects/items?apiVersion=2026-03-10",
+    "https://docs.github.com/en/rest/projects/fields?apiVersion=2026-03-10",
+    "https://docs.github.com/en/graphql/reference/issues",
+    "https://docs.github.com/en/graphql/reference/pulls"
+  ]
+}
