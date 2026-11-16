@@ -107,6 +107,15 @@ These descriptors describe **what readers must verify**, not proof the read occu
 
 [#180](https://github.com/attention-spa/gh-plan/issues/180) issue verification, [#181](https://github.com/attention-spa/gh-plan/issues/181) disposable private-repository proof, and [#189](https://github.com/attention-spa/gh-plan/issues/189) the C2 GitHub adapter remain separate prerequisites. An HTTP 2xx or a matching preflight descriptor alone never proves a mutation succeeded.
 
+## #180 implementation checkpoint — authoritative issue GET verification
+
+[#180](https://github.com/attention-spa/gh-plan/issues/180) adds an internal [issue postcondition reader](https://github.com/attention-spa/gh-plan/blob/main/src/apply-issue-reader.ts) for the two B1 issue operation kinds. Versioned typed inputs come from #178; this does not parse descriptive postconditions, issue writes, acquire an A1 lock, or export a public executor.
+
+- **Create:** Read all pages of the open/closed issue catalog, excluding pull requests even if their bodies contain a marker. Require one owner with a whole-token canonical/custom marker; then independently GET the identified issue by number. Check REST number, id and node_id against catalog and every managed title, body, initial open state and numeric milestone number. An existing marker with different properties is a conflict. A lost create response is recoverable only if fresh catalog/by-number reads uniquely verify all properties. Never blindly replay POST.
+- **Update:** Fresh complete issue catalog and GET by number before and after; enforce that the unique marker belongs to that precise issue. Check changed title, body, state and milestone number or explicit null. Preserve unmentioned fields across the two reads. A create-followed-by-close update binds the new issue's numeric number; a milestone reference likewise binds the producer milestone **number**, never REST id. Verified no-op reruns require fresh reads.
+- **Failure policy:** Reject ambiguous markers, missing/wrong IDs and node IDs, marker drift, unexpected PR detail, mismatched create response, 403/hidden 404, incomplete or cross-origin/cross-repository pagination, redirected requests, and indeterminate writes. Return only sanitized error codes/phases; runtime bearer credentials and transport exception details never appear in errors. Injected test transports remain caller-trusted.
+- **Boundary:** No public applyPlan, ownership, dispatcher, or live credential proof. The separate [#175](https://github.com/attention-spa/gh-plan/issues/175), [#181](https://github.com/attention-spa/gh-plan/issues/181), [#187](https://github.com/attention-spa/gh-plan/issues/187), and [#189](https://github.com/attention-spa/gh-plan/issues/189) gates remain necessary for a trustworthy reference adapter.
+
 ## Independent implementation and disposable-test evidence
 
 - [#178](https://github.com/attention-spa/gh-plan/issues/178): typed capability predicate compiler, safe whole-plan preflight, exhaustive enum/shape tests, no-write rejection.
