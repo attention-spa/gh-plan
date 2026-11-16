@@ -200,20 +200,44 @@ const markerConflict = resolveResourceIdentities(
 );
 equal(resolution(markerConflict, "marker-conflict").status, "ambiguous", "marker/number conflict should block");
 
-// Unique exact title bootstrap, and duplicate exact title ambiguity.
+// Issue title adoption requires explicit opt-in, even for an exact match.
 const titleBootstrap = resolveResourceIdentities(graph([managedIssue("title-only", "Alpha")]), snapshot());
-equal(resolution(titleBootstrap, "title-only").identity?.number, 1, "unique exact issue title should bootstrap identity");
-
-const duplicateTitle = resolveResourceIdentities(
-  graph([managedIssue("duplicate-title", "Same")]),
-  snapshot({
-    issues: [
-      { kind: "issue", number: 8, id: 108, title: "Same", state: "open" },
-      { kind: "issue", number: 9, id: 109, title: "Same", state: "closed" },
-    ],
-  }),
+equal(resolution(titleBootstrap, "title-only").status, "unresolved",
+  "an issue title match without opt-in must block implicit adoption");
+equal(resolution(titleBootstrap, "title-only").candidates?.map((candidate) => candidate.number),
+  [1], "default-off title matches must list candidate numbers");
+assert(titleBootstrap.blockers.some((item) =>
+  item.code === "TITLE_MATCH_REQUIRES_ADOPTION"
+  && item.blocking
+  && item.details !== undefined
+  && item.message.includes("adoptByTitle: true")
+  && item.message.includes("identity.number")),
+  "the default-off blocker must include candidates and resolution instructions");
+const explicitOptOut = resolveResourceIdentities(
+  graph([managedIssue("title-only", "Alpha")]), snapshot(), { adoptByTitle: false },
 );
-equal(resolution(duplicateTitle, "duplicate-title").status, "ambiguous", "duplicate exact issue titles should be ambiguous");
+equal(explicitOptOut, titleBootstrap, "omitted options must behave like adoptByTitle false");
+
+const authorizedTitle = resolveResourceIdentities(
+  graph([managedIssue("title-only", "Alpha")]), snapshot(), { adoptByTitle: true },
+);
+equal(resolution(authorizedTitle, "title-only").identity?.number, 1,
+  "an opted-in exact title match should adopt its issue");
+equal(authorizedTitle.blockers, [], "authorized unique title adoption should not block");
+
+const duplicateTitleSnapshot = snapshot({
+  issues: [
+    { kind: "issue", number: 8, id: 108, title: "Same", state: "open" },
+    { kind: "issue", number: 9, id: 109, title: "Same", state: "closed" },
+  ],
+});
+const duplicateTitle = resolveResourceIdentities(
+  graph([managedIssue("duplicate-title", "Same")]), duplicateTitleSnapshot, { adoptByTitle: true },
+);
+equal(resolution(duplicateTitle, "duplicate-title").status, "ambiguous",
+  "opted-in duplicate issue titles should be ambiguous");
+equal(resolution(duplicateTitle, "duplicate-title").candidates?.map((candidate) => candidate.number),
+  [8, 9], "opted-in ambiguous titles must list all candidates in deterministic order");
 
 const milestoneTitle = resolveResourceIdentities(graph([managedMilestone("milestone-title", "Foundation")]), snapshot());
 equal(resolution(milestoneTitle, "milestone-title").identity?.number, 7, "unique milestone title should bootstrap identity");
@@ -392,3 +416,108 @@ const customExplicit = resolveResourceIdentities(
 equal(resolution(customExplicit, "A").identity?.number, 1,
   "a longer custom marker must not conflict with explicit numeric identity");
 equal(customExplicit.blockers, [], "no marker collision should produce an ambiguity blocker");
+
+
+// M1.4: title matching is case/whitespace insensitive ONLY for opt-in adoption;
+// default behavior also detects potentially colliding unmanaged issues, never adopts.
+const titleVariants = snapshot({
+  issues: [
+    { kind: "issue", number: 12, id: 112, title: "  EXAMPLE ISSUE   ", body: null, state: "open" },
+  ],
+});
+const matchingVariant = graph([managedIssue("variant", "example issue")]);
+const deniedVariant = resolveResourceIdentities(matchingVariant, titleVariants);
+equal(resolution(deniedVariant, "variant").status, "unresolved",
+  "unmarked title should not be automatically adopted without opt-in");
+equal(deniedVariant.blockers.map((d) => d.code), ["TITLE_MATCH_REQUIRES_ADOPTION"],
+  "default-off variant match must produce adoption blocker");
+equal(resolution(deniedVariant, "variant").candidates?.map((candidate) => candidate.number), [12],
+  "unmarked title candidates must include the underlying issue number");
+equal(deniedVariant.blockers[0]?.details, {
+  candidateIssueNumbers: [12],
+  resolution: "Supply explicit identity hints or a unique marker; alternatively set adoptByTitle: true.",
+}, "adoption blockers must contain structured candidate and resolution details");
+
+const authorizedVariant = resolveResourceIdentities(
+  matchingVariant, titleVariants, { adoptByTitle: true },
+);
+equal(resolution(authorizedVariant, "variant").identity?.number, 12,
+  "case-and-whitespace normalized title should match when opted in");
+equal(authorizedVariant.blockers, [], "authorized title match should not produce blockers");
+
+const whitespaceDesired = resolveResourceIdentities(
+  graph([managedIssue("variant", "  example issue  ")]),
+  snapshot({ issues: [{ kind: "issue", number: 13, id: 113, title: "EXAMPLE ISSUE", state: "open" }] }),
+  { adoptByTitle: true },
+);
+equal(resolution(whitespaceDesired, "variant").identity?.number, 13,
+  "trim and lowercase must be applied to both desired and observed titles");
+
+const ambigCaseSnapshot = snapshot({
+  issues: [
+    { kind: "issue", number: 16, id: 116, title: "  example issue ", state: "open" },
+    { kind: "issue", number: 14, id: 114, title: "EXAMPLE ISSUE", state: "closed" },
+    { kind: "issue", number: 15, id: 115, title: "Example Issue", state: "open" },
+  ],
+});
+const ambiguousAdoption = resolveResourceIdentities(
+  matchingVariant, ambigCaseSnapshot, { adoptByTitle: true },
+);
+equal(resolution(ambiguousAdoption, "variant").status, "ambiguous",
+  "opted-in case/whitespace variants must not arbitrarily choose an issue");
+equal(resolution(ambiguousAdoption, "variant").candidates?.map((x) => x.number),
+  [14, 15, 16], "ambiguity must list all candidate issues in numeric order");
+assert(ambiguousAdoption.blockers.some((d) =>
+  d.code === "AMBIGUOUS_IDENTITY" && d.message.includes("#14, #15, #16")),
+  "ambiguity diagnostic must enumerate matching issue numbers");
+const deniedAmbiguity = resolveResourceIdentities(matchingVariant, ambigCaseSnapshot);
+equal(deniedAmbiguity.blockers.map((d) => d.code), ["TITLE_MATCH_REQUIRES_ADOPTION"],
+  "when opt-out, multiple title matches require adoption rather than ambiguous auto-selection");
+equal(resolution(deniedAmbiguity, "variant").candidates?.map((x) => x.number),
+  [14, 15, 16], "denied adoption must retain all candidate numbers");
+
+const unmatchedTitle = resolveResourceIdentities(
+  graph([managedIssue("brand-new", "No matching title")]), titleVariants,
+);
+equal(resolution(unmatchedTitle, "brand-new").status, "new",
+  "without any matching issue, default opt-out must allow new resource planning");
+equal(unmatchedTitle.blockers, [], "no matching issue should not block creation");
+
+// Marker and explicit numeric identity must still outrank title matching.
+const markerPrecedenceSnapshot = snapshot({
+  issues: [
+    { kind: "issue", number: 20, id: 120, title: "Different", body: "<!-- gh-plan:owned -->", state: "open" },
+    { kind: "issue", number: 21, id: 121, title: "Same Desired Title", body: null, state: "open" },
+  ],
+});
+for (const adoptByTitle of [false, true]) {
+  const marked = resolveResourceIdentities(
+    graph([managedIssue("owned", "Same Desired Title")]), markerPrecedenceSnapshot, { adoptByTitle },
+  );
+  equal(resolution(marked, "owned").identity?.number, 20,
+    "marker must take precedence over title with adoptByTitle=" + adoptByTitle);
+  equal(marked.blockers, [], "marker-preferred resource should not trigger title diagnostics");
+  const numbered = resolveResourceIdentities(
+    graph([managedIssue("numbered", "Same Desired Title", { number: 20 })]),
+    markerPrecedenceSnapshot,
+    { adoptByTitle },
+  );
+  equal(resolution(numbered, "numbered").identity?.number, 20,
+    "explicit number must take precedence over title with adoptByTitle=" + adoptByTitle);
+}
+
+// Milestone titles remain *exact* identity hints because milestones have no body
+// marker to opt into, and the opt-in safety switch protects issues only.
+const milestoneCaseOnly = resolveResourceIdentities(
+  graph([managedMilestone("new-milestone", "Foundation")]),
+  snapshot({ milestones: [{ kind: "milestone", number: 77, title: " foundation ", state: "open" }] }),
+  { adoptByTitle: true },
+);
+equal(resolution(milestoneCaseOnly, "new-milestone").status, "new",
+  "milestone title matching must stay exact even with issue adoption enabled");
+equal(milestoneCaseOnly.blockers, [], "new milestone without exact match should be allowed");
+const milestoneExactOptOut = resolveResourceIdentities(
+  graph([managedMilestone("foundation", "Foundation")]), snapshot(), { adoptByTitle: false },
+);
+equal(resolution(milestoneExactOptOut, "foundation").identity?.number, 7,
+  "milestone exact-title identity remains active even without issue adoption");
