@@ -22,4 +22,4 @@ The v0.1 planner does **not** emit any `issue.delete` operation. It supports exp
 
 ## Rationale and consequences
 
-Issue deletion is irreversible in practice and can destroy discussions, audit trails and links. The future [M7.4 proposal](https://github.com/attention-spa/gh-plan/issues/33) may add explicit orphan reporting and bounded duplicate handling, but those policies are not implemented or pre-authorized by this decision. See [management modes](/concepts/management-modes.md) and [plan readiness](/concepts/plan-and-steps.md).
+Issue deletion is irreversible in practice and can destroy discussions, audit trails and links. The future [M7.4 proposal](https://github.com/attention-spa/gh-plan/issues/36) may add explicit orphan reporting and bounded duplicate handling, but those policies are not implemented or pre-authorized by this decision. See [management modes](/concepts/management-modes.md) and [plan readiness](/concepts/plan-and-steps.md).
