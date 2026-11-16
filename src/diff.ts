@@ -161,6 +161,42 @@ export function diffGithubState(
         }
       }
     }
+    if (d.labels) {
+      const labelId = "issue.labels:" + id;
+      const available = observed.labels;
+      const requested = d.labels.op === "set" ? d.labels.value :
+        [...d.labels.add, ...d.labels.remove];
+      const keys = new Map<string, string[]>();
+      for (const label of available ?? []) {
+        const key = label.name.toLowerCase();
+        keys.set(key, [...(keys.get(key) ?? []), label.name]);
+      }
+      const unknown = requested.filter((name) => keys.get(name.toLowerCase())?.length !== 1);
+      if (unknown.length) {
+        report("UNKNOWN_LABEL", labelId, id, kind, "labels",
+          "Unknown or ambiguous labels: " + unknown.join(", ") + ".",
+          { names: unknown });
+      } else if (issue) {
+        if (!issue.labels) {
+          report("UNRESOLVED_REFERENCE", labelId, id, kind, "labels",
+            "Issue labels were not discovered for " + id + ".");
+        } else {
+          const currentKeys = new Set(issue.labels.map((name) => name.toLowerCase()));
+          const desiredKeys = d.labels.op === "set"
+            ? new Set(d.labels.value.map((name) => name.toLowerCase()))
+            : new Set([...currentKeys, ...d.labels.add.map((name) => name.toLowerCase())]);
+          if (d.labels.op === "modify") {
+            for (const name of d.labels.remove) desiredKeys.delete(name.toLowerCase());
+          }
+          const sameSet = currentKeys.size === desiredKeys.size &&
+            [...currentKeys].every((key) => desiredKeys.has(key));
+          add(labelId, id, kind, sameSet ? "noop" : "update",
+            sameSet ? "Issue labels already match." : "Issue label set differs.",
+            "labels", [...issue.labels].sort(),
+            [...desiredKeys].sort());
+        }
+      }
+    }
     if (d.issueType) {
       const value = d.issueType.value;
       if (observed.issueTypes.filter((type) => type.name === value).length !== 1) {
