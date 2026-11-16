@@ -254,6 +254,11 @@ function fieldsSame(a: IssueSnapshot, b: IssueSnapshot): boolean {
     a.state === b.state && a.milestoneNumber === b.milestoneNumber;
 }
 function satisfied(checked: Resolved, observed: IssueSnapshot): boolean {
+  // GitHub creates issues without a milestone when the optional field is omitted.
+  // A preexisting marked issue with a milestone cannot stand in for that create.
+  if (checked.spec.kind === "issue.create" &&
+      !checked.expected.some((p) => p.field === "milestone") &&
+      observed.milestoneNumber !== null) return false;
   return checked.expected.every(({ field, expected }) => {
     if (field === "title") return observed.title === expected;
     if (field === "body") return observed.body === expected;
