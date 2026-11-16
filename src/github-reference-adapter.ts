@@ -288,12 +288,12 @@ export function createGithubReferenceApplyOptions(config: GithubReferenceApplyCo
 
   return Object.freeze({
     plan: fixed, dispatch, readPostcondition,
-    readIssueCatalog: async (name) => {
+    readIssueCatalog: async (name: string) => {
       if (name !== repo || !active || !handle) reject();
       await handle.assertOwned();
       return transport.issuesCatalog();
     },
-    readMilestoneCatalog: async (name) => {
+    readMilestoneCatalog: async (name: string) => {
       if (name !== repo || !active || !handle) reject();
       await handle.assertOwned();
       return transport.milestonesCatalog();
