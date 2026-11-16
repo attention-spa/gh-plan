@@ -9,11 +9,13 @@ import type {
   ResourceResolution,
 } from "./types.ts";
 
-/** Adopting unmarked issues by matching titles is disabled unless explicitly requested. */
+/** Controls safe identity fallback. Issue title adoption is disabled by default;
+ * explicit IDs and unique body markers do not require this opt-in. */
 export interface IdentityResolutionOptions {
   adoptByTitle?: boolean;
 }
 
+/** Pure identity-resolution decisions with candidate details and blocking diagnostics. */
 export interface IdentityResolutionResult {
   resolutions: ResourceResolution[];
   warnings: GithubDiagnostic[];
@@ -357,6 +359,13 @@ function resolveOne(
   };
 }
 
+/**
+ * Resolve each issue/milestone without writes or network I/O.
+ * Precedence: all supplied explicit REST/node/number hints must agree; for issues,
+ * a unique marker is next; milestones use exact title fallback. Issue-title matches
+ * require adoptByTitle: true. Conflicting/ambiguous hints never silently adopt;
+ * managed unmatched resources are new, reference-only unmatched resources block.
+ */
 export function resolveResourceIdentities(
   desired: NormalizedDesiredStateGraph,
   observed: GithubStateSnapshot,

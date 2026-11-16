@@ -15,6 +15,7 @@ import type {
   NormalizedDesiredStateGraph, PlanStep, ResourceResolution,
 } from "./types.ts";
 
+/** Single planner metadata version; independent of the package's publication version. */
 export const GITHUB_PLAN_VERSION = "0.1.0";
 
 type Parts = {
@@ -148,8 +149,15 @@ function assemble(
 }
 
 /**
- * Read-only planner. The sole network-capable dependency is REST discovery;
- * compilers never issue mutations or require a GitHub SDK.
+ * Complete read-only planner: normalize, discover/enrich, resolve, diff, compile
+ * and topologically order proposed REST requests without executing any write.
+ * Runtime auth is used only for GET headers and is excluded from the returned plan.
+ * Normalization errors, blocked GraphQL mode and recognized transport failures
+ * are represented by blocking diagnostics rather than leaked token/error bodies.
+ * Request count scales with paginated broad catalogs, selected existing issues,
+ * relationship details, and assignee eligibility checks. Inject fetch for testing;
+ * no GitHub SDK is required. The caller must reject readiness === "blocked"
+ * before executing any requests using a separate executor.
  */
 export async function planGithub(config: GithubPlannerConfig): Promise<GithubPlan> {
   const mode = config.mode ?? "rest";

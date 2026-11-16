@@ -11,6 +11,8 @@ import type {
   RepositoryRef,
 } from "./types.ts";
 
+/** Pure normalization result. Invalid inputs yield blocking diagnostics and no graph;
+ * unsupported extra properties may produce nonblocking warnings. */
 export interface NormalizationResult {
   ok: boolean;
   graph?: NormalizedDesiredStateGraph;
@@ -516,6 +518,13 @@ function detectDirectedCycle(edges: Array<[string, string]>): boolean {
   return false;
 }
 
+/**
+ * Normalize the authoring input into sorted resources, labels and canonical edges.
+ * Pure: no fetch, mutation, or exception for ordinary invalid JSON-shaped input.
+ * Absent property means untouched; shorthands become explicit set/remove intent.
+ * Unsupported unknown keys warn rather than silently changing behavior.
+ * Malformed and cyclic relationships return INVALID_SCHEMA/RELATIONSHIP_CYCLE.
+ */
 export function normalizeSchema(schema: object): NormalizationResult {
   const diagnostics: GithubDiagnostic[] = [];
   const resources: DesiredResource[] = [];
