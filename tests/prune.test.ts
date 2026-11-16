@@ -220,4 +220,58 @@ check(seen.length === 8, "Prune uses existing four broad GETs only.");
 check(!JSON.stringify(integratedClose).includes("private-token") &&
   !JSON.stringify(integratedReport).includes("private-token"),
   "No runtime credentials can enter outputs.");
+const graphReadCalls: string[] = [];
+const graphFetch: FetchLike = async (url, options) => {
+  graphReadCalls.push(url);
+  check(options?.method === "GET", "GraphQL deletion planning still performs only REST GET reads.");
+  check(options?.headers?.Authorization === "Bearer private-token",
+    "GraphQL opt-in cannot move credentials into the serialized plan.");
+  const root = "https://api.github.com/repos/alice/plan";
+  if (url === root) return response({ id: 50, full_name: repo,
+    owner: { type: "User" } });
+  if (url === root + "/issues?state=all&per_page=100") return response([
+    { number: 1, id: 1001, node_id: "I_1",
+      title: "Alpha", body: marked("X") + "Main", state: "open" },
+    { number: 2, id: 1002, node_id: "I_2",
+      title: "Alpha", body: marked("X") + "Duplicate", state: "open" },
+  ]);
+  if (url === root + "/milestones?state=all&per_page=100" ||
+      url === root + "/issue-types" ||
+      url === root + "/issues/1/dependencies/blocked_by?per_page=100" ||
+      url === root + "/issues/1/relates_to?per_page=100") return response([]);
+  if (url === root + "/issues/1/parent") return {
+    ok: false, status: 404, statusText: "Not Found",
+    headers: { get() { return null; } },
+    async json() { return { message: "Not Found" }; },
+    async text() { return "Not Found"; },
+  };
+  throw Error("Unexpected GET under GraphQL opt-in: " + url);
+};
+const optedPlan = await planGithub({
+  schema: authored({ prune: "close", deleteDuplicates: true }),
+  auth: "private-token", fetch: graphFetch, mode: "graphql",
+});
+equal(optedPlan.metadata.mode, "graphql",
+  "Explicit GraphQL opt-in must retain correct plan metadata.");
+equal(optedPlan.readiness, "ready_with_warnings",
+  "Only verified duplicates with explicit canonical identity may produce GraphQL proposals.");
+const optedDelete = optedPlan.steps.find((x) => x.kind === "issue.duplicate.delete");
+check(optedDelete?.request?.protocol === "graphql" &&
+  optedDelete.destructive && !optedDelete.reversible,
+  "End-to-end dual opt-in must include irreversible GraphQL deletion proposal.");
+check(optedPlan.steps.some((x) => x.kind === "issue.duplicate.comment"),
+  "Deletion must record durable justification on the surviving canonical issue.");
+equal(validatePlanStepReferences(optedPlan.steps), [],
+  "End-to-end GraphQL duplicate plan must preserve step DAG integrity.");
+check(graphReadCalls.length === 7 &&
+  !JSON.stringify(optedPlan).includes("private-token"),
+  "GraphQL mutation is never executed: only four broad and three targeted GETs.");
+const forbiddenGraphQl = await planGithub({
+  schema: { repository: repo }, auth: "private-token", fetch: graphFetch,
+  mode: "graphql",
+});
+check(forbiddenGraphQl.readiness === "blocked" &&
+  forbiddenGraphQl.blockers.some((x) => x.code === "NO_GRAPHQL_TRANSPORT"),
+  "GraphQL planning without explicit deletion opt-in must remain blocked.");
+
 console.log("Prune report/close, marker and title conflicts, guarded duplicate close, GraphQL-only deletion and GET-only fixtures passed.");
