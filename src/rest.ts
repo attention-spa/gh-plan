@@ -617,7 +617,18 @@ function mapProjectItem(raw: unknown, repoFullName: string): ObservedProjectItem
   if (!isRecord(raw)) invalidResponse("/projectsV2/items");
   if (raw.content_type !== "Issue" && raw.content_type !== "PullRequest") return undefined;
   if (!isRecord(raw.content)) invalidResponse("/projectsV2/items.content");
-  const repositoryUrl = raw.content.repository_url;
+  // Issue content exposes repository_url, but PullRequest content can identify
+  // its repository through base.repo or its canonical API URL instead.
+  let repositoryUrl = raw.content.repository_url;
+  if (repositoryUrl === undefined && isRecord(raw.content.base) &&
+      isRecord(raw.content.base.repo) &&
+      typeof raw.content.base.repo.full_name === "string") {
+    repositoryUrl = "https://api.github.com/repos/" + raw.content.base.repo.full_name;
+  }
+  if (repositoryUrl === undefined && typeof raw.content.url === "string") {
+    const match = /^https:\/\/api\.github\.com\/repos\/([^/]+\/[^/]+)\/(?:pulls|issues)\/\d+$/.exec(raw.content.url);
+    if (match) repositoryUrl = "https://api.github.com/repos/" + match[1];
+  }
   if (typeof repositoryUrl !== "string") invalidResponse("/projectsV2/items.content.repository_url");
   const expectedRepo = "https://api.github.com/repos/" + repoFullName;
   if (repositoryUrl.toLowerCase() !== expectedRepo.toLowerCase()) return undefined;

@@ -48,6 +48,10 @@ const projectItems = [{
   content: { id: 999, number: 10,
     repository_url: "https://api.github.com/repos/other/other" },
   fields: [],
+}, {
+  id: 91, content_type: "PullRequest",
+  content: { id: 501, number: 51, base: { repo: { full_name: repo } } },
+  fields: [{ id: 4, value: "opt-doing" }],
 }];
 function response(status: number, data: unknown): FetchResponseLike {
   return { ok: status >= 200 && status < 300, status, statusText: "Mock",
