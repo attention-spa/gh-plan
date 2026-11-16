@@ -371,7 +371,12 @@ function mapLabel(raw: unknown): ObservedLabel {
   const name = requiredString(raw.name, "/labels.name");
   const id = raw.id === undefined ? undefined : requiredNumber(raw.id, "/labels.id");
   const color = optionalString(raw.color, "/labels.color");
-  return { name, ...(id === undefined ? {} : { id }), ...(color === undefined ? {} : { color }) };
+  const description = raw.description;
+  if (description !== undefined && description !== null && typeof description !== "string")
+    invalidResponse("/labels.description");
+  return { name, ...(id === undefined ? {} : { id }),
+    ...(color === undefined ? {} : { color }),
+    ...(description === undefined ? {} : { description: description as string | null }) };
 }
 
 function mapMilestone(raw: unknown): ObservedMilestone {
@@ -567,7 +572,7 @@ export function createRestDiscoveryTransport(
       const issueTypes = sortByNameThenId((rawIssueTypes ?? []).map(mapIssueType));
       // Catalog reads are needed only when the plan explicitly manages labels.
       // This keeps unchanged discovery request counts stable for other plans.
-      const needsLabels = desired.resources.some((resource) =>
+      const needsLabels = !!desired.labels?.length || desired.resources.some((resource) =>
         resource.kind === "issue" && resource.management === "managed" &&
         resource.desired.labels !== undefined);
       const labels = needsLabels

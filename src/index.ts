@@ -43,6 +43,7 @@ export type {
   DesiredIssueState,
   DesiredIssueLabels,
   DesiredIssueAssignees,
+  DesiredRepositoryLabel,
   DesiredMilestoneState,
   DesiredRelationship,
   DesiredRemove,

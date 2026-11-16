@@ -157,7 +157,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
   const repository = graph?.repository ??
     { fullName: "" };
   const counts = {
-    resourceCount: graph?.resources.length ?? 0,
+    resourceCount: (graph?.resources.length ?? 0) + (graph?.labels?.length ?? 0),
     relationshipCount: graph?.relationships.length ?? 0,
   };
   if (!normalization.ok || !graph) {
