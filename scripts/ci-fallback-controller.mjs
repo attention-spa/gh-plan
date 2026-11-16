@@ -98,12 +98,23 @@ export function actionsApi({ token, fetchImpl = globalThis.fetch,
     async inspect(id, expected) {
       if (!int(id)) throw fail("INVALID_RUN_ID");
       const wid = await workflow();
-      const { data: run } = await request("GET", "/runs/" + id);
-      if (run?.id !== id || run.workflow_id !== wid ||
-          run.event !== "workflow_dispatch" || run.head_branch !== "main" ||
-          run.repository?.full_name !== REPO ||
-          run.display_title !== title(expected.correlation, expected.backend, expected.sha) ||
-          run.run_attempt !== 1) throw fail("RUN_IDENTITY");
+      let run, mismatch = "UNKNOWN";
+      // Dispatch may return an ID before GitHub has populated run-name and
+      // repository fields. Never accept a wrong identity, but allow the new
+      // run's read model a bounded 12-second convergence window.
+      for (let attempt = 0; attempt < 7; attempt++) {
+        ({ data: run } = await request("GET", "/runs/" + id));
+        mismatch = run?.id !== id ? "ID" :
+          run.workflow_id !== wid ? "WORKFLOW" :
+          run.event !== "workflow_dispatch" ? "EVENT" :
+          run.head_branch !== "main" ? "BRANCH" :
+          run.repository?.full_name !== REPO ? "REPOSITORY" :
+          run.display_title !== title(expected.correlation, expected.backend, expected.sha) ? "TITLE" :
+          run.run_attempt !== 1 ? "ATTEMPT" : null;
+        if (mismatch === null) break;
+        if (attempt < 6) await sleep(2_000);
+      }
+      if (mismatch !== null) throw fail("RUN_IDENTITY_" + mismatch);
       if (!["queued", "pending", "waiting", "in_progress", "completed"].includes(run.status))
         throw fail("RUN_STATE");
       const { data: listed } = await request("GET", "/runs/" + id + "/jobs?per_page=100");

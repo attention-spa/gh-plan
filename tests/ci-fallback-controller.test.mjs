@@ -224,8 +224,38 @@ for (const code of [403, 429, 503]) {
   await assert.rejects(bad.dispatch(expected, 51),
     new RegExp("CI_FALLBACK_HTTP_" + code));
 }
+let temporaryRunReads = 0;
+const hydrated = actionsApi({
+  token, sleep: async () => {},
+  fetchImpl: async (url) => {
+    if (url.endsWith("/workflows/ci-worker.yml"))
+      return json(200, { id: 444, path: ".github/workflows/ci-worker.yml" });
+    if (url.endsWith("/runs/123")) {
+      temporaryRunReads++;
+      return json(200, {
+        id: 123, workflow_id: 444, event: "workflow_dispatch",
+        head_branch: "main", run_attempt: 1,
+        repository: temporaryRunReads < 3 ? null : { full_name: "attention-spa/gh-plan" },
+        display_title: temporaryRunReads < 3 ? "CI worker" : title,
+        status: "completed", conclusion: "success",
+      });
+    }
+    if (url.includes("/runs/123/jobs?")) return json(200, {
+      total_count: 1, jobs: [{
+        run_id: 123, status: "completed",
+        started_at: "2026-11-16T10:00:00Z", conclusion: "success",
+      }],
+    });
+    throw Error("Unexpected hydration request " + url);
+  },
+});
+assert.equal((await hydrated.inspect(123, expected)).conclusion, "success",
+  "Fresh workflow run IDs may precede the repository/run-name read model.");
+assert.equal(temporaryRunReads, 3,
+  "Run-identity reads must converge before the controller proceeds.");
+
 const mismatch = actionsApi({
-  token, fetchImpl: async (url) => url.endsWith("/workflows/ci-worker.yml")
+  token, sleep: async () => {}, fetchImpl: async (url) => url.endsWith("/workflows/ci-worker.yml")
     ? json(200, { id: 444, path: ".github/workflows/ci-worker.yml" })
     : json(200, { workflow_run_id: 123, display_title: "malicious" }),
 });
