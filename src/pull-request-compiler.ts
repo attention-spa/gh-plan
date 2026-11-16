@@ -42,13 +42,14 @@ function planPath(repo: string, id: string, number?: number): PlanPath {
   const prefix = "/repos/" + repo.split("/").map(encodeURIComponent).join("/") + "/pulls/";
   return number === undefined ? [prefix, ref(id)] : prefix + number;
 }
-function cleanBlock(body: string): string | undefined {
+function splitCloseBlock(body: string): { prefix: string; suffix: string } | undefined {
   const start = body.indexOf(CLOSE_BEGIN), end = body.indexOf(CLOSE_END);
   if ((start < 0) !== (end < 0)) return undefined;
-  if (start < 0) return body;
+  if (start < 0) return { prefix: body ? body + "\n\n" : "", suffix: "" };
   if (end < start || body.indexOf(CLOSE_BEGIN, start + 1) >= 0 ||
       body.indexOf(CLOSE_END, end + 1) >= 0) return undefined;
-  return (body.slice(0, start).trimEnd() + body.slice(end + CLOSE_END.length)).trim();
+  // Preserve every byte outside the explicitly managed Closes block.
+  return { prefix: body.slice(0, start), suffix: body.slice(end + CLOSE_END.length) };
 }
 
 type TextBody = { rendered: PlanJsonValue; preview: string; dependencies: string[] };
@@ -57,9 +58,9 @@ function managedBody(
   resolutions: Map<string, ResourceResolution>,
 ): TextBody | undefined {
   if (refs === undefined) return { rendered: initial, preview: initial, dependencies: [] };
-  const human = cleanBlock(initial);
-  if (human === undefined) return undefined;
-  const prefix = (human ? human + "\n\n" : "") + CLOSE_BEGIN + "\n";
+  const sections = splitCloseBlock(initial);
+  if (!sections) return undefined;
+  const prefix = sections.prefix + CLOSE_BEGIN + "\n";
   const parts: Array<string | PlanValueRef> = [prefix];
   const dependencies: string[] = [], previews: string[] = [];
   for (const id of refs) {
@@ -76,11 +77,12 @@ function managedBody(
       previews.push("Closes #" + resolution.identity.number);
     }
   }
-  parts.push(CLOSE_END);
+  parts.push(CLOSE_END + sections.suffix);
   return {
     rendered: parts.some((x) => typeof x !== "string") ?
       { $template: parts } satisfies PlanStringTemplate : parts.join(""),
-    preview: prefix + (previews.length ? previews.join("\n") + "\n" : "") + CLOSE_END,
+    preview: prefix + (previews.length ? previews.join("\n") + "\n" : "") +
+      CLOSE_END + sections.suffix,
     dependencies,
   };
 }
@@ -113,6 +115,7 @@ export function compilePullRequestSteps(
   const repo = desired.repository.fullName;
   const all = [...(desired.pullRequests ?? [])].sort((a, b) =>
     a.logicalId.localeCompare(b.logicalId));
+  const ownerByPRNumber = new Map<number, string>();
 
   for (const pr of all) {
     const id = pr.logicalId, desiredState = pr.desired;
@@ -127,6 +130,18 @@ export function compilePullRequestSteps(
       continue;
     }
     const current = matches[0];
+    if (current) {
+      const owner = ownerByPRNumber.get(current.number);
+      if (owner) {
+        blockers.push(diagnostic(id, "PR_PAIR_CONFLICT",
+          "PR #" + current.number + " is already targeted by logical resource " + owner + "."));
+        blockers.push(diagnostic(owner, "PR_PAIR_CONFLICT",
+          "Two logical PR resources target the same GitHub PR #" + current.number + "."));
+        resolutions.push({ logicalId: id, kind: "pull_request", status: "ambiguous" });
+        continue;
+      }
+      ownerByPRNumber.set(current.number, id);
+    }
     if (current && (!identMatches(pr, current) || current.head !== pr.head)) {
       blockers.push(diagnostic(id, "PR_PAIR_CONFLICT", "Explicit PR identity or head ref does not match the discovered PR."));
       resolutions.push({ logicalId: id, kind: "pull_request", status: "ambiguous" });
@@ -293,10 +308,6 @@ export function compilePullRequestSteps(
         [...producers, ...(removed.length ? ["pull_request.reviewer.remove:" + id] : [])]));
       if (!removed.length && !added.length) noops.push(step(id,
         "pull_request.reviewer.add", null, null, "Reviewer requests already match."));
-    }
-    if (!isNew && desiredState.draft !== undefined && desiredState.draft.value === current.draft) {
-      noops.push(step(id, "pull_request.update", current.draft, current.draft,
-        "PR draft status already matches; no transition needed."));
     }
   }
   steps.sort((a, b) => a.id.localeCompare(b.id));

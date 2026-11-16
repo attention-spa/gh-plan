@@ -44,6 +44,12 @@ function isReferenceObject(value: unknown): value is PlanValueRef {
 function traverse(value: PlanJsonValue, visit: (reference: PlanValueRef) => void): void {
   if (isReferenceObject(value)) {
     visit(value);
+  } else if (isObject(value) && Object.hasOwn(value, "$template")) {
+    if (Object.keys(value).length !== 1 || !Array.isArray(value.$template) ||
+        !value.$template.every((part) => typeof part === "string" || isReferenceObject(part))) {
+      throw new PlanBindingError("INVALID_PLAN_REFERENCE", "malformed $template");
+    }
+    for (const part of value.$template) if (typeof part !== "string") visit(part as PlanValueRef);
   } else if (Array.isArray(value)) {
     for (const child of value) traverse(child, visit);
   } else if (isObject(value)) {
