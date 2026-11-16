@@ -115,7 +115,7 @@ type IssueDescriptor = ApplyPostconditionSpec & {
 function checkedSpec(value: ApplyPostconditionSpec, phase: IssueReadPhase): IssueDescriptor {
   if (!record(value) || value.version !== 1 ||
       (value.kind !== "issue.create" && value.kind !== "issue.update") ||
-      !REPO.test(value.repository) ||
+      (typeof value.repository !== "string" || !REPO.test(value.repository)) ||
       !Array.isArray(value.predicates) || !value.predicates.length ||
       !Array.isArray(value.reads) || !record(value.identity) ||
       typeof value.stepId !== "string") fail("INVALID_SPEC", phase);
@@ -180,13 +180,16 @@ interface Resolved {
   expected: readonly ApplyFieldPredicate[];
   identityHint?: Partial<IssueIdentity>;
 }
+function idFromSpec(spec: IssueDescriptor): string {
+  return spec.stepId.slice(spec.kind.length + 1);
+}
 function resolve(spec: IssueDescriptor, context: IssueReadContext | undefined,
   phase: IssueReadPhase): Resolved {
   if (context !== undefined && !record(context)) fail("INVALID_SPEC", phase);
   if (context?.bindings !== undefined && !record(context.bindings))
     fail("INVALID_SPEC", phase);
   const binding = (value: PlanValueRef): number => {
-    const [logicalId] = value.$ref.split(".number");
+    const logicalId = value.$ref.slice(0, -".number".length);
     const bindings = context?.bindings as Readonly<PlanBindings> | undefined;
     const actual = bindings ? bindings[logicalId!]?.number : undefined;
     if (!positive(actual)) return fail("INVALID_SPEC", phase);
@@ -202,15 +205,28 @@ function resolve(spec: IssueDescriptor, context: IssueReadContext | undefined,
   const n = spec.identity.strategy === "issue_number"
     ? positive(spec.identity.number) ? spec.identity.number : binding(spec.identity.number)
     : undefined;
-  const claim = context?.expectedIdentity === undefined ? undefined :
+  const hint = context?.expectedIdentity === undefined ? undefined :
     identityClaim(context.expectedIdentity, phase, true);
-  if (n !== undefined && claim?.number !== undefined && claim.number !== n)
+  const producer = spec.identity.strategy === "issue_number" &&
+      !positive(spec.identity.number)
+    ? context?.bindings?.[idFromSpec(spec)] : undefined;
+  const verifiedProducer = producer === undefined ? undefined :
+    identityClaim(producer, phase, true);
+  const claim = {
+    ...(verifiedProducer ?? {}), ...(hint ?? {}),
+  };
+  for (const key of ["number", "id", "nodeId"] as const) {
+    if (verifiedProducer?.[key] !== undefined && hint?.[key] !== undefined &&
+        verifiedProducer[key] !== hint[key])
+      fail("IDENTITY_MISMATCH", phase);
+  }
+  if (n !== undefined && claim.number !== undefined && claim.number !== n)
     fail("IDENTITY_MISMATCH", phase);
-  const id = spec.stepId.slice(spec.kind.length + 1);
+  const id = idFromSpec(spec);
   return { spec, marker: spec.identity.marker, custom:
     spec.identity.marker !== "<!-- gh-plan:" + id + " -->",
     ...(n === undefined ? {} : { number: n }), expected,
-    ...(claim === undefined ? {} : { identityHint: claim }),
+    ...(Object.keys(claim).length ? { identityHint: claim } : {}),
   };
 }
 function mapIssue(input: unknown, phase: IssueReadPhase): IssueSnapshot {
