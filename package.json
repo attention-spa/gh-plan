@@ -25,7 +25,7 @@
     "test:normalization": "node --experimental-strip-types tests/normalize.test.ts",
     "test:rest": "node --experimental-strip-types tests/rest-discovery.test.ts && node --experimental-strip-types tests/rest-global-fetch.test.ts && node --experimental-strip-types tests/rest-token-safety.test.ts && node --experimental-strip-types tests/discovery.test.ts",
     "test:identity": "node --experimental-strip-types tests/identity.test.ts",
-    "test": "npm run typecheck && npm run test:normalization && npm run test:rest && npm run test:identity && npm run test:diff && npm run test:bindings && npm run test:milestones && npm run test:issues && npm run test:issue-fields && npm run test:relationships && npm run test:plan && npm run test:labels && npm run test:assignees && npm run test:repository-labels && npm run test:schema && npm run test:knowledge && npm run test:knowledge-examples && npm run test:readme && npm run test:pr",
+    "test": "npm run typecheck && npm run test:normalization && npm run test:rest && npm run test:identity && npm run test:diff && npm run test:bindings && npm run test:milestones && npm run test:issues && npm run test:issue-fields && npm run test:relationships && npm run test:plan && npm run test:labels && npm run test:assignees && npm run test:repository-labels && npm run test:schema && npm run test:knowledge && npm run test:knowledge-examples && npm run test:readme && npm run test:pr && npm run test:projects",
     "test:diff": "node --experimental-strip-types tests/diff.test.ts",
     "test:bindings": "node --experimental-strip-types tests/plan-bindings.test.ts",
     "test:milestones": "node --experimental-strip-types tests/milestone-compiler.test.ts",
@@ -45,7 +45,8 @@
     "docs:readme": "node --experimental-strip-types scripts/readme.ts --write",
     "docs:check": "node --experimental-strip-types scripts/readme.ts --check && npm run test:knowledge && npm run test:knowledge-examples && npm run test:readme",
     "test:readme": "node --experimental-strip-types tests/readme.test.mjs",
-    "test:pr": "node --experimental-strip-types tests/pull-requests.test.ts"
+    "test:pr": "node --experimental-strip-types tests/pull-requests.test.ts",
+    "test:projects": "node --experimental-strip-types tests/projects.test.ts"
   },
   "devDependencies": {
     "typescript": "5.9.3",
