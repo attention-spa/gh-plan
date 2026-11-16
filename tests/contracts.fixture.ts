@@ -6,6 +6,7 @@ import type {
   JsonValue,
   NormalizedDesiredStateGraph,
   PlanRequest,
+  PlanValueRef,
   PlanStep,
   ResourceResolution,
 } from "../src/index.ts";
@@ -122,6 +123,30 @@ const createStep = {
   destructive: false,
   reversible: "partial",
 } satisfies PlanStep;
+
+// Parent assignment after a newly created child obtains its REST ID.
+const parentAssignment = {
+  id: "issue.parent.set:CHILD",
+  kind: "issue.parent.set",
+  logicalId: "CHILD",
+  status: "planned",
+  current: null,
+  desired: { parent: "PARENT" },
+  reason: "Attach new child under existing parent",
+  dependsOn: ["issue.create:CHILD"],
+  request: {
+    protocol: "rest",
+    method: "POST",
+    path: ["/repos/attention-spa/example/issues/42/sub_issues"],
+    body: { sub_issue_id: { $ref: "CHILD.id" } satisfies PlanValueRef },
+  },
+  preconditions: ["new child exists"],
+  expectedPostconditions: ["child parent is #42"],
+  destructive: false,
+  reversible: true,
+} satisfies PlanStep;
+
+void parentAssignment;
 
 const noopStep = {
   id: "issue.title:PARENT",
