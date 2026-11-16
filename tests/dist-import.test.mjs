@@ -31,6 +31,43 @@ for (const filename of files.filter((entry) => entry.endsWith(".d.ts"))) {
     "Declaration imports must point to compilable .js paths: " + filename);
 }
 
+// Public API documentation is part of emitted TypeScript declarations.
+const documented = {
+  "types.d.ts": [
+    "Runtime-only GitHub bearer token", "full step IDs", "partial",
+    "A blocked plan must not be executed", "Late-bound identity placeholder",
+  ],
+  "authoring-schema.d.ts": [
+    "Managed issue", "reference", "blocked_by", "labels", "assignees",
+  ],
+  "identity.d.ts": ["Precedence:", "adoptByTitle"],
+  "normalize.d.ts": ["Absent property means untouched"],
+  "discovery.d.ts": ["per-issue", "Transport failures"],
+  "diff.d.ts": ["Pure", "No"],
+  "rest.d.ts": ["four GETs", "bearer"],
+  "plan.d.ts": ["read-only planner", "Request count"],
+  "plan-bindings.d.ts": ["post-create", "no network"],
+};
+for (const [filename, keywords] of Object.entries(documented)) {
+  const declaration = readFileSync(new URL(filename, dist), "utf8");
+  for (const keyword of keywords) {
+    assert(declaration.toLowerCase().includes(keyword.toLowerCase()),
+      "Public documentation missing from " + filename + ": " + keyword);
+  }
+}
+for (const filename of [
+  "authoring-schema", "types", "identity", "normalize", "discovery", "diff",
+  "rest", "plan", "plan-bindings", "issue-compiler", "issue-field-compiler",
+  "issue-label-compiler", "issue-assignee-compiler", "repository-label-compiler",
+  "milestone-compiler", "relationship-compiler",
+]) {
+  const source = readFileSync(new URL("../src/" + filename + ".ts", import.meta.url), "utf8");
+  const blocks = source.match(/\/\*\*[\s\S]*?\*\//g) ?? [];
+  assert(!blocks.some((block) => /(?:^|\n)\s*\*\s*@[A-Za-z]+/m.test(block)),
+    "JSDoc tags are disallowed in public contract comments: " + filename);
+}
+console.log("Public contract comments survive declaration generation without JSDoc tags.");
+
 const direct = await import("../dist/index.js");
 const self = await import("@attention-spa/gh-plan");
 for (const name of [
