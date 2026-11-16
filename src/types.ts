@@ -138,8 +138,8 @@ export interface BlocksRelationship {
   blocked: LogicalResourceId;
 }
 
-export interface RelatedRelationship {
-  kind: "related";
+export interface RelatesToRelationship {
+  kind: "relates_to";
   from: LogicalResourceId;
   to: LogicalResourceId;
 }
@@ -148,7 +148,7 @@ export type DesiredRelationship =
   | ParentRelationship
   | BlockedByRelationship
   | BlocksRelationship
-  | RelatedRelationship;
+  | RelatesToRelationship;
 
 export interface NormalizedDesiredStateGraph {
   repository: RepositoryRef;
@@ -188,6 +188,7 @@ export interface ObservedIssue {
   fields?: Record<string, JsonValue>;
   parentNumber?: number | null;
   blockedByNumbers?: number[];
+  relatesToNumbers?: number[];
 }
 
 export interface ObservedMilestone {

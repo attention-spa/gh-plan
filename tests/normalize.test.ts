@@ -182,7 +182,7 @@ const orderedA = valid({
   repository: { fullName: "attention-spa/example" },
   milestones: [{ logicalId: "M1", title: "Foundation" }],
   issues: [
-    { logicalId: "B", title: "Beta", related: ["A"] },
+    { logicalId: "B", title: "Beta", relatesTo: ["A"] },
     { logicalId: "A", title: "Alpha" },
   ],
 });
@@ -190,8 +190,58 @@ const orderedB = valid({
   repository: "attention-spa/example",
   issues: [
     { logicalId: "A", title: "Alpha" },
-    { logicalId: "B", title: "Beta", related: ["A"] },
+    { logicalId: "B", title: "Beta", relatesTo: ["A"] },
   ],
   milestones: [{ logicalId: "M1", title: "Foundation" }],
 });
 equal(orderedA, orderedB, "semantically equivalent source order should normalize identically");
+
+// Native relates_to is symmetric, validates issue endpoints, and rejects unpublished legacy aliases.
+
+const symmetrical = valid({
+  repository: "attention-spa/example",
+  issues: [
+    { logicalId: "B", title: "Beta", relatesTo: ["A"] },
+    { logicalId: "A", title: "Alpha", relatesTo: ["B"] },
+  ],
+  relationships: [
+    { kind: "relates_to", from: "B", to: "A" },
+    { kind: "relates_to", from: "A", to: "B" },
+  ],
+});
+equal(symmetrical.relationships, [
+  { kind: "relates_to", from: "A", to: "B" },
+], "relates_to must be symmetric, canonical and deduplicated");
+const symmetricalReordered = valid({
+  repository: "attention-spa/example",
+  issues: [
+    { logicalId: "A", title: "Alpha", relatesTo: ["B"] },
+    { logicalId: "B", title: "Beta" },
+  ],
+});
+equal(symmetrical.relationships, symmetricalReordered.relationships,
+  "relates_to output must not depend on authoring direction");
+
+blocked({
+  repository: "attention-spa/example",
+  issues: [{ logicalId: "A", title: "Alpha" }],
+  relationships: [{ kind: "relates_to", from: "A", to: "UNKNOWN" }],
+}, "INVALID_SCHEMA");
+blocked({
+  repository: "attention-spa/example",
+  issues: [{ logicalId: "A", title: "Alpha" }],
+  milestones: [{ logicalId: "M1", title: "Foundation" }],
+  relationships: [{ kind: "relates_to", from: "A", to: "M1" }],
+}, "INVALID_SCHEMA");
+blocked({
+  repository: "attention-spa/example",
+  issues: [{ logicalId: "A", title: "Alpha" }, { logicalId: "B", title: "Beta" }],
+  relationships: [{ kind: "related", from: "A", to: "B" }],
+}, "UNSUPPORTED_SCHEMA_FEATURE");
+blocked({
+  repository: "attention-spa/example",
+  issues: [
+    { logicalId: "A", title: "Alpha", related: ["B"] },
+    { logicalId: "B", title: "Beta" },
+  ],
+}, "UNSUPPORTED_SCHEMA_FEATURE");

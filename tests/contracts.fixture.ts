@@ -80,7 +80,7 @@ const graph = {
   relationships: [
     { kind: "parent", parent: "PARENT", child: "CHILD" },
     { kind: "blocked_by", issue: "CHILD", blocker: "EXTERNAL" },
-    { kind: "related", from: "CHILD", to: "EXTERNAL" },
+    { kind: "relates_to", from: "CHILD", to: "EXTERNAL" },
   ],
 } satisfies NormalizedDesiredStateGraph;
 
