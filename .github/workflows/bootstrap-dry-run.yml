@@ -5,23 +5,23 @@ on:
 
 permissions:
   contents: read
-  issues: read
 
 jobs:
-  bootstrap-dry-run:
-    # workflow_dispatch is manually initiated by a trusted repository operator.
-    runs-on: [self-hosted, Linux, trusted]
+  bootstrap-controller:
+    # Manual bootstrap can only dispatch from the canonical trusted main ref.
+    if: github.ref == 'refs/heads/main' && github.repository == 'attention-spa/gh-plan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Confirm no GitHub writes are needed
+      - name: Prefer OCI for read-only bootstrap, fall back only before start
+        run: node scripts/ci-fallback-controller.mjs
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_PROMPT_DISABLED: '1'
-        shell: bash
-        run: |
-          set -euo pipefail
-          node .github/plan/bootstrap.mjs | tee bootstrap-dry-run.log
-          grep -Fx 'Mutations required: 0' bootstrap-dry-run.log
+          BOOTSTRAP_FALLBACK_RUN: '1'
+          GITHUB_TOKEN: ${{ github.token }}
