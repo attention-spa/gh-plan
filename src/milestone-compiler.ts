@@ -131,7 +131,7 @@ export function compileMilestoneSteps(
       if (diff.status === "noop") continue;
       if (property === "description") {
         clearDescription = op.op === "remove";
-        changed.description = clearDescription ? "" : op.value;
+        changed.description = op.op === "remove" ? "" : op.value;
       } else if (op.op === "set") {
         changed[property] = op.value;
       } else {
