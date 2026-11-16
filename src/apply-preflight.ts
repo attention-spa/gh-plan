@@ -259,7 +259,7 @@ function stepSpec(step: PlanStep, steps: Map<string, PlanStep>, repository: stri
  * lock can run from this function. Noops are rejected until #187 adds an
  * independently verified fresh-noop strategy; descriptive strings are ignored.
  */
-export function preflightApplyPlan(plan: GithubPlan): ApplyCapabilityPreflight {
+function inspectPlan(plan: GithubPlan): ApplyCapabilityPreflight {
   const errors: ApplyCapabilityError[] = [];
   const fail = (code: ApplyCapabilityErrorCode, stepIndex?: number): void => {
     errors.push(stepIndex === undefined ? { code } : { code, stepIndex });
@@ -409,4 +409,15 @@ export function preflightApplyPlan(plan: GithubPlan): ApplyCapabilityPreflight {
   }
   if (errors.length) return { ok: false, errors };
   return { ok: true, postconditions: specs };
+}
+
+/** Sanitized public-to-the-module boundary for malformed runtime plans. */
+export function preflightApplyPlan(plan: GithubPlan): ApplyCapabilityPreflight {
+  try {
+    return inspectPlan(plan);
+  } catch {
+    // Runtime input may contain malformed arrays, getters, or cyclic values.
+    // Do not leak caller-controlled exception text or allow an unsafe callback.
+    return { ok: false, errors: [{ code: "INVALID_PLAN" }] };
+  }
 }
