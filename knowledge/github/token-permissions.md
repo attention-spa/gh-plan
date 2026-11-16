@@ -1,0 +1,33 @@
+---
+type: GitHub Reference
+title: "GitHub fine-grained token permissions"
+description: "Required permissions for read-only planning and potential external execution of its proposed requests."
+resource: https://docs.github.com/en/rest/overview/permissions-required-for-fine-grained-personal-access-tokens
+tags: [github, rest, permissions]
+status: draft
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:24:25.476+01:00 }
+sources:
+  - resource: https://docs.github.com/en/rest/overview/permissions-required-for-fine-grained-personal-access-tokens
+  - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
+---
+
+## Summary
+
+Required permissions for read-only planning and potential external execution of its proposed requests.
+
+## Verified endpoints and access
+
+| Permission | Applied to | Phase |
+| --- | --- | --- |
+| Metadata: read | Repository details and repository issue type catalog | REST discovery |
+| Issues: read | Issue/milestone/label reads, relationship details, assignee eligibility, per-issue field values | REST discovery |
+| Organization Issue Fields: read | List issue fields for an organization-owned repository | Conditional discovery |
+| Issues: write | Create/update issues and milestones; labels, assignees, field values, native relationships | External executor only |
+
+## Verified source and scope
+
+These labels describe **GitHub's documented fine-grained access-token permission sets**, not the currently connected agent-hachi token's actual grants. Read-only planning requires only the read permissions relevant to requested operations. Organization-owned repositories using custom issue fields additionally require the *organization-level* **Issue Fields: read** permission, distinct from repository Issues: read. The repository `/issue-types` catalog uses **Metadata: read**. Writing through a future external executor requires **Issues: write** for issue and relationship mutations. Some generic issue/PR endpoints accept Pull requests permission as an alternative, but Issues: write is the uniform requirement for the issue-centric planner.
+
+Read-only endpoints for public resources can sometimes be requested unauthenticated; private repositories require a token with the appropriate installation/repository access. API version `2026-03-10` is used by the current transport. **No write-permission probe** was performed in this documentation-only work unit, and this bundle does not claim authorization to apply a plan.
+
+Official documentation checked 2026-11-16: [Repository issue types](https://docs.github.com/en/rest/repos/issue-types), [Organization issue fields](https://docs.github.com/en/rest/orgs/issue-fields), [Issues](https://docs.github.com/en/rest/issues/issues), [Issue dependencies](https://docs.github.com/en/rest/issues/issue-dependencies), [Issue field values](https://docs.github.com/en/rest/issues/issue-field-values), [Assignees](https://docs.github.com/en/rest/issues/assignees), [Sub-issues](https://docs.github.com/en/rest/issues/sub-issues).
