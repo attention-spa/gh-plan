@@ -4,6 +4,7 @@ import { diffGithubState } from "./diff.ts";
 import { compileMilestoneSteps } from "./milestone-compiler.ts";
 import { compileIssueSteps } from "./issue-compiler.ts";
 import { compileIssueFieldSteps } from "./issue-field-compiler.ts";
+import { compileIssueLabelSteps } from "./issue-label-compiler.ts";
 import { compileRelationshipSteps } from "./relationship-compiler.ts";
 import { validatePlanStepReferences } from "./plan-bindings.ts";
 import { createRestDiscoveryTransport, GithubRestTransportError } from "./rest.ts";
@@ -193,6 +194,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
   const milestone = compileMilestoneSteps(graph, semantic, resolution.resolutions);
   const issues = compileIssueSteps(graph, semantic, snapshot, resolution.resolutions);
   const fields = compileIssueFieldSteps(graph, semantic, snapshot, resolution.resolutions);
+  const labels = compileIssueLabelSteps(graph, semantic, snapshot, resolution.resolutions);
   const relationships = compileRelationshipSteps(graph, semantic, snapshot, resolution.resolutions, mode);
   return assemble(snapshot.repository, mode, counts, resolution.resolutions, [
     { warnings: normalizationWarnings },
@@ -201,6 +203,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     milestone,
     issues,
     fields,
+    labels,
     relationships,
   ]);
 }
