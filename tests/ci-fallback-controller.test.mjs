@@ -212,6 +212,13 @@ assert.equal(await mismatch.dispatch(expected, 51), 123,
   "Run IDs are accepted provisionally; inspect must independently check identity.");
 await assert.rejects(mismatch.inspect(123, expected), /CI_FALLBACK_RUN_IDENTITY/);
 
+// Guard against expression delimiter regressions that YAML itself accepts but Actions rejects.
+for (const file of ["ci.yml", "ci-worker.yml"]) {
+  const yamlSource = readFileSync(new URL("../.github/workflows/" + file, import.meta.url), "utf8");
+  const starts = (yamlSource.match(/\$\{\{/g) ?? []).length;
+  const closed = (yamlSource.match(/\$\{\{[^\n]*?\}\}/g) ?? []).length;
+  assert.equal(starts, closed, file + " must close every GitHub Actions expression with }}.");
+}
 const ci = YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"));
 const worker = YAML.parse(readFileSync(new URL("../.github/workflows/ci-worker.yml", import.meta.url), "utf8"));
 assert.deepEqual(ci.on.push.branches, ["main"]);

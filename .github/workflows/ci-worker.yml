@@ -1,5 +1,5 @@
 name: CI worker
-run-name: CI worker ${{ inputs.correlation } ${{ inputs.backend } ${{ inputs.sha }
+run-name: CI worker ${{ inputs.correlation }} ${{ inputs.backend }} ${{ inputs.sha }}
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   contracts-worker:
-    runs-on: ${{ inputs.backend == 'oci' && fromJSON('["self-hosted","Linux","trusted"]') || 'ubuntu-latest' }
+    runs-on: ${{ inputs.backend == 'oci' && fromJSON('["self-hosted","Linux","trusted"]') || 'ubuntu-latest' }}
     permissions:
       contents: read
     timeout-minutes: 35
@@ -34,12 +34,12 @@ jobs:
           fetch-depth: 0
       - name: Verify immutable trusted main commit and workflow identity
         env:
-          TARGET_SHA: ${{ inputs.sha }
-          BACKEND: ${{ inputs.backend }
-          CORRELATION: ${{ inputs.correlation }
-          PARENT_RUN: ${{ inputs.parent_run_id }
-          REPOSITORY: ${{ github.repository }
-          GIT_REF: ${{ github.ref }
+          TARGET_SHA: ${{ inputs.sha }}
+          BACKEND: ${{ inputs.backend }}
+          CORRELATION: ${{ inputs.correlation }}
+          PARENT_RUN: ${{ inputs.parent_run_id }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_REF: ${{ github.ref }}
         shell: bash
         run: |
           set -euo pipefail

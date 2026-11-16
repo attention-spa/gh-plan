@@ -44,4 +44,4 @@ jobs:
         run: node scripts/ci-fallback-controller.mjs
         env:
           CI_FALLBACK_RUN: '1'
-          GITHUB_TOKEN: ${{ github.token }
+          GITHUB_TOKEN: ${{ github.token }}
