@@ -400,6 +400,51 @@ await denied("owner assertion throws", throwingOwner.config(),
   "OWNER_LOST", "unknown");
 equal(throwingOwner.dispatches, 0, "Thrown owner callback stops.");
 
+const ownerLostJustBeforeDispatch = new Fixture();
+ownerLostJustBeforeDispatch.beforeReadHook = () => {
+  ownerLostJustBeforeDispatch.lostOwner = true;
+};
+await denied("owner lost after pre-read but before dispatch",
+  ownerLostJustBeforeDispatch.config(), "OWNER_LOST", "unknown");
+equal(ownerLostJustBeforeDispatch.dispatches, 0,
+  "Fresh ownership reassertion must block a race just before first mutation.");
+
+const twoContenders = new Fixture();
+let sharedOwned = false;
+const oneOwner = {
+  acquire: async () => {
+    if (sharedOwned) throw Error("DO_NOT_LOG competing CAS owner");
+    sharedOwned = true;
+    return { ownerId: "EXACT_OWNER" };
+  },
+  assertOwned: async () => sharedOwned,
+  release: async () => { sharedOwned = false; },
+};
+let firstEntered!: () => void;
+let permitFirst!: () => void;
+const firstEnteredPromise = new Promise<void>((resolve) => { firstEntered = resolve; });
+const permitFirstPromise = new Promise<void>((resolve) => { permitFirst = resolve; });
+twoContenders.ownerHeld = true; // simulation's external CAS adapter owns the ref
+twoContenders.dispatchHook = async () => { firstEntered(); await permitFirstPromise; };
+const firstRun = executeCallbackApplyPlan({
+  ...twoContenders.config(), ownership: oneOwner,
+});
+await firstEnteredPromise;
+const rejectedContender = await denied(
+  "second concurrent runner cannot acquire shared owner while first dispatches",
+  { ...twoContenders.config(), ownership: oneOwner },
+  "OWNER_UNCERTAIN", "unknown",
+);
+equal(rejectedContender.completedStepIds, [],
+  "Rejected contender may not claim the first invocation's progress.");
+equal(twoContenders.dispatches, 1,
+  "Second invocation cannot dispatch while the first holds owner.");
+permitFirst();
+const completedContender = await firstRun;
+equal(completedContender.status, "applied", "First owner can finish.");
+equal(twoContenders.maxInFlight, 1, "Concurrent owners cannot overlap dispatch.");
+assert(!sharedOwned, "Winning owner releases after all terminal reads.");
+
 const auditBeforeWrite = new Fixture();
 auditBeforeWrite.failAudit = (entry) =>
   entry.outcome === "started" && entry.phase === "dispatch";
