@@ -132,8 +132,12 @@ export function compileMilestoneSteps(
       if (property === "description") {
         clearDescription = op.op === "remove";
         changed.description = clearDescription ? "" : op.value;
-      } else {
+      } else if (op.op === "set") {
         changed[property] = op.value;
+      } else {
+        blockers.push(diagnostic(id, "Unsupported removal of milestone " + property + "."));
+        invalid = true;
+        break;
       }
       before[property] = diff.current ?? null;
     }
