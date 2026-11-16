@@ -3,7 +3,24 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:normalization": "node --experimental-strip-types tests/normalize.test.ts",
     "test:rest": "node --experimental-strip-types tests/rest-discovery.test.ts && node --experimental-strip-types tests/rest-global-fetch.test.ts && node --experimental-strip-types tests/rest-token-safety.test.ts && node --experimental-strip-types tests/discovery.test.ts",
@@ -18,7 +35,8 @@
     "test:plan": "node --experimental-strip-types tests/plan.test.ts",
     "test:labels": "node --experimental-strip-types tests/labels.test.ts",
     "test:assignees": "node --experimental-strip-types tests/assignees.test.ts",
-    "test:repository-labels": "node --experimental-strip-types tests/repository-labels.test.ts"
+    "test:repository-labels": "node --experimental-strip-types tests/repository-labels.test.ts",
+    "test:dist": "node tests/dist-import.test.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"
