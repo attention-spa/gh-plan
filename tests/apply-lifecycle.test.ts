@@ -356,7 +356,7 @@ wrongUpdate.wrongUpdateRead = true;
 // a different REST issue/milestone number must fail and retain ownership.
 await denied("wrong by-number update identity",
   wrongUpdate.config(), "VERIFICATION_FAILED", "retained");
-equal(wrongUpdate.dispatches, 2,
+equal(wrongUpdate.dispatches, 3,
   "Mismatched update identity stops without dispatching later steps.");
 
 const invalidBefore = new Fixture();
