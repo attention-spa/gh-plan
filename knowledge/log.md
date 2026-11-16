@@ -2,6 +2,7 @@
 
 ## 2026-11-16
 
+- **M6.3 README generation ([#32](https://github.com/attention-spa/gh-plan/issues/32))**: Added a deterministic [README](https://github.com/attention-spa/gh-plan/blob/main/README.md) concept synopsis from the ordered [OKF concept index](/concepts/index.md), with separate handwritten install/quickstart, strict generated-section boundaries, doc regeneration checks, and the M7+ knowledge maintenance definition of done.
 - **M6.2 reference expansion ([#31](https://github.com/attention-spa/gh-plan/issues/31))**: Added six [schema-element pages](/schema/index.md) with tested authoring examples, 21 [public API pages](/api/index.md) with source paths, and three [REST reference pages](/github/index.md) mapping verified GitHub API documentation to planned operations and token permissions. Extended conformance tests without changing planner behavior.
 - **Creation (M6.1, [#30](https://github.com/attention-spa/gh-plan/issues/30))**: Established the OKF v0.2 [bundle](/index.md), [overview](/overview.md), [concepts](/concepts/index.md) and [decisions](/decisions/index.md). All new concept documents begin in draft status with agent provenance.
 - **M5 packaging and contract ([#27](https://github.com/attention-spa/gh-plan/issues/27), [#28](https://github.com/attention-spa/gh-plan/issues/28), [#29](https://github.com/attention-spa/gh-plan/issues/29))**: Added a private MIT-licensed ESM build with declarations, typed authoring input and generated JSON Schema, and documented public API semantics.
