@@ -29,7 +29,6 @@ const config = {
   schema: { repository: "attention-spa/example" },
   auth: "runtime-only-secret",
   fetch: customFetch,
-  octokit: { graphql: async () => ({}) },
   mode: "graphql",
   adoptByTitle: true,
   enrichConcurrency: 4,
