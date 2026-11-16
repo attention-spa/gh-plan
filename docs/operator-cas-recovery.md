@@ -82,6 +82,84 @@ function Invoke-GhPlanAbandonedLockRecovery {
     $payload | & gh api --method POST "repos/$sourceIssue/comments" --input - | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Durable audit failed; no further CAS attempts.' }
   }
+  function ReadEvidenceComment([string]$url) {
+    if ($url -notmatch '^https://github.com/([A-Za-z0-9-]+)/([A-Za-z0-9._-]+)/issues/[1-9][0-9]*#issuecomment-([1-9][0-9]*)
+  if (!$Execute) {
+    Write-Output 'Read-only inspection complete. No lock ref changed.'
+    return
+  }
+  if (!$ConfirmedOwnerAndAllWorkersStopped -or !$ConfirmedAllNetworkRequestsTerminal -or
+      !$ConfirmedAllResourcePostconditionsReviewed) {
+    throw 'Process, network and resource proof confirmations are all mandatory.'
+  }
+  $stopEvidence = ReadEvidenceComment $StopProofUrl
+  $resourceEvidence = ReadEvidenceComment $ResourceReviewUrl
+  $approval = ReadEvidenceComment $HumanApprovalUrl
+  if ([DateTime]::Parse($approval.created_at) -lt [DateTime]::Parse($stopEvidence.created_at) -or
+      [DateTime]::Parse($approval.created_at) -lt [DateTime]::Parse($resourceEvidence.created_at)) {
+    throw 'Exact approval predates stop or resource review evidence.'
+  }
+  $phrase = "APPROVE GH-PLAN CAS RECOVERY repository=$Repository ownerOid=$OwnerOid"
+  if ($approval.user.login -cne $HumanApproverLogin -or $approval.user.type -cne 'User' -or
+      !$approval.body.Contains($phrase)) {
+    throw 'Exact human-authored recovery approval was not verified.'
+  }
+  # The operator must independently verify this login is a human, not a machine user.
+  if (!$PSCmdlet.ShouldProcess("$Repository $ref $OwnerOid",'CAS-delete approved abandoned lock')) {
+    return
+  }
+  Audit 'authorized_attempt' $identity.node_id
+  $identity = Inspect  # repeat exact GET immediately before CAS
+  $mutation = 'mutation ($repositoryId:ID!, $name:GitRefname!, $before:GitObjectID!, $after:GitObjectID!) { updateRefs(input:{repositoryId:$repositoryId,refUpdates:[{name:$name,beforeOid:$before,afterOid:$after,force:false}]}) { clientMutationId } }'
+  $raw = & gh api graphql -f query="$mutation" -f repositoryId="$($identity.node_id)" -f name="$ref" -f before="$OwnerOid" -f after="$zero"
+  if ($LASTEXITCODE -ne 0) { throw 'CAS response uncertain. Do not retry.' }
+  $result = $raw | ConvertFrom-Json -AsHashtable
+  if ($result.errors -or !$result.data.updateRefs) {
+    throw 'GraphQL CAS not confirmed. Do not retry.'
+  }
+  $after = & gh api "repos/$Repository/git/ref/heads/gh-plan/locks/repository" 2>&1
+  if ($LASTEXITCODE -eq 0 -or ($after | Out-String) -notmatch 'HTTP 404') {
+    throw 'Post-CAS exact-ref absence unverified. Do not retry.'
+  }
+  $sameRepo = GhRead "repos/$Repository"
+  if ($sameRepo.node_id -cne $identity.node_id) {
+    throw 'Post-CAS repository identity changed. Do not retry.'
+  }
+  Audit 'confirmed_release' $identity.node_id
+  Write-Output 'Recovery confirmed. A future run must acquire a fresh lock and revalidate its plan.'
+}
+```
+
+**Run the function without -Execute first** to inspect the exact ref and owner. The listed switches are operator attestations, not machine proof of stopped processes or completed GitHub requests. For production use, human sign-off must explicitly name the exact SHA and be stored in the linked incident comment. The operator must independently inspect the termination/resource evidence. Do not paste authentication tokens into records.
+
+## Refusal and failure handling
+
+| Condition | Required action |
+| --- | --- |
+| Crash before acquisition, no lock ref | No CAS deletion; stop. |
+| Owner alive, idle, unreachable or another worker possibly active | Refuse recovery. |
+| Any possibly in-flight REST mutation | Refuse recovery, even if the client was canceled. |
+| Unresolved create/update or unreadable resource state | Refuse recovery; no automatic resume. |
+| Wrong repository, altered marker/tree/OID/ref or missing ref | Refuse; investigate before reinspection. |
+| Permission/ruleset error, forbidden ref, unknown HTTP response | Refuse; never bypass branch protection. |
+| CAS returns HTTP 200 with GraphQL errors | Not success. Stop and reread; never retry blindly. |
+| Lost CAS response; post-ref is absent or changed | Outcome uncertain; audit and escalate, never repeat. |
+| Confirmed exact-OID CAS, 404 ref read, and durable success audit | Recovery complete; no plan restart. |
+
+**Guarantee limitations:** no TTL, auto-reclaim, worker fencing, global exactly-once or atomic transaction between lock check and GitHub Issues REST. Only cooperating writers use the A1 ref. The internal helper's callback/dossier proofs are trusted operator inputs and **do not authenticate the asserted human or network termination independently**. This runbook must not be integrated into CI cleanup or an always-on agent without a new, separate owner decision.
+
+## Disposable-repository acceptance
+
+#176 validates both hard denial and successful exact-OID conditional cleanup on a **separate private disposable repository**, using GraphQL updateRefs force=false and fresh exact-ref reads. The test's approved-only fixture is a test authorization under the user's permission to test #176; it is **not a real human approval of a production lock**. Synthetic tests cover the human-proof gates. After test completion, transfer summarized evidence to the durable #176 issue and delete the disposable repository. The next real apply run must acquire a new owner OID and rerun B1 preflight, independent postconditions and current desired-state verification.
+) {
+      throw 'Audit evidence must be an exact GitHub issue comment.'
+    }
+    $entry = GhRead "repos/$($Matches[1])/$($Matches[2])/issues/comments/$($Matches[3])"
+    if (!$entry.id -or !$entry.body -or !$entry.created_at) {
+      throw 'Audit evidence comment is unreadable/incomplete.'
+    }
+    return $entry
+  }
   $identity = Inspect
   Write-Output "Verified exact ref=$ref owner=$OwnerOid repo=$Repository node=$($identity.node_id)"
   if (!$Execute) {
