@@ -154,7 +154,11 @@ export type DesiredRelationship =
   | BlocksRelationship
   | RelatesToRelationship;
 
+export type RelationshipReconciliationMode = "reconcile" | "additive";
+
 export interface NormalizedDesiredStateGraph {
+  /** Default reconcile: managed issues own their native relationship sets. */
+  relationshipMode?: RelationshipReconciliationMode;
   repository: RepositoryRef;
   resources: DesiredResource[];
   relationships: DesiredRelationship[];
@@ -253,6 +257,10 @@ export type PlanOperationKind =
   | "issue.field.remove"
   | "issue.parent.set"
   | "issue.dependency.add"
+  | "issue.dependency.remove"
+  | "issue.parent.remove"
+  | "issue.relates_to.add"
+  | "issue.relates_to.remove"
   | "verification.read";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
