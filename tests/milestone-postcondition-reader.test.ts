@@ -70,6 +70,7 @@ function fixtures(routes: Record<string, Route>): { fetch: FetchLike; calls: str
     assert(init.headers?.["X-GitHub-Api-Version"] === "2026-03-10", "Pinned API version.");
     assert(init.headers?.Accept === "application/vnd.github+json", "GitHub media type.");
     assert(init.body === undefined, "GET request cannot have a body.");
+    assert(init.redirect === "error", "Milestone reads must reject redirects before token forwarding.");
     if (!routes[url]) throw Error("secret " + TOKEN + " unexpected URL " + url);
     return routes[url]!();
   };
@@ -171,7 +172,7 @@ const driftRig = reader({ [ROOT + "/7"]: () => response(unrelatedTitle
 const driftBefore = await driftRig.verify.readBefore(omitTitle);
 unrelatedTitle = true;
 await rejection("omitted title mutated", () =>
-  driftRig.verify.readAfter(omitTitle, driftBefore), "IDENTITY_MISMATCH");
+  driftRig.verify.readAfter(omitTitle, driftBefore), "POSTCONDITION_MISMATCH");
 
 const omittedDescription = reader({ [ROOT + "/7"]: () => response(good({
   description: "Do not clear", due_on: "2027-02-20T12:00:00Z",
