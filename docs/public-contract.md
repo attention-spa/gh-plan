@@ -1,6 +1,7 @@
 # Public API contract
 
 The public entry point is `@attention-spa/gh-plan` (`src/index.ts`).
+The [M8.1.6a ownership ADR](../knowledge/decisions/github-native-apply-ownership.md) selects a future, unimplemented repository-wide CAS Git-ref lock and manual stale-lock recovery. It does not add an executor or export, and cannot prevent writes from external non-cooperating GitHub clients.
 This package **plans**, but does not execute, changes to GitHub. Its return
 value contains proposed HTTP requests, identity resolutions and diagnostics.
 The caller must not execute a plan whose `readiness` is `blocked`.
