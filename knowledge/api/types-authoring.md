@@ -5,7 +5,7 @@ description: "Typed GithubPlanSchema and its exported shorthand issue, milestone
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/authoring-schema.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:23:20.409+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/authoring-schema.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -18,6 +18,7 @@ Typed GithubPlanSchema and its exported shorthand issue, milestone, label and re
 ## Public symbols
 
 - `GithubPlanSchema`
+- `AuthoringPullRequest`
 - `AuthoringIssue`
 - `AuthoringManagedIssue`
 - `AuthoringReferencedIssue`

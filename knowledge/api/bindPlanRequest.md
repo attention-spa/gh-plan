@@ -5,7 +5,7 @@ description: "Substitutes externally obtained post-create identities in inert re
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan-bindings.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:23:20.409+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan-bindings.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -20,6 +20,8 @@ Substitutes externally obtained post-create identities in inert requests. Export
 ```ts
 bindPlanRequest(request: PlanRequest, bindings: PlanBindings) => BoundPlanRequest
 ```
+
+An additional `PlanStringTemplate` can contain literal strings and `PlanValueRef` tokens, allowing a PR `Closes #` body to be assembled from post-create issue numbers. Its producer must be an explicit `dependsOn` step; malformed templates raise `PlanBindingError`.
 
 Returns a new object and does not mutate the original PlanRequest or bindings.
 

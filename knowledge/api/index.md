@@ -6,6 +6,7 @@
 - [compileIssueLabelSteps](/api/compileIssueLabelSteps.md) — Compiles issue-label exact sets and targeted add/remove operations.
 - [compileIssueSteps](/api/compileIssueSteps.md) — Compiles managed issue create, core updates and issue-type requests.
 - [compileMilestoneSteps](/api/compileMilestoneSteps.md) — Compiles managed milestone create and minimal-update requests.
+- [compilePullRequestSteps](/api/compilePullRequestSteps.md) — Pure PR create/update, reviewer, label and assignee planning without merging.
 - [compileRelationshipSteps](/api/compileRelationshipSteps.md) — Compiles parent, dependency and related-to native GitHub relations.
 - [compileRepositoryLabelSteps](/api/compileRepositoryLabelSteps.md) — Compiles repository-label creation and partial metadata updates.
 - [createRestDiscoveryTransport](/api/createRestDiscoveryTransport.md) — Builds an authenticated read-only GitHub REST discovery adapter.

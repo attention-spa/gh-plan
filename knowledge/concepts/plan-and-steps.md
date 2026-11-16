@@ -4,7 +4,7 @@ title: "Plans and Steps"
 description: "Deterministic read-only reconciliation proposals with dependency-ordered REST requests."
 tags: ["planning", "dag"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:12:55.558+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -23,6 +23,10 @@ A plan includes repository identity, metadata, resource resolutions, topological
 - `blocked` must not be executed, even if it contains candidate steps.
 
 Each `PlanStep` has a full operation `id`, a `kind`, a logical resource ID, a status, a reason, optional request, conditions and `dependsOn` **step IDs** (e.g. `issue.create:A`). `reversible: "partial"` indicates that rollback cannot fully restore the former state, notably after creates.
+
+## PR plans
+
+[Pull requests](/schema/pull-request.md) are separate managed resources with `pull_request.create`, `pull_request.update` and reviewer-request steps. Existing M4 issue-label and assignee steps can operate on a PR number but depend on `pull_request.create` when necessary. The normal REST update cannot toggle an existing PR's draft flag; no merge step is ever proposed. `Closes #` references to new issues use a string template with explicit producing `issue.create` dependencies.
 
 ## Execution boundary
 

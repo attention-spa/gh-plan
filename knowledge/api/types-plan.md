@@ -5,7 +5,7 @@ description: "GithubPlan and PlanStep request DAG, readiness, identity refs and 
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:23:20.409+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -26,6 +26,7 @@ GithubPlan and PlanStep request DAG, readiness, identity refs and execution boun
 - `RestPlanRequest`
 - `PlanPath`
 - `PlanValueRef`
+- `PlanStringTemplate`
 - `PlanBindings`
 - `GithubPlannerConfig`
 - `GithubPlannerMode`
