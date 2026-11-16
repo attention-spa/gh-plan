@@ -180,10 +180,15 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     ]);
   }
   const normalizationWarnings = normalization.diagnostics.filter((d) => !d.blocking);
-  if (mode === "graphql") {
+  // M7.4's explicit, duplicate-only deletion opt-in may *describe* a
+  // GraphQL mutation, while discovery still uses authenticated REST GETs.
+  // Every other graphql request remains unsupported; this is not an executor.
+  const allowGraphqlDuplicatePlan =
+    graph.prune === "close" && graph.deleteDuplicates === true;
+  if (mode === "graphql" && !allowGraphqlDuplicatePlan) {
     return assemble(repository, mode, counts, [], [
       { blockers: [diagnostic("NO_GRAPHQL_TRANSPORT",
-        "GraphQL planning is unavailable; use the REST transport.")] },
+        "GraphQL planning requires explicit prune:close and deleteDuplicates:true.")] },
       { warnings: normalizationWarnings },
     ]);
   }

@@ -534,7 +534,8 @@ export interface RestPlanRequest {
   body?: PlanJsonValue;
 }
 
-/** Reserved GraphQL request descriptor; GraphQL planning currently blocks. */
+/** Inert GraphQL request descriptor; currently emitted only by explicitly opted-in
+ * M7.4 duplicate deletion, not by a GraphQL I/O transport or executor. */
 export interface GraphqlPlanRequest {
   protocol: "graphql";
   document: string;
