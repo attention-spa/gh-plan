@@ -260,7 +260,8 @@ function ordered(plan: GithubPlan): PlanStep[] {
 }
 function checkUpdateIdentity(spec: ApplyPostconditionSpec,
   value: Read, bindings: PlanBindings): void {
-  if (!spec.kind.endsWith(".update") || value.identity === undefined) return;
+  if (!spec.kind.endsWith(".update") || value.status !== "satisfied" ||
+      value.identity === undefined) return;
   const claimed = identity(value.identity);
   if (!claimed || claimed.number !== numberFor(spec, bindings))
     throw new Error("update-identity-not-target");
