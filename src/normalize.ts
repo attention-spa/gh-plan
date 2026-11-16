@@ -93,11 +93,13 @@ function reportUnknownKeys(
 ): void {
   for (const key of Object.keys(value).sort()) {
     if (!allowed.has(key)) {
-      diagnostics.push(diagnostic(
-        "UNSUPPORTED_SCHEMA_FEATURE",
-        `Unsupported schema property '${key}'.`,
-        `${path}.${key}`,
-      ));
+      diagnostics.push({
+        code: "UNSUPPORTED_SCHEMA_FEATURE",
+        severity: "warning",
+        blocking: false,
+        schemaPath: `${path}.${key}`,
+        message: `Unsupported schema property '${key}' was ignored.`,
+      });
     }
   }
 }
