@@ -1,3 +1,5 @@
+export { compileIssueSteps } from "./issue-compiler.ts";
+export type { IssueCompilationResult } from "./issue-compiler.ts";
 export { compileMilestoneSteps } from "./milestone-compiler.ts";
 export type { MilestoneCompilationResult } from "./milestone-compiler.ts";
 export { bindPlanRequest, requestReferences, validatePlanStepReferences, PlanBindingError } from "./plan-bindings.ts";
