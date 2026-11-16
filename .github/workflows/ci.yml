@@ -18,6 +18,7 @@ jobs:
           node-version: 22
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run schema:check
+      - run: npm run docs:check
       - run: npm test
       - run: npm run build
       - run: npm run test:dist
