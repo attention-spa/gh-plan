@@ -7,6 +7,7 @@ import type {
   NormalizedDesiredStateGraph,
   ObservedIssue,
   ObservedIssueField,
+  ObservedLabel,
   ObservedIssueFieldOption,
   ObservedIssueType,
   ObservedMilestone,
@@ -303,6 +304,14 @@ function mapIssue(raw: unknown): ObservedIssue | undefined {
     issueType = requiredString(raw.type.name, `/issues/${number}.type.name`);
   }
 
+  let labels: string[] | undefined;
+  if (raw.labels !== undefined) {
+    if (!Array.isArray(raw.labels)) invalidResponse("/issues/" + number + ".labels");
+    labels = raw.labels.map((label, index) => {
+      if (!isRecord(label)) invalidResponse("/issues/" + number + ".labels[" + index + "]");
+      return requiredString(label.name, "/issues/" + number + ".labels[" + index + "].name");
+    }).sort((a, b) => a.localeCompare(b));
+  }
   const nodeId = optionalString(raw.node_id, `/issues/${number}.node_id`);
   return {
     kind: "issue",
@@ -314,7 +323,16 @@ function mapIssue(raw: unknown): ObservedIssue | undefined {
     state,
     milestoneNumber,
     issueType,
+    ...(labels === undefined ? {} : { labels }),
   };
+}
+
+function mapLabel(raw: unknown): ObservedLabel {
+  if (!isRecord(raw)) invalidResponse("/labels");
+  const name = requiredString(raw.name, "/labels.name");
+  const id = raw.id === undefined ? undefined : requiredNumber(raw.id, "/labels.id");
+  const color = optionalString(raw.color, "/labels.color");
+  return { name, ...(id === undefined ? {} : { id }), ...(color === undefined ? {} : { color }) };
 }
 
 function mapMilestone(raw: unknown): ObservedMilestone {
@@ -508,6 +526,14 @@ export function createRestDiscoveryTransport(
         invalidResponse(`${repoPath}/issue-types`);
       }
       const issueTypes = sortByNameThenId((rawIssueTypes ?? []).map(mapIssueType));
+      // Catalog reads are needed only when the plan explicitly manages labels.
+      // This keeps unchanged discovery request counts stable for other plans.
+      const needsLabels = desired.resources.some((resource) =>
+        resource.kind === "issue" && resource.management === "managed" &&
+        resource.desired.labels !== undefined);
+      const labels = needsLabels
+        ? sortByNameThenId((await client.getPaginated<unknown>(
+          `${repoPath}/labels?per_page=100`)).map(mapLabel)) : undefined;
 
       let issueFields: ObservedIssueField[] = [];
       const organizationOwned = ownerType === "Organization";
@@ -522,6 +548,7 @@ export function createRestDiscoveryTransport(
         issues,
         milestones,
         issueTypes,
+        ...(labels === undefined ? {} : { labels }),
         issueFields,
       };
     },

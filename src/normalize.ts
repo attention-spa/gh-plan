@@ -29,6 +29,7 @@ const ISSUE_KEYS = new Set([
   "milestone",
   "type",
   "fields",
+  "labels",
   "children",
   "blockedBy",
   "blocks",
@@ -275,6 +276,56 @@ function normalizeFields(
   return fields;
 }
 
+function normalizeLabels(
+  raw: unknown, path: string, diagnostics: GithubDiagnostic[], logicalId: string,
+): DesiredIssueState["labels"] | undefined {
+  const parse = (input: unknown, at: string): string[] | undefined => {
+    if (!Array.isArray(input) || input.some((value) =>
+      typeof value !== "string" || !value.trim() || value.trim() !== value)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "Labels must be nonempty, trimmed strings.", at, logicalId));
+      return undefined;
+    }
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const name of input as string[]) {
+      const key = name.toLowerCase();
+      if (seen.has(key)) {
+        diagnostics.push(diagnostic("INVALID_SCHEMA", "Duplicate label: " + name, at, logicalId));
+        return undefined;
+      }
+      seen.add(key);
+      result.push(name);
+    }
+    return result.sort((a, b) => a.localeCompare(b));
+  };
+  if (Array.isArray(raw)) {
+    const value = parse(raw, path);
+    return value === undefined ? undefined : { op: "set", value };
+  }
+  if (!isPlainObject(raw)) {
+    diagnostics.push(diagnostic("INVALID_SCHEMA", "Labels must be an array or operation object.", path, logicalId));
+    return undefined;
+  }
+  if (raw.op === "set" && Object.keys(raw).length === 2 && "value" in raw) {
+    const value = parse(raw.value, path + ".value");
+    return value === undefined ? undefined : { op: "set", value };
+  }
+  if (Object.keys(raw).some((key) => key !== "add" && key !== "remove") ||
+    !("add" in raw || "remove" in raw)) {
+    diagnostics.push(diagnostic("INVALID_SCHEMA", "Labels require {op:set,value} or {add,remove}.", path, logicalId));
+    return undefined;
+  }
+  const add = parse(raw.add ?? [], path + ".add");
+  const remove = parse(raw.remove ?? [], path + ".remove");
+  if (!add || !remove) return undefined;
+  const overlap = new Set(add.map((name) => name.toLowerCase()));
+  if (remove.some((name) => overlap.has(name.toLowerCase()))) {
+    diagnostics.push(diagnostic("INVALID_SCHEMA", "Cannot add and remove the same label.", path, logicalId));
+    return undefined;
+  }
+  return { op: "modify", add, remove };
+}
+
 function normalizeManagement(value: unknown, path: string, diagnostics: GithubDiagnostic[], logicalId?: string): "managed" | "reference" {
   if (value === undefined || value === "managed") return "managed";
   if (value === "reference") return "reference";
@@ -452,7 +503,7 @@ export function normalizeSchema(schema: object): NormalizationResult {
     const identity = normalizeIdentity(value.identity, `${path}.identity`, diagnostics, logicalId);
 
     if (management === "reference") {
-      const forbidden = ["title", "body", "state", "milestone", "type", "fields", "children", "blockedBy", "blocks", "relatesTo"].filter((key) => key in value);
+      const forbidden = ["title", "body", "state", "milestone", "type", "fields", "labels", "children", "blockedBy", "blocks", "relatesTo"].filter((key) => key in value);
       if (forbidden.length > 0) {
         diagnostics.push(diagnostic("INVALID_SCHEMA", "Reference-only issues cannot contain desired state or inline relationships.", path, logicalId, forbidden));
       }
@@ -486,6 +537,10 @@ export function normalizeSchema(schema: object): NormalizationResult {
     if ("type" in value) {
       const normalized = normalizeStringSet(value.type, `${path}.type`, diagnostics, logicalId, false);
       if (normalized?.op === "set") desired.issueType = normalized;
+    }
+    if ("labels" in value) {
+      const normalized = normalizeLabels(value.labels, `${path}.labels`, diagnostics, logicalId);
+      if (normalized) desired.labels = normalized;
     }
     if ("fields" in value) {
       const normalized = normalizeFields(value.fields, `${path}.fields`, diagnostics, logicalId);

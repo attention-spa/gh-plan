@@ -1,3 +1,5 @@
+export { compileIssueLabelSteps } from "./issue-label-compiler.ts";
+export type { IssueLabelCompilationResult } from "./issue-label-compiler.ts";
 export { planGithub, GITHUB_PLAN_VERSION } from "./plan.ts";
 export { compileRelationshipSteps } from "./relationship-compiler.ts";
 export type { RelationshipCompilationResult } from "./relationship-compiler.ts";
@@ -37,6 +39,7 @@ export type {
   BlockedByRelationship,
   BlocksRelationship,
   DesiredIssueState,
+  DesiredIssueLabels,
   DesiredMilestoneState,
   DesiredRelationship,
   DesiredRemove,
@@ -76,6 +79,7 @@ export type {
   ObservedIssueField,
   ObservedIssueFieldOption,
   ObservedIssueType,
+  ObservedLabel,
   ObservedMilestone,
   ParentRelationship,
   PlanGithub,
