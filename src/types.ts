@@ -248,6 +248,7 @@ export type PlanOperationKind =
   | "issue.create"
   | "issue.update"
   | "issue.type.set"
+  | "issue.marker.adopt"
   | "issue.field.set"
   | "issue.parent.set"
   | "issue.dependency.add"
