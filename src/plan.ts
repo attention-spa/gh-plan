@@ -1,4 +1,5 @@
 import { normalizeSchema } from "./normalize.ts";
+import { buildApplyIntent } from "./apply-preflight.ts";
 import { discoverAndResolve } from "./discovery.ts";
 import { diffGithubState } from "./diff.ts";
 import { compileMilestoneSteps } from "./milestone-compiler.ts";
@@ -119,6 +120,7 @@ function assemble(
   desired: GithubPlan["desired"],
   resolutions: ResourceResolution[],
   pieces: Parts[],
+  source?: NormalizedDesiredStateGraph,
 ): GithubPlan {
   const steps = pieces.flatMap((piece) => piece.steps ?? []);
   const noops = pieces.flatMap((piece) => piece.noops ?? []);
@@ -135,6 +137,7 @@ function assemble(
     warnings.length || unsupported.length ? "ready_with_warnings" : "ready";
   return {
     metadata: { planner: "gh-plan", version: GITHUB_PLAN_VERSION, mode },
+    ...(source ? { applyIntent: buildApplyIntent(source) } : {}),
     repository, desired,
     resolutions: [...resolutions].sort((a, b) => a.logicalId.localeCompare(b.logicalId)),
     steps: topological(steps),
@@ -237,5 +240,5 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     pullRequests,
     projectItems,
     pruning,
-  ]);
+  ], graph);
 }
