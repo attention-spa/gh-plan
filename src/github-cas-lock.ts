@@ -420,11 +420,15 @@ export function createGithubCasHttpBackend(options: GithubCasHttpOptions): Githu
         query: "mutation ApplyOwnerCas($input:UpdateRefsInput!){updateRefs(input:$input){clientMutationId}}",
         variables: { input },
       });
-      if (!object(raw) || !object(raw.data) ||
-          !object(raw.data.updateRefs) || !Array.isArray(raw.errors) && raw.errors !== undefined)
+      if (!object(raw))
         return error("INVALID_RESPONSE", "acquire", "unknown");
-      if (raw.errors !== undefined && raw.errors.length > 0)
+      // GitHub can return HTTP 200 with GraphQL errors but without "data".
+      // Such a response is NOT an accepted CAS, even when the error is generic.
+      if (Array.isArray(raw.errors) && raw.errors.length > 0)
         return error("TRANSPORT_FAILED", "acquire", "unknown");
+      if (raw.errors !== undefined && !Array.isArray(raw.errors) ||
+          !object(raw.data) || !object(raw.data.updateRefs))
+        return error("INVALID_RESPONSE", "acquire", "unknown");
     },
   };
 }
