@@ -1,10 +1,10 @@
 ---
 type: Decision
 title: "Issue deletion policy"
-description: "Never plan issue deletion in v0.1; deletion needs a separately authorized, explicit policy."
+description: "Default to no issue deletion; permanent duplicate deletion requires an explicit GraphQL-only opt-in and verified identities."
 tags: ["deletion", "safety"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:13:51.663+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:57:13.548+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
@@ -18,8 +18,10 @@ A desired-state document is not an implicit list of issues that should exist to 
 
 ## Decision
 
-The v0.1 planner does **not** emit any `issue.delete` operation. It supports explicit managed issue state reconciliation, including closing an issue when the user supplies `state: closed`, but does not treat omitted issue declarations as a close or delete request. Reference-only issues are not mutation targets.
+The default `prune:"report"` policy **never emits orphan or duplicate mutations**. It scans only exact, standalone canonical gh-plan issue-body markers (never titles alone), and reports orphaned marker issues as nonblocking informational warnings. `prune:"close"` explicitly permits non-destructive, reversible closure of uniquely marked orphan issues using `state_reason:not_planned`. It may also propose a duplicate's canonical-link comment before a reversible `state_reason:duplicate` close, but only when an explicitly identified managed canonical issue shares the duplicate's marker. Declared identities and ambiguous marker groups remain protected.
+
+Permanent deletion is **not a REST issue operation**. With `deleteDuplicates:true` and `prune:"close"`, the pure [prune compiler](/api/compilePruneSteps.md) can describe an irreversible GraphQL `deleteIssue` only for a demonstrably duplicated issue with a known node ID, after a reason comment on the surviving canonical issue. In REST mode this is a blocking unsupported diagnostic; the top-level planner's GraphQL mode still blocks because transport is not implemented. No executor exists, so these are inert proposals only.
 
 ## Rationale and consequences
 
-Issue deletion is irreversible in practice and can destroy discussions, audit trails and links. The future [M7.4 proposal](https://github.com/attention-spa/gh-plan/issues/36) may add explicit orphan reporting and bounded duplicate handling, but those policies are not implemented or pre-authorized by this decision. See [management modes](/concepts/management-modes.md) and [plan readiness](/concepts/plan-and-steps.md).
+Issue deletion is irreversible in practice and can destroy discussions, audit trails and links. Existing REST mode has **no deletion mechanism**, and an explicit close is always preferred. The [M7.4 schema](/schema/prune-duplicates.md) limits risk to a demonstrable shared marker and a user-selected canonical issue; it never treats title collisions as sufficient authorization. The later [M8 executor](https://github.com/attention-spa/gh-plan/issues/37) remains unscheduled and is not authorized to execute any of these requests.

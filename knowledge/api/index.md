@@ -6,6 +6,7 @@
 - [compileIssueLabelSteps](/api/compileIssueLabelSteps.md) — Compiles issue-label exact sets and targeted add/remove operations.
 - [compileIssueSteps](/api/compileIssueSteps.md) — Compiles managed issue create, core updates and issue-type requests.
 - [compileMilestoneSteps](/api/compileMilestoneSteps.md) — Compiles managed milestone create and minimal-update requests.
+- [compilePruneSteps](/api/compilePruneSteps.md) — Purely reports orphaned issue markers and duplicate clashes, and compiles guarded close or GraphQL-only deletion proposals.
 - [compileProjectItemSteps](/api/compileProjectItemSteps.md) — Purely compiles Projects v2 item membership and supported custom-field requests against an existing observed board.
 - [compilePullRequestSteps](/api/compilePullRequestSteps.md) — Pure PR create/update and reviewer planner, reusing issue-label and assignee compilers without mutation.
 - [compileRelationshipSteps](/api/compileRelationshipSteps.md) — Compiles parent, dependency and related-to native GitHub relations.

@@ -63,3 +63,7 @@ Root `projects` only **references** existing boards by `logicalId`, `owner`, `nu
 ## Milestone due dates
 
 Managed milestones accept `due_on: "YYYY-MM-DD"`, `due_on: {op: "set", value: "YYYY-MM-DD"}`, or `due_on: {op: "remove"}`. The value must be a valid UTC calendar day; timestamps, invalid dates and `null` are rejected. GitHub REST stores a full ISO timestamp, which the planner compares by UTC calendar date, ignoring differences in time within that date. A set proposes `YYYY-MM-DDT00:00:00Z`; remove proposes `due_on: null` on PATCH. Omission leaves the date unchanged. See [milestone OKF schema](../knowledge/schema/milestone.md).
+
+## Orphan and duplicate policies
+
+Root `prune` defaults to `"report"`, emitting only informational `ORPHAN_ISSUE` and duplicate marker/title diagnostics from the existing issue listing. Set `prune: "close"` only when intentionally planning reversible issue closure. A uniquely marked orphan receives a proposed `state_reason: "not_planned"` close; exact shared-marker duplicates additionally need an explicitly numbered/identified managed canonical issue, a reason comment and a canonical URL. Title similarity alone never authorizes a close. `deleteDuplicates: true` requires `prune: "close"` and only describes irreversible GraphQL `deleteIssue` in the pure compiler. REST mode blocks it, and full GraphQL planning remains unavailable. See [OKF pruning schema](../knowledge/schema/prune-duplicates.md) and [issue-deletion policy](../knowledge/decisions/issue-deletion-policy.md).
