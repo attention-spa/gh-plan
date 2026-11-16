@@ -213,7 +213,8 @@ function supersededIssueCreate(spec: ApplyPostconditionSpec,
   const closes = steps.filter((later) => later.kind === "issue.update" &&
     later.logicalId === step.logicalId && later.dependsOn.includes(step.id) &&
     later.request?.protocol === "rest" &&
-    isRecord(later.request.body) && later.request.body.state === "closed");
+    isRecord(later.request.body) &&
+    (later.request.body as Record<string, unknown>).state === "closed");
   if (closes.length !== 1) return undefined;
   return frozen({
     ...spec,
