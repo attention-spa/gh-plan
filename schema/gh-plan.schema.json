@@ -6,6 +6,10 @@
     "GithubPlanSchema": {
       "type": "object",
       "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "Editor schema hint; ignored by the planner when a string."
+        },
         "repository": {
           "anyOf": [
             {
