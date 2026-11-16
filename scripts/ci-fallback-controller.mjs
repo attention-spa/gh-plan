@@ -42,7 +42,8 @@ export function actionsApi({ token, fetchImpl = globalThis.fetch,
     if (!Number.isInteger(response?.status) ||
         response.status < 200 || response.status > 299)
       throw fail("HTTP_" + (Number.isInteger(response?.status) ? response.status : "INVALID"));
-    if (response.status === 204) return { status: 204, data: null };
+    if (response.status === 204 || (method === "POST" && path.endsWith("/cancel") && response.status === 202))
+      return { status: response.status, data: null };
     try { return { status: response.status, data: await response.json() }; }
     catch { throw fail("INVALID_RESPONSE"); }
   }
@@ -119,7 +120,9 @@ export function actionsApi({ token, fetchImpl = globalThis.fetch,
   };
 }
 const started = (jobs) => jobs.some((j) => j.started_at != null ||
-  !["queued", "waiting", "pending", "cancelled"].includes(j.status));
+  j.status === "in_progress" ||
+  (j.status === "completed" && j.conclusion !== "cancelled") ||
+  !["queued", "waiting", "pending", "cancelled", "completed"].includes(j.status));
 function verifiedOutcome(observation, hadStarted) {
   if (observation.status !== "completed") return false;
   if (hadStarted && observation.conclusion === "success" &&
@@ -194,6 +197,11 @@ export async function orchestrate({ api, sha, parentRunId,
     const hosted = await execute("hosted");
     return { backend: "hosted", runId: hosted.id, cancelledOciRunId: oci.id };
   } catch (e) {
+    // Parent cancellation is best-effort propagated to the known child run.
+    // A cancellation acknowledgement never authorizes hosted failover.
+    if (signal?.aborted && active?.id) {
+      try { await api.cancel(active.id); } catch { /* leave original failure sanitized */ }
+    }
     throw /^CI_FALLBACK_[A-Z0-9_]+$/.test(e?.message ?? "")
       ? e : fail("UNEXPECTED");
   }
@@ -204,9 +212,13 @@ async function main() {
   const report = ({ backend, id, state }) =>
     console.log("CI worker " + backend + " " + state + ": https://github.com/" +
       REPO + "/actions/runs/" + id);
+  const controller = new AbortController();
+  process.once("SIGTERM", () => controller.abort());
+  process.once("SIGINT", () => controller.abort());
   const result = await orchestrate({
     api: actionsApi({ token: context.token }),
     sha: context.sha, parentRunId: context.runId, report,
+    signal: controller.signal,
   });
   console.log("Verified CI contracts on " + result.backend + ".");
   if (process.env.GITHUB_STEP_SUMMARY) {
