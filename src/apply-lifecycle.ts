@@ -196,6 +196,32 @@ async function catalog(
     throw new Error("update-reader-mismatch");
   return found;
 }
+/**
+ * A planned create-followed-by-close has a strictly superseded initial
+ * "open" default. A rerun may treat the create as satisfied ONLY if a
+ * dependent issue.update of the exact same logical ID explicitly closes it,
+ * and a second fresh independent reader check plus marker catalog confirm
+ * ALL the create's other fields and the final closed state.
+ *
+ * This is not implicit adoption or a generic license to ignore stale fields.
+ */
+function supersededIssueCreate(spec: ApplyPostconditionSpec,
+  step: PlanStep, steps: readonly PlanStep[]): ApplyPostconditionSpec | undefined {
+  if (spec.kind !== "issue.create" ||
+      !spec.predicates.some((p) => p.field === "state" &&
+        p.comparison === "exact" && p.expected === "open")) return undefined;
+  const closes = steps.filter((later) => later.kind === "issue.update" &&
+    later.logicalId === step.logicalId && later.dependsOn.includes(step.id) &&
+    later.request?.protocol === "rest" &&
+    isRecord(later.request.body) && later.request.body.state === "closed");
+  if (closes.length !== 1) return undefined;
+  return frozen({
+    ...spec,
+    predicates: spec.predicates.map((p) =>
+      p.field === "state" && p.expected === "open"
+        ? { ...p, expected: "closed" } : { ...p }),
+  });
+}
 function ordered(plan: GithubPlan): PlanStep[] {
   const byId = new Map(plan.steps.map((step) => [step.id, step]));
   const output: PlanStep[] = [], done = new Set<string>();
@@ -351,13 +377,28 @@ export async function executeCallbackApplyPlan(
       }
       phase = "precondition"; code = "UNVERIFIED_STATE";
       let first: Read, catalogBefore: Identity | undefined;
+      let readSpec = spec;
       try {
         const outcome: unknown = await prepared.readPostcondition(frozen({
           spec, phase: "before", step, request, bindings: frozen(snapshot(bindings)),
         }));
         if (!readShape(outcome)) throw new Error("invalid-read");
         first = outcome;
-        catalogBefore = await catalog(prepared, spec, bindings, first);
+        if (first.status === "unsatisfied") {
+          const superseded = supersededIssueCreate(spec, step, steps);
+          if (superseded) {
+            const rechecked: unknown = await prepared.readPostcondition(frozen({
+              spec: superseded, phase: "before", step, request,
+              bindings: frozen(snapshot(bindings)),
+            }));
+            if (!readShape(rechecked)) throw new Error("invalid-superseded-read");
+            if (rechecked.status === "satisfied") {
+              first = rechecked;
+              readSpec = superseded;
+            }
+          }
+        }
+        catalogBefore = await catalog(prepared, readSpec, bindings, first);
       } catch { throw new Error("before-unverified"); }
       if (first.status === "satisfied") {
         if (spec.kind.endsWith(".create")) {
