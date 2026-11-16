@@ -71,12 +71,17 @@ export interface DesiredRemove {
 
 export type DesiredSetOrRemove<T> = DesiredSet<T> | DesiredRemove;
 
+export type DesiredIssueLabels =
+  | { op: "set"; value: string[] }
+  | { op: "modify"; add: string[]; remove: string[] };
+
 export type DesiredIssueState = {
   title?: DesiredSet<string>;
   body?: DesiredSetOrRemove<string>;
   state?: DesiredSet<"open" | "closed">;
   milestone?: DesiredSetOrRemove<LogicalResourceRef>;
   issueType?: DesiredSet<string>;
+  labels?: DesiredIssueLabels;
   fields?: Record<string, DesiredSetOrRemove<JsonValue>>;
 };
 
@@ -192,6 +197,8 @@ export interface ObservedIssue {
   state: "open" | "closed";
   milestoneNumber?: number | null;
   issueType?: string | null;
+  /** Undefined means not discovered; empty array is authoritative. */
+  labels?: string[];
   fields?: Record<string, JsonValue>;
   parentNumber?: number | null;
   blockedByNumbers?: number[];
@@ -227,11 +234,19 @@ export interface ObservedIssueField {
   options?: ObservedIssueFieldOption[];
 }
 
+export interface ObservedLabel {
+  name: string;
+  id?: number;
+  color?: string;
+}
+
 export interface GithubStateSnapshot {
   repository: RepositoryRef;
   issues: ObservedIssue[];
   milestones: ObservedMilestone[];
   issueTypes: ObservedIssueType[];
+  /** Undefined until catalog discovery is requested. */
+  labels?: ObservedLabel[];
   issueFields: ObservedIssueField[];
 }
 
@@ -252,6 +267,9 @@ export type PlanOperationKind =
   | "issue.update"
   | "issue.type.set"
   | "issue.marker.adopt"
+  | "issue.label.set"
+  | "issue.label.add"
+  | "issue.label.remove"
   | "issue.field.set"
   | "issue.field.remove"
   | "issue.parent.set"
@@ -326,6 +344,7 @@ export type DiagnosticCode =
   | "UNRESOLVED_REFERENCE"
   | "UNKNOWN_ISSUE_TYPE"
   | "UNKNOWN_ISSUE_FIELD"
+  | "UNKNOWN_LABEL"
   | "UNKNOWN_FIELD_OPTION"
   | "RELATIONSHIP_CYCLE"
   | "INSUFFICIENT_PERMISSION"
