@@ -7,6 +7,8 @@ import type {
   ObservedIssue, ObservedMilestone,
 } from "../src/index.ts";
 import type { ApplyIntentManifest } from "../src/apply-preflight.ts";
+import type { BoundPlanRequest } from "../src/plan-bindings.ts";
+import type { ApplyPostconditionRead } from "../src/apply-contract.ts";
 function assert(ok: unknown, why: string): asserts ok {
   if (!ok) throw Error(why);
 }
@@ -173,21 +175,22 @@ class Fixture {
     this.reads++;
     if (ctx.phase === "before") {
       await this.beforeReadHook?.(ctx);
-      if (this.beforeReadInvalid) return { status: "bogus", secret: "DO_NOT_LOG" };
+      if (this.beforeReadInvalid) return { status: "bogus", secret: "DO_NOT_LOG" } as unknown as ApplyPostconditionRead;
     } else {
       await this.afterReadHook?.(ctx);
       if (this.afterReadInvalid) throw Error("DO_NOT_LOG unable to complete GitHub GET");
     }
     const spec = ctx.spec;
+    const path = ctx.request.protocol === "rest" ? ctx.request.path : "";
     let current: Issue | Milestone | undefined;
     if (spec.kind === "issue.create") {
       current = this.issues.find((i) => i.body.includes(token("I")));
     } else if (spec.kind === "milestone.create") {
       current = this.milestones.find((m) => m.title === "Release");
     } else if (spec.kind === "issue.update") {
-      current = this.issues.find((i) => i.number === numbered(ctx.request.path));
+      current = this.issues.find((i) => i.number === numbered(path));
     } else {
-      current = this.milestones.find((m) => m.number === numbered(ctx.request.path));
+      current = this.milestones.find((m) => m.number === numbered(path));
     }
     if (!current) return { status: "unsatisfied" as const };
     for (const pred of spec.predicates) {
@@ -204,7 +207,8 @@ class Fixture {
       },
     };
   }
-  async dispatch(request: { protocol: string; path: string; body?: unknown }, step: PlanStep) {
+  async dispatch(request: Readonly<BoundPlanRequest>, step: PlanStep) {
+    if (request.protocol !== "rest") throw Error("DO_NOT_LOG non-REST operation");
     this.events.push("dispatch:" + step.id);
     this.dispatches++;
     this.inFlight++;
