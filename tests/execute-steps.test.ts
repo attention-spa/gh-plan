@@ -25,7 +25,7 @@ const milestone = step("milestone.create:M", "milestone.create", "M", [],
     body: { title: "Sprint" } });
 const issue = step("issue.create:I", "issue.create", "I", ["milestone.create:M"],
   { protocol: "rest", method: "POST", path: "/repos/a/b/issues",
-    body: { title: "Issue", milestone: { $ref: "M.number" } } });
+    body: { title: "Issue", body: "<!-- gh-plan:I -->", milestone: { $ref: "M.number" } } });
 const patch = step("issue.update:I", "issue.update", "I", ["issue.create:I"],
   { protocol: "rest", method: "PATCH",
     path: ["/repos/a/b/issues/", { $ref: "I.number" }],
@@ -39,6 +39,11 @@ function plan(steps: PlanStep[], readiness: GithubPlan["readiness"] = "ready"): 
     readiness,
   };
 }
+const marked = {
+  kind: "issue" as const, number: 12, id: 800,
+  title: "Issue", body: "<!-- gh-plan:I -->", state: "open" as const,
+  nodeId: "I_12",
+};
 const calls: Array<{ method: string; path: string; body?: unknown }> = [];
 const events: string[] = [];
 const original = plan([patch, issue, milestone]);
@@ -55,7 +60,7 @@ const result = await executePlanSteps(original, async (request, s) => {
   check(request.protocol === "rest", "Every read receives the bound REST request.");
   if (s.id === "issue.create:I") {
     equal(bindings.M?.number, 7, "Reader receives the previous producer binding.");
-    equal(request.body, { title: "Issue", milestone: 7 },
+    equal(request.body, { title: "Issue", body: "<!-- gh-plan:I -->", milestone: 7 },
       "Reader receives resolved body, never unresolved references.");
   }
   if (s.id === "issue.update:I") {
@@ -63,7 +68,8 @@ const result = await executePlanSteps(original, async (request, s) => {
     equal(request.path, "/repos/a/b/issues/12", "Reader sees resolved update path.");
   }
   return { status: "unsatisfied" };
-});
+}, async () => []);
+
 equal(result.completedStepIds, ["milestone.create:M", "issue.create:I", "issue.update:I"],
   "Unordered plan must execute in complete topological order.");
 equal(result.skippedStepIds, [], "Unsatisfied reads must not be classified as skips.");
@@ -77,7 +83,7 @@ equal(result.bindings, { M: { id: 200, number: 7, nodeId: "M_7" },
 "Create responses populate only identity bindings.");
 equal(calls, [
   { method: "POST", path: "/repos/a/b/milestones", body: { title: "Sprint" } },
-  { method: "POST", path: "/repos/a/b/issues", body: { title: "Issue", milestone: 7 } },
+  { method: "POST", path: "/repos/a/b/issues", body: { title: "Issue", body: "<!-- gh-plan:I -->", milestone: 7 } },
   { method: "PATCH", path: "/repos/a/b/issues/12", body: { state: "closed" } },
 ], "Consumer body/path must use purely bound producer identities.");
 equal(JSON.stringify(original), before, "Executor must not mutate the proposed plan.");
@@ -86,7 +92,7 @@ async function rejected(input: GithubPlan, why: string): Promise<void> {
   let writes = 0;
   let failed = false;
   try { await executePlanSteps(input, async () => { writes++; return {}; },
-    async () => ({ status: "unsatisfied" })); }
+    async () => ({ status: "unsatisfied" }), async () => []); }
   catch { failed = true; }
   check(failed, why + ": must reject.");
   equal(writes, 0, why + ": complete preflight must prevent writes.");
@@ -109,7 +115,7 @@ try {
       return { number: "not an integer" };
     }
     return {};
-  }, async () => ({ status: "unsatisfied" }));
+  }, async () => ({ status: "unsatisfied" }), async () => []);
 } catch { failed = true; }
 check(failed, "Invalid post-create identity must stop execution.");
 equal(writes, 1, "No consumer may execute with an invalid producer identity.");
@@ -136,13 +142,13 @@ const resumed = await executePlanSteps(original, async (_request, s) => {
   }
   if (s.id === "issue.create:I") {
     equal(prior.M?.number, 7, "Skipped milestone must supply future binding.");
-    equal(bound.protocol === "rest" && bound.body, { title: "Issue", milestone: 7 },
+    equal(bound.protocol === "rest" && bound.body, { title: "Issue", body: "<!-- gh-plan:I -->", milestone: 7 },
       "The read after a skipped milestone must receive the fully bound request.");
-    return { status: "satisfied", identity: { number: 12, id: 800, node_id: "I_12" } };
+    return { status: "satisfied", identity: { number: 12, id: 800 } };
   }
   equal(prior.I?.id, 800, "Skipped issue must supply verified identity.");
   return { status: "satisfied" };
-});
+}, async () => [marked]);
 equal(resumed.completedStepIds, ["milestone.create:M", "issue.create:I", "issue.update:I"],
   "All verified skips remain completed.");
 equal(resumed.skippedStepIds, ["milestone.create:M", "issue.create:I", "issue.update:I"],
@@ -156,7 +162,7 @@ const mixed = await executePlanSteps(original, async (bound, s) => {
   mixedEvents.push("write:" + s.id);
   if (s.id === "issue.create:I") {
     check(bound.protocol === "rest", "REST create expected.");
-    equal(bound.body, { title: "Issue", milestone: 7 },
+    equal(bound.body, { title: "Issue", body: "<!-- gh-plan:I -->", milestone: 7 },
       "A skipped milestone still binds the issue create request.");
     return { number: 12, id: 800 };
   }
@@ -168,7 +174,8 @@ const mixed = await executePlanSteps(original, async (bound, s) => {
   }
   return s.id === "issue.update:I"
     ? { status: "satisfied" } : { status: "unsatisfied" };
-});
+}, async () => []);
+
 equal(mixed.skippedStepIds, ["milestone.create:M", "issue.update:I"],
   "Only satisfied steps should be skipped.");
 equal(mixedEvents, [
@@ -213,7 +220,7 @@ try {
     readsBeforeFailure++;
     if (readsBeforeFailure === 2) throw new Error("Read failed after earlier write.");
     return { status: "unsatisfied" };
-  });
+  }, async () => []);
   throw new Error("Expected second reader failure.");
 } catch (error) {
   check(error instanceof Error && error.message === "Read failed after earlier write.",

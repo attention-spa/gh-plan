@@ -689,6 +689,30 @@ async function mapBounded<T, R>(
  * Newly assigned logins add one eligibility GET per distinct login. Reads use
  * a bounded concurrency pool (default four). No HTTP mutation is performed.
  */
+/**
+ * Full read-only issue catalog for M8 issue-create recovery. Requests all
+ * pages of open AND closed issues, filters out pull requests, and uses the
+ * existing sanitized REST/pagination and response-validation machinery.
+ * Credentials are runtime-only and never included in the returned records.
+ * This reader does not depend on a possibly stale planning snapshot.
+ */
+export function createRestIssueCatalogReader(
+  config: Pick<RestDiscoveryTransportConfig, "auth" | "fetch">,
+): (repositoryFullName: string) => Promise<ObservedIssue[]> {
+  const client = createRestClient(config.auth, resolveFetch(config.fetch));
+  return async (repositoryFullName: string): Promise<ObservedIssue[]> => {
+    const [owner, repository] = splitRepository(repositoryFullName);
+    const root = "/repos/" + encodeURIComponent(owner) + "/" +
+      encodeURIComponent(repository);
+    const raw = await client.getPaginated<unknown>(
+      root + "/issues?state=all&per_page=100",
+    );
+    return raw.map(mapIssue)
+      .filter((issue): issue is ObservedIssue => issue !== undefined)
+      .sort((a, b) => a.number - b.number);
+  };
+}
+
 export function createRestDiscoveryTransport(
   config: RestDiscoveryTransportConfig,
 ): GithubDiscoveryTransport {
