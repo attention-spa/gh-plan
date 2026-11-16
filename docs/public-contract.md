@@ -26,7 +26,7 @@ but repository-label renaming and deletion are not.
 
 Identity resolution prioritizes **explicit id, nodeId and number** (all
 supplied hints must identify the same resource), then a unique issue body
-marker, then title fallback. Milestones can match an exact title. An issue
+marker, then title fallback. Milestones can match an exact title. Managed milestone `due_on` accepts a real UTC date (`YYYY-MM-DD`), explicit set or remove. GitHub REST timestamps are compared at UTC calendar-day precision; sets emit midnight-UTC timestamps, explicit removes propose `due_on: null`, and omissions preserve the existing deadline. An issue
 whose title matches but whose marker does not is **not adopted** unless
 `adoptByTitle: true` is explicitly supplied. Conflicts and ambiguous matches
 block planning; reference-only resources never silently become new resources.

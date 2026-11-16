@@ -90,6 +90,8 @@ export interface AuthoringManagedMilestone {
   title?: string | AuthoringSet<string>;
   description?: string | AuthoringSetOrRemove<string>;
   state?: "open" | "closed" | AuthoringSet<"open" | "closed">;
+  /** UTC date-only YYYY-MM-DD; explicit remove clears the existing deadline. */
+  due_on?: string | AuthoringSetOrRemove<string>;
 }
 /** Existing milestone resource used as a pointer, not mutated or created. */
 export interface AuthoringReferencedMilestone {

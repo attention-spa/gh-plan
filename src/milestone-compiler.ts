@@ -1,3 +1,4 @@
+import { toGithubMilestoneDueOn } from "./milestone-due-date.ts";
 import type {
   GithubDiagnostic, GithubDiff, GithubDiffResult, JsonValue,
   ManagedMilestoneResource, NormalizedDesiredStateGraph, PlanStep, ResourceResolution,
@@ -13,7 +14,7 @@ export interface MilestoneCompilationResult {
   blockers: GithubDiagnostic[];
 }
 
-const PROPERTIES = ["title", "description", "state"] as const;
+const PROPERTIES = ["title", "description", "state", "due_on"] as const;
 type MilestoneProperty = typeof PROPERTIES[number];
 
 function diagnostic(logicalId: string, message: string): GithubDiagnostic {
@@ -105,6 +106,9 @@ export function compileMilestoneSteps(
       if (description?.op === "set") body.description = description.value;
       // Removal on a new milestone is already satisfied by omission.
       if (resource.desired.state) body.state = resource.desired.state.value;
+      if (resource.desired.due_on?.op === "set")
+        body.due_on = toGithubMilestoneDueOn(resource.desired.due_on.value);
+      // Explicit remove on creation is satisfied by omission, like description.
       steps.push(step("milestone.create:" + id, id, "milestone.create", "planned",
         null, body, "Milestone does not exist.",
         { protocol: "rest", method: "POST", path: "/repos/" + repoPath + "/milestones", body },
@@ -135,6 +139,8 @@ export function compileMilestoneSteps(
       if (property === "description") {
         clearDescription = op.op === "remove";
         changed.description = op.op === "remove" ? "" : op.value;
+      } else if (property === "due_on") {
+        changed.due_on = op.op === "remove" ? null : toGithubMilestoneDueOn(op.value);
       } else if (op.op === "set") {
         changed[property] = op.value;
       } else {
@@ -154,7 +160,7 @@ export function compileMilestoneSteps(
     steps.push(step("milestone.update:" + id, id, "milestone.update", "planned",
       before, changed, "Only explicitly changed milestone properties are updated.",
       { protocol: "rest", method: "PATCH", path: "/repos/" + repoPath + "/milestones/" + number, body: changed },
-      clearDescription ? "partial" : true));
+      clearDescription || changed.due_on === null ? "partial" : true));
   }
   return {
     steps: steps.sort((a, b) => a.id.localeCompare(b.id)),

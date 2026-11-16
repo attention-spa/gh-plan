@@ -5,7 +5,7 @@ description: "Builds deterministic semantic deltas independent of request encodi
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/diff.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:23:20.409+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:39:10.683+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/diff.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -20,6 +20,8 @@ Builds deterministic semantic deltas independent of request encoding. Exported f
 ```ts
 diffGithubState(desired: NormalizedDesiredStateGraph, observed: GithubStateSnapshot, resolutions: ResourceResolution[]) => GithubDiffResult
 ```
+
+For managed milestone `due_on`, the diff compares the desired UTC **calendar day** against the date represented by the observed ISO timestamp. A differing time of day within the same UTC day is a noop; an observed null is an absent deadline, while an undiscovered/malformed timestamp blocks rather than implicitly clearing.
 
 Compilers consume this result; it contains intent but does not issue HTTP requests.
 

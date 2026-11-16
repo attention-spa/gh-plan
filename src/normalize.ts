@@ -1,3 +1,4 @@
+import { isIsoCalendarDate } from "./milestone-due-date.ts";
 import type {
   DesiredIssueState,
   DesiredProjectReference,
@@ -55,6 +56,7 @@ const MILESTONE_KEYS = new Set([
   "title",
   "description",
   "state",
+  "due_on",
 ]);
 
 function isPlainObject(value: unknown): value is RecordLike {
@@ -713,7 +715,7 @@ export function normalizeSchema(schema: object): NormalizationResult {
     const identity = normalizeIdentity(value.identity, `${path}.identity`, diagnostics, logicalId);
 
     if (management === "reference") {
-      const forbidden = ["title", "description", "state"].filter((key) => key in value);
+      const forbidden = ["title", "description", "state", "due_on"].filter((key) => key in value);
       if (forbidden.length > 0) {
         diagnostics.push(diagnostic("INVALID_SCHEMA", "Reference-only milestones cannot contain desired state.", path, logicalId, forbidden));
       }
@@ -738,6 +740,15 @@ export function normalizeSchema(schema: object): NormalizationResult {
     if ("state" in value) {
       const normalized = normalizeState(value.state, `${path}.state`, diagnostics, logicalId);
       if (normalized) desired.state = normalized;
+    }
+    if ("due_on" in value) {
+      const normalized = normalizeStringSet(value.due_on, `${path}.due_on`, diagnostics, logicalId, true);
+      if (normalized?.op === "remove") desired.due_on = normalized;
+      else if (normalized?.op === "set") {
+        if (isIsoCalendarDate(normalized.value)) desired.due_on = normalized;
+        else diagnostics.push(diagnostic("INVALID_SCHEMA",
+          "Milestone due_on must be a real UTC YYYY-MM-DD calendar date.", `${path}.due_on`, logicalId));
+      }
     }
 
     addResource({
