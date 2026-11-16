@@ -82,6 +82,32 @@ equal(outcome.postconditions[1]?.predicates.find((x) => x.field === "milestone")
 assert(outcome.postconditions.every((p) => p.version === 1 && p.repository === "a/b"),
   "Versioned/repository-locked descriptors only.");
 equal(JSON.stringify(good), immutable, "Preflight must not mutate plan.");
+const implicitClear = JSON.parse(JSON.stringify(good)) as GithubPlan;
+implicitClear.steps[3]!.request = { protocol: "rest", method: "POST",
+  path: "/repos/a/b/milestones", body: { title: "Release" } };
+implicitClear.steps[3]!.desired = { title: "Release" };
+implicitClear.applyIntent!.managed[2]!.removes = ["description", "due_on"];
+const clearResult = preflightApplyPlan(implicitClear);
+assert(clearResult.ok, "Removing unset description/due_on on new milestone requires no extra write.");
+if (clearResult.ok) equal(clearResult.postconditions[3]?.predicates,
+  [{ field: "title", comparison: "exact", expected: "Release" }],
+  "New milestone removals remain implicit and need no PATCH.");
+
+const openIssue = JSON.parse(JSON.stringify(good)) as GithubPlan;
+openIssue.steps.splice(0, 1); // No create-to-close step; issue remains open.
+openIssue.summary.planned--;
+openIssue.applyIntent!.managed[0]!.desiredState = "open";
+const openResult = preflightApplyPlan(openIssue);
+assert(openResult.ok, "An explicit desired open state is satisfied by issue-create defaults.");
+if (openResult.ok) equal(
+  openResult.postconditions[0]?.predicates.find((p) => p.field === "state"),
+  { field: "state", comparison: "exact", expected: "open" },
+  "Issue create requires independent GET verification of initial open state.");
+
+const prose = JSON.parse(JSON.stringify(good)) as GithubPlan;
+prose.steps.forEach((x) => { x.expectedPostconditions = ["this describes an impossible operation"]; });
+assert(preflightApplyPlan(prose).ok,
+  "Descriptive postcondition strings must not influence typed capability checks.");
 
 function clone(): GithubPlan {
   return JSON.parse(JSON.stringify(good)) as GithubPlan;
