@@ -57,6 +57,13 @@
           },
           "description": "Optional milestones keyed by logical ID."
         },
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringProjectReference"
+          },
+          "description": "Existing Projects v2 boards only. Does not create projects or fields."
+        },
         "labels": {
           "type": "array",
           "items": {
@@ -182,6 +189,10 @@
         "assignees": {
           "$ref": "#/$defs/AuthoringIssueAssignees",
           "description": "GitHub logins; assignment eligibility is checked by GET during discovery."
+        },
+        "projects": {
+          "$ref": "#/$defs/AuthoringProjectAssignments",
+          "description": "Add/reconcile this issue's membership and field values in declared existing Projects v2."
         },
         "children": {
           "type": "array",
@@ -485,6 +496,19 @@
       "$ref": "#/$defs/AuthoringIssueLabels",
       "description": "GitHub login assignment using the same exact/incremental forms as labels. Omission never unassigns collaborators."
     },
+    "AuthoringProjectAssignments": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": [
+            "string",
+            "number"
+          ]
+        }
+      },
+      "description": "Optional Projects v2 membership, keyed by a declared project logicalId. An empty map adds membership only. Values are raw text/number/date or option/iteration names, resolved against existing fields."
+    },
     "AuthoringReferencedIssue": {
       "type": "object",
       "properties": {
@@ -497,6 +521,10 @@
         },
         "identity": {
           "$ref": "#/$defs/AuthoringIdentity"
+        },
+        "projects": {
+          "$ref": "#/$defs/AuthoringProjectAssignments",
+          "description": "Referenced existing issues may still be added to Projects v2 without changing the issue itself."
         }
       },
       "required": [
@@ -582,6 +610,10 @@
             "type": "string"
           },
           "description": "Logical IDs of declared issues referenced by a managed Closes #number block."
+        },
+        "projects": {
+          "$ref": "#/$defs/AuthoringProjectAssignments",
+          "description": "Project memberships and field values keyed by existing board logicalId."
         }
       },
       "required": [
@@ -696,6 +728,35 @@
       ],
       "additionalProperties": false,
       "description": "Existing milestone resource used as a pointer, not mutated or created."
+    },
+    "AuthoringProjectReference": {
+      "type": "object",
+      "properties": {
+        "logicalId": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "number": {
+          "type": "number"
+        },
+        "ownerType": {
+          "type": "string",
+          "enum": [
+            "org",
+            "user"
+          ],
+          "description": "Organization is default. A user project requires compatible authentication."
+        }
+      },
+      "required": [
+        "logicalId",
+        "owner",
+        "number"
+      ],
+      "additionalProperties": false,
+      "description": "Referenced existing Projects v2 board; project/field creation is deliberately unsupported."
     },
     "AuthoringRepositoryLabel": {
       "anyOf": [
