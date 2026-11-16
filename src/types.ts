@@ -32,7 +32,6 @@ export interface GithubPlannerConfig {
   schema: object;
   auth: string;
   fetch?: FetchLike;
-  octokit?: unknown;
   mode?: GithubPlannerMode;
   /** Default false; only explicitly opted-in plans may adopt existing issues by title. */
   adoptByTitle?: boolean;
@@ -331,6 +330,7 @@ export type DiagnosticCode =
   | "RELATIONSHIP_CYCLE"
   | "INSUFFICIENT_PERMISSION"
   | "NO_REST_TRANSPORT"
+  | "RATE_LIMITED"
   | "NO_GRAPHQL_TRANSPORT"
   | "UNSUPPORTED_SCHEMA_FEATURE"
   | "PARENT_CONFLICT";
