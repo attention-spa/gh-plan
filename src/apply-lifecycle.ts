@@ -463,11 +463,18 @@ export async function executeCallbackApplyPlan(
       try { response = await prepared.dispatch(request, step); }
       catch { throw new Error("ambiguous-write"); }
       phase = "verification"; code = "VERIFICATION_FAILED";
+      // Capture the dispatcher's immutable identity BEFORE invoking the
+      // caller-controlled postcondition reader; never trust a rewritten reply.
+      const claimed = spec.kind.endsWith(".create") && response != null
+        ? identity(response) : undefined;
+      if (spec.kind.endsWith(".create") && response != null && !claimed)
+        throw new Error("invalid-dispatch-identity");
+      const savedClaim = claimed === undefined ? undefined : frozen({ ...claimed });
       let verified: Read, afterCatalog: Identity | undefined;
       try {
         const outcome: unknown = await prepared.readPostcondition(frozen({
           spec, phase: "after", step, request,
-          bindings: frozen(snapshot(bindings)), responseIdentity: response,
+          bindings: frozen(snapshot(bindings)), responseIdentity: savedClaim,
         }));
         if (!readShape(outcome) || outcome.status !== "satisfied")
           throw new Error("postwrite-unverified");
@@ -477,7 +484,7 @@ export async function executeCallbackApplyPlan(
       checkUpdateIdentity(spec, verified, bindings);
       if (spec.kind.endsWith(".create")) {
         let found: Identity;
-        try { found = checkCreateIdentity(spec, verified, response, afterCatalog); }
+        try { found = checkCreateIdentity(spec, verified, savedClaim, afterCatalog); }
         catch { throw new Error("create-id-mismatch"); }
         bindings[step.logicalId] = found;
       } else if (verified.identity !== undefined &&
