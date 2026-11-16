@@ -1,5 +1,7 @@
 # Architecture and Safety Decisions
 
+- [Caller-injected public apply contract](/decisions/caller-injected-apply-contract.md) — Select callback-based applyPlan with an explicit caller trust boundary and separately verified GitHub adapters.
+
 - [Progressive apply coverage and authoritative postconditions](/decisions/progressive-apply-postconditions.md) — Start optional apply with four narrowly verified issue and milestone operations; reject unsupported plans before any write.
 
 - [GitHub-native cooperative apply ownership](/decisions/github-native-apply-ownership.md) — Serialize participating apply workers per target repository using a compare-and-swap Git ref; require manual abandoned-lock recovery.
