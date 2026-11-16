@@ -66,6 +66,7 @@ const graph = {
         body: { op: "remove" },
         milestone: { op: "set", value: { logicalId: "M1" } },
         issueType: { op: "set", value: "Task" },
+        assignees: { op: "modify", add: ["agent-hachi"], remove: [] },
         fields: {
           Priority: { op: "set", value: "High" },
           Effort: { op: "remove" },
