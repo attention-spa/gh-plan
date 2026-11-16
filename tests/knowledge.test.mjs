@@ -26,6 +26,7 @@ const decisions = [
   "markers-in-body", "deterministic-output", "no-secrets-in-plans",
   "relationship-reconciliation", "issue-deletion-policy", "title-adoption-opt-in",
   "github-native-apply-ownership", "progressive-apply-postconditions",
+  "caller-injected-apply-contract",
 ];
 const schema = ["repository","issue","milestone","label","relationship","set-remove-operations","pull-request","projects-v2","prune-duplicates"];
 const api = ["planGithub","normalizeSchema","resolveResourceIdentities","discoverAndResolve","createRestDiscoveryTransport","diffGithubState","compileMilestoneSteps","compileIssueSteps","compileIssueFieldSteps","compileIssueLabelSteps","compileIssueAssigneeSteps","compileRepositoryLabelSteps","compileRelationshipSteps","compilePullRequestSteps","compileProjectItemSteps","compilePruneSteps","requestReferences","validatePlanStepReferences","bindPlanRequest","types-authoring","types-state","types-plan","types-errors","types-transport"];
@@ -66,7 +67,13 @@ assert(rows.filter(r => !supported.includes(r.kind))
   .every(r => r.policy.includes("**Excluded from initial apply**")),
   "Every other kind needs an explicit rejected entry.");
 
-
+// Guard C2's public API trust boundary as runtime work proceeds.
+const c2 = paths.get("decisions/caller-injected-apply-contract.md");
+assert(c2 && c2.includes("Architecture decision C2"), "Owner-approved callback choice missing.");
+assert(c2.includes("acknowledgeCallbackTrust: true"), "C2 must be explicitly opted into.");
+assert(c2.includes("cannot prove callbacks actually performed GitHub GETs"),
+  "C2 documentation must not claim GitHub verification for arbitrary callbacks.");
+assert(c2.includes("four B1 exact candidate kinds"), "C2 must preserve B1 capability gate.");
 
 function frontmatter(id, text) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);

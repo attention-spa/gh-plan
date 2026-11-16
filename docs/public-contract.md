@@ -1,10 +1,14 @@
 # Public API contract
 
 The public entry point is `@attention-spa/gh-plan` (`src/index.ts`).
-The [M8.1.6a ownership ADR](../knowledge/decisions/github-native-apply-ownership.md) selects a future, unimplemented repository-wide CAS Git-ref lock and manual stale-lock recovery. The [M8.1.6b progressive coverage ADR](../knowledge/decisions/progressive-apply-postconditions.md) approves only four candidate future issue/milestone operation kinds with typed verification and full-plan fail-closed preflight; this decision implements **no** postcondition reader or public writer. It does not add an executor or export, and cannot prevent writes from external non-cooperating GitHub clients.
+The [M8.1.6a ownership ADR](../knowledge/decisions/github-native-apply-ownership.md) selects a future, unimplemented repository-wide CAS Git-ref lock and manual stale-lock recovery. The [M8.1.6b progressive coverage ADR](../knowledge/decisions/progressive-apply-postconditions.md) approves only four candidate future issue/milestone operation kinds with typed verification and full-plan fail-closed preflight; this decision implements **no** postcondition reader or public writer. It does not add an executor or export, and cannot prevent writes from external non-cooperating GitHub clients. The [approved C2 caller-injected API decision](../knowledge/decisions/caller-injected-apply-contract.md) chooses a **future public callback-based** `applyPlan()` in this private package, not a built-in authenticated GitHub writer. The caller will provide `dispatch`, `readPostcondition`, create catalogs and ownership callbacks; a library cannot prove those callbacks actually verify GitHub or hold a CAS lock. A separately selectable reference GitHub adapter remains required for independently tested live safety.
 This package **plans**, but does not execute, changes to GitHub. Its return
 value contains proposed HTTP requests, identity resolutions and diagnostics.
 The caller must not execute a plan whose `readiness` is `blocked`.
+
+## Future apply boundary — C2 approved, NOT IMPLEMENTED
+
+The future `applyPlan()` is opt-in via explicit `acknowledgeCallbackTrust: true`, requires callback dispatch, readback and ownership inputs, and must reject the entire plan before any resource writes if a B1 kind/shape/intent is unsupported. Its result/errors will carry only typed phases, stable codes and safe audit records; cancellation is cooperative, unknown GitHub writes must not be blindly retried, and callback honesty cannot be mechanically established by the package. The public `auth` and `fetch` options previously proposed under C1 are **not** approved for C2. This is a design only; `src/index.ts` has no such export, and `planGithub()` remains read-only.
 
 ## Authoring semantics
 

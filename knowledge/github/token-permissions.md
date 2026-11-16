@@ -30,6 +30,10 @@ Required permissions for read-only planning and potential external execution of 
 | Contents: read | Validate head/base refs and compare commits ahead of base | New PR discovery |
 | Pull requests: write | PR create/close/update and add/remove reviewer requests | External executor only |
 
+## C2 callback ownership of permissions (future, not implemented)
+
+The approved [C2 caller-injected API](/decisions/caller-injected-apply-contract.md) has **no public `auth` parameter or built-in GitHub writer**: it accepts caller-provided dispatch, postcondition, catalog and ownership callbacks. The package cannot attest the actual permission scopes or GitHub interactions of those callbacks. A separately selectable GitHub-backed reference adapter is required to apply the A1/B1 documented permission policy and prove it in a disposable private repository. The package remains private/read-only in its current exports.
+
 ## B1 planned mutation permissions (not currently exercised)
 
 The [approved B1 four-kind allowlist](/decisions/progressive-apply-postconditions.md) uses `Issues:write` for issue/milestone REST POST/PATCH plus read access for authoritative verification. GitHub also documents `Pull requests:write` as an alternative for certain milestone writes, but not as the uniform MVP requirement. Creating an issue with a milestone additionally requires push access. The A1 Git-ref lock separately needs repository `Contents:read/write`. No live production token/permission check or write was performed by this decision; disposable private-repository tests are required.
