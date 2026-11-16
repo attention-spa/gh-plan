@@ -66,8 +66,8 @@ class FakeBackend implements GithubCasBackend {
     const commit: CasCommit = {
       oid, treeOid: tree, parentOids: [parentOid], message,
     };
-    this.ownerCommits.set(oid, commit);
-    return commit;
+    this.ownerCommits.set(oid, { ...commit, parentOids: [...commit.parentOids] });
+    return { ...commit, parentOids: [...commit.parentOids] };
   }
   async lockRef(name: string): Promise<CasRef | null> {
     this.calls.push("lockRef");
