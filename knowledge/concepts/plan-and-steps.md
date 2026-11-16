@@ -4,7 +4,7 @@ title: "Plans and Steps"
 description: "Deterministic read-only reconciliation proposals with dependency-ordered REST requests."
 tags: ["planning", "dag"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:02:00+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:15:46+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -38,4 +38,8 @@ The default [prune policy](/schema/prune-duplicates.md) reports orphaned canonic
 
 ## Execution boundary
 
-An external executor may later use the proposed HTTP method/path/body and [late-bound references](/concepts/late-binding-refs.md). M8.1.1 introduces an internal (not package-exported) `executePlanSteps()` staging primitive. It checks the entire DAG for blocked/incomplete steps, duplicate IDs, missing dependencies, cycles and invalid future references **before any dispatch**; it orders requests by dependency, uses `bindPlanRequest()` just before dispatch, and records validated create-response identities for downstream references. Its dispatcher is explicitly injected. It does **not** reread postconditions, recover interrupted creates, verify writes or provide an idempotent public `applyPlan()`. Do not use it against a live repository until the remaining M8.1 gates are implemented. Deterministic output and [secret-free plans](/decisions/no-secrets-in-plans.md) make review possible before writing.
+The package entrypoint remains read-only. The internal (not exported) `executePlanSteps(plan, dispatch, readPostcondition)` staging primitive checks the entire DAG for blocked/incomplete steps, duplicate IDs, missing dependencies, cycles and invalid future references **before any dispatch**. It then evaluates each step sequentially in dependency order, late-binding any produced identities using `bindPlanRequest()`.
+
+M8.1.2 requires an explicitly injected **fresh, authoritative postcondition reader** before **every** planned mutation. It receives the step, bound request and current identities and must independently read GitHub's latest state (not reuse the planner snapshot), confirming **all** of that step's postconditions. A `satisfied` result skips the write; `unsatisfied` dispatches it. Missing, ambiguous or failed reads stop execution. Skipped create steps must return observed, validated identities or execution fails closed; satisfied steps are retained in `completedStepIds` and listed separately in `skippedStepIds`. The postcondition strings in `PlanStep` are *descriptive*, not machine-executable; this stage **does not implement a GitHub-backed reader**.
+
+This remains staging, **not** a safe public `applyPlan()`: no marker-based interrupted-create recovery, post-write verification, secret-free apply log or completed rerun guarantees exist yet. Do not use it against a live repository until the remaining M8.1 gates are implemented. Deterministic output and [secret-free plans](/decisions/no-secrets-in-plans.md) make review possible before writing.

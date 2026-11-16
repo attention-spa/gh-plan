@@ -4,7 +4,7 @@ title: "gh-plan overview"
 description: "A read-only GitHub desired-state planner that emits deterministic request DAGs."
 tags: ["github", "planning", "architecture"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:02:00+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:15:46+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/normalize.ts
@@ -12,7 +12,7 @@ sources:
 
 ## Summary
 
-`gh-plan` is a TypeScript ESM package for **planning**, not applying, GitHub repository changes. It interprets typed desired-state documents, reads GitHub REST state, resolves identities, computes a semantic diff and emits deterministic, dependency-ordered mutation requests. Its public entrypoint never performs GitHub writes. The internal M8.1.1 staging primitive can dispatch caller-supplied writes, but remains unexported pending idempotency, verification and recovery safeguards. The package remains private pending a separate release decision.
+`gh-plan` is a TypeScript ESM package for **planning**, not applying, GitHub repository changes. It interprets typed desired-state documents, reads GitHub REST state, resolves identities, computes a semantic diff and emits deterministic, dependency-ordered mutation requests. Its public entrypoint never performs GitHub writes. The internal M8 staging primitive supports injected dispatch and mandatory fresh postcondition checks with write skips, but remains unexported pending post-write verification and interrupted-run recovery safeguards. The package remains private pending a separate release decision.
 
 ## Pipeline
 

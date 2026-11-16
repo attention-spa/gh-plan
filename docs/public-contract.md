@@ -98,7 +98,9 @@ A `GithubPlan` contains `resolutions`, topologically sorted `steps`,
   original state, notably after resource creation. The plan itself does not
   implement rollback, transactionality or write execution.
 
-An internal M8.1.1 staging function, `executePlanSteps(plan, dispatch)`, now validates the complete DAG before running any injected dispatcher, sorts operations by dependency and late-binds validated post-create IDs. This is deliberately **not a public package export or safe general-purpose apply API**. It does not reread postconditions, recover creates after interruption or verify mutations. These safeguards remain required before `applyPlan()` can be exposed. The read-only planner contract is unchanged.
+An internal M8 staging function, `executePlanSteps(plan, dispatch, readPostcondition)`, validates the complete DAG before writes, executes in dependency order and late-binds validated identities. The **required** injected reader must make an authoritative, fresh GitHub read immediately before **each** step and compare all postconditions; the original planner snapshot is insufficient. If already satisfied, the write is skipped and recorded in `skippedStepIds`. Skipped create steps must supply observed, validated identities for future bindings. Missing readers, uncertain reads and unusable identities stop execution without proceeding to that write. Neither a GitHub-specific postcondition reader nor machine-evaluable postcondition declarations are provided yet.
+
+This staging function is deliberately **not a public package export or safe general-purpose apply API**. It does not yet recover interrupted creates or verify mutations after dispatch; secret-free durable logs and complete idempotency fixtures also remain future work. These safeguards are required before `applyPlan()` can be exposed. The read-only planner contract is unchanged.
 
 All public types and functions are documented in their TypeScript declarations,
 including the distributed `dist/*.d.ts` output. This contract describes the
