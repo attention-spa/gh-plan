@@ -43,11 +43,50 @@ export type PlanIssueCatalogReader = (
   repositoryFullName: string,
 ) => Promise<readonly ObservedIssue[]>;
 
+/** Stable, allowlisted phases; the log never contains HTTP data or error text. */
+export type PlanExecutionPhase =
+  | "binding" | "precondition" | "recovery" | "dispatch" | "verification" | "logging";
+
+/**
+ * Secret-free apply record. The 0-based position identifies the step in
+ * dependency order; no request bodies, paths, resource names, token-bearing
+ * errors, or other caller-controlled strings appear in the log.
+ */
+export interface PlanApplyLogEntry {
+  stepIndex: number;
+  outcome: "skipped" | "applied" | "failed";
+  phase: PlanExecutionPhase;
+}
+
+/** Optional async append-only sink; called after each resolved step or failure. */
+export type PlanApplyLogSink = (entry: Readonly<PlanApplyLogEntry>) => void | Promise<void>;
+
+/**
+ * Sanitized failure: deliberately discards arbitrary transport/error messages
+ * and response payloads. A caller can inspect the partial safe log and stage.
+ */
+export class PlanExecutionError extends Error {
+  readonly code = "PLAN_STEP_FAILED" as const;
+  readonly stepIndex: number;
+  readonly phase: PlanExecutionPhase;
+  readonly log: PlanApplyLogEntry[];
+
+  constructor(stepIndex: number, phase: PlanExecutionPhase, log: readonly PlanApplyLogEntry[]) {
+    super("Plan execution failed; no further steps were dispatched.");
+    this.name = "PlanExecutionError";
+    this.stepIndex = stepIndex;
+    this.phase = phase;
+    this.log = log.map((entry) => ({ ...entry }));
+  }
+}
+
 export interface PlanStepExecution {
   /** All resolved steps, including those already satisfied and skipped. */
   completedStepIds: string[];
   /** Steps for which the fresh postcondition read confirmed no write was needed. */
   skippedStepIds: string[];
+  /** Verified, secret-free apply decisions in dependency order. */
+  log: PlanApplyLogEntry[];
   /** Only public resource IDs from create responses or verified reads. */
   bindings: PlanBindings;
 }
@@ -144,6 +183,24 @@ function checkRecoveredIdentity(observed: ObservedIssue, asserted: unknown): voi
   }
 }
 
+/** Verification must affirm the identity returned by the preceding create. */
+function assertCreatedIdentity(
+  kind: PlanStep["kind"], dispatched: PlanBindings[string], checked: unknown,
+): void {
+  const observed = createdIdentity(kind, checked);
+  for (const key of ["number", "id", "nodeId"] as const) {
+    if (dispatched[key] !== undefined && observed[key] !== undefined &&
+        dispatched[key] !== observed[key]) {
+      throw new Error("Post-write verification contradicted the create identity.");
+    }
+  }
+  // At least one stable identity must be independently observed and equal.
+  const key = kind === "project.item.add" ? "id" : "number";
+  if (observed[key] !== dispatched[key]) {
+    throw new Error("Post-write verification did not confirm create identity.");
+  }
+}
+
 /** Collect trusted shape/field types, not arbitrary error messages or response bodies. */
 function createdIdentity(kind: PlanStep["kind"], response: unknown): PlanBindings[string] {
   if (!isRecord(response)) throw new Error("Create response lacks a resource identity.");
@@ -162,27 +219,25 @@ function createdIdentity(kind: PlanStep["kind"], response: unknown): PlanBinding
 }
 
 /**
- * Execute planned requests in deterministic dependency order. Validate the
- * entire DAG before the first write, then reread every step's postconditions
- * immediately before dispatch. A verified satisfied step is skipped; skipped
- * creates contribute observed identities so dependent requests can still bind.
+ * Internal, sequential execution staging. The entire plan is validated before
+ * any writes. Each step is freshly read before dispatch; each actual write is
+ * independently read again and must verify all postconditions. No failed step
+ * permits a following dispatch, and exceptions expose only an allowlisted phase
+ * and ordinal, never caller error messages, credentials or HTTP data.
  *
- * The required postcondition reader must check current state. When the plan
- * creates an issue, a second exhaustive marker catalog read guards against
- * repeating a create after an interruption, including when its desired state
- * has subsequently drifted. Existing marker + unsatisfied state is a conflict,
- * not permission to create again. No write is performed on ambiguity.
- *
- * This is NOT public applyPlan(): it cannot guarantee global concurrency-safe
- * exactly-once creation, postwrite verification or durable apply logs.
+ * The optional sink can persist each sanitized log entry as it is produced.
+ * Still not a public applyPlan(): postconditions require a caller-supplied
+ * authoritative reader and concurrent writers are not transactionally locked.
  */
 export async function executePlanSteps(
   plan: GithubPlan, dispatch: PlanStepDispatcher,
   readPostcondition: PlanStepPostconditionReader,
   readIssueCatalog?: PlanIssueCatalogReader,
+  onLog?: PlanApplyLogSink,
 ): Promise<PlanStepExecution> {
-  if (typeof dispatch !== "function" || typeof readPostcondition !== "function") {
-    throw new Error("Execution requires a dispatcher and fresh postcondition reader.");
+  if (typeof dispatch !== "function" || typeof readPostcondition !== "function" ||
+      (onLog !== undefined && typeof onLog !== "function")) {
+    throw new Error("Execution requires valid dispatcher, postcondition reader and log sink.");
   }
   const steps = orderedSteps(plan);
   const markers = new Map<string, { marker: string; custom: boolean }>();
@@ -196,53 +251,102 @@ export async function executePlanSteps(
   const bindings: PlanBindings = Object.create(null) as PlanBindings;
   const completedStepIds: string[] = [];
   const skippedStepIds: string[] = [];
-  for (const step of steps) {
-    // Bind after prerequisite creates (including skipped, observed creates).
-    const request = bindPlanRequest(step.request!, bindings);
-    const identitySnapshot: PlanBindings = Object.fromEntries(
-      Object.entries(bindings).map(([id, identity]) => [id, { ...identity }]),
-    );
-    const checked: unknown = await readPostcondition(step, request, identitySnapshot);
-    if (!isRecord(checked)) {
-      throw new Error("Postcondition reader returned no conclusive result.");
-    }
-    // M8.1.3: identify an interrupted issue create by its unique durable
-    // marker. The second read cannot be replaced with a stale plan snapshot.
-    // A marker match with changed properties is a conflict, never a new POST.
-    const marker = markers.get(step.id);
-    let recovered: ObservedIssue | undefined;
-    if (marker) {
-      recovered = matchingIssue(
-        await readIssueCatalog!(plan.repository.fullName), marker.marker, marker.custom);
-      if (recovered && checked.status !== "satisfied") {
-        throw new Error("Existing marked issue differs from create postconditions; replan.");
-      }
-      if (!recovered && checked.status === "satisfied") {
-        throw new Error("Postcondition claims an issue exists without its marker.");
-      }
-      if (recovered) checkRecoveredIdentity(recovered, checked.identity);
-    }
-    if (checked.status === "satisfied") {
-      if (PRODUCERS.has(step.kind)) {
-        // Do not skip a producer without a verified, usable binding. Otherwise
-        // dependent steps might bind guessed or missing resource identities.
-        bindings[step.logicalId] = recovered
-          ? createdIdentity(step.kind, recovered) : createdIdentity(step.kind, checked.identity);
-      } else if (Object.hasOwn(checked, "identity")) {
-        throw new Error("Non-create postcondition included an unexpected identity.");
-      }
-      skippedStepIds.push(step.id);
-    } else if (checked.status === "unsatisfied" && !Object.hasOwn(checked, "identity")) {
-      // Rebind after the read to avoid dispatching an object mutated by a
-      // caller-supplied reader. A write must not occur for unknown read states.
-      const response = await dispatch(bindPlanRequest(step.request!, bindings), step);
-      if (PRODUCERS.has(step.kind)) {
-        bindings[step.logicalId] = createdIdentity(step.kind, response);
-      }
-    } else {
-      throw new Error("Postcondition reader returned no conclusive result.");
-    }
-    completedStepIds.push(step.id);
+  const log: PlanApplyLogEntry[] = [];
+
+  async function record(entry: PlanApplyLogEntry): Promise<void> {
+    log.push(entry);
+    if (onLog) await onLog({ ...entry });
   }
-  return { completedStepIds, skippedStepIds, bindings: { ...bindings } };
+  for (const [stepIndex, step] of steps.entries()) {
+    let phase: PlanExecutionPhase = "binding";
+    try {
+      // Bind only after prior creates have been independently verified.
+      const request = bindPlanRequest(step.request!, bindings);
+      const snapshot = (): PlanBindings => Object.fromEntries(
+        Object.entries(bindings).map(([id, identity]) => [id, { ...identity }]),
+      );
+      phase = "precondition";
+      const checked: unknown = await readPostcondition(step, request, snapshot());
+      if (!isRecord(checked)) {
+        throw new Error("Postcondition reader returned no conclusive result.");
+      }
+
+      // The full marker catalog is independent of the postcondition reader.
+      phase = "recovery";
+      const marker = markers.get(step.id);
+      let recovered: ObservedIssue | undefined;
+      if (marker) {
+        recovered = matchingIssue(
+          await readIssueCatalog!(plan.repository.fullName), marker.marker, marker.custom);
+        if (recovered && checked.status !== "satisfied") {
+          throw new Error("Existing marked issue differs from create postconditions; replan.");
+        }
+        if (!recovered && checked.status === "satisfied") {
+          throw new Error("Postcondition claims an issue exists without its marker.");
+        }
+        if (recovered) checkRecoveredIdentity(recovered, checked.identity);
+      }
+
+      if (checked.status === "satisfied") {
+        if (PRODUCERS.has(step.kind)) {
+          bindings[step.logicalId] = recovered
+            ? createdIdentity(step.kind, recovered) : createdIdentity(step.kind, checked.identity);
+        } else if (Object.hasOwn(checked, "identity")) {
+          throw new Error("Non-create postcondition included an unexpected identity.");
+        }
+        skippedStepIds.push(step.id);
+        phase = "logging";
+        await record({ stepIndex, outcome: "skipped", phase: "precondition" });
+      } else if (checked.status === "unsatisfied" && !Object.hasOwn(checked, "identity")) {
+        phase = "dispatch";
+        // Rebind after the read so a malicious/mutating reader cannot alter
+        // the outgoing request object before dispatch.
+        const response = await dispatch(bindPlanRequest(step.request!, bindings), step);
+        const produced = PRODUCERS.has(step.kind)
+          ? createdIdentity(step.kind, response) : undefined;
+
+        phase = "verification";
+        const afterBindings = snapshot();
+        if (produced) afterBindings[step.logicalId] = { ...produced };
+        const verified: unknown = await readPostcondition(step, request, afterBindings);
+        if (!isRecord(verified) || verified.status !== "satisfied") {
+          throw new Error("Post-write verification did not confirm the intended state.");
+        }
+        if (produced) {
+          assertCreatedIdentity(step.kind, produced, verified.identity);
+        } else if (Object.hasOwn(verified, "identity")) {
+          throw new Error("Non-create verification included an unexpected identity.");
+        }
+
+        // Check issue marker uniqueness after the write as well: a successful
+        // create response alone does not prove which issue now owns the marker.
+        if (marker) {
+          const observed = matchingIssue(
+            await readIssueCatalog!(plan.repository.fullName), marker.marker, marker.custom);
+          if (!observed) throw new Error("Created issue marker not found after write.");
+          checkRecoveredIdentity(observed, response);
+          checkRecoveredIdentity(observed, verified.identity);
+        }
+        if (produced) bindings[step.logicalId] = produced;
+        phase = "logging";
+        await record({ stepIndex, outcome: "applied", phase: "verification" });
+      } else {
+        throw new Error("Postcondition reader returned no conclusive result.");
+      }
+      completedStepIds.push(step.id);
+    } catch {
+      // Intentionally drop the caught error and all raw request/response data.
+      // The caller can safely store this allowlisted record on failures.
+      const failure = { stepIndex, outcome: "failed" as const, phase };
+      log.push(failure);
+      if (onLog && phase !== "logging") {
+        try { await onLog({ ...failure }); } catch { /* preserve original failure phase */ }
+      }
+      throw new PlanExecutionError(stepIndex, phase, log);
+    }
+  }
+  return {
+    completedStepIds, skippedStepIds, log: log.map((entry) => ({ ...entry })),
+    bindings: { ...bindings },
+  };
 }

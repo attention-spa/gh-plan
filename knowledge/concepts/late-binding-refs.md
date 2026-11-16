@@ -4,7 +4,7 @@ title: "Late-Binding References"
 description: "Identity placeholders for requests that depend on resources not yet created."
 tags: ["planning", "identity"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:25:57+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T09:00:00+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan-bindings.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -23,6 +23,10 @@ An executor, after completing the create request, provides the identity using `P
 ## Interrupted-create bindings
 
 M8.1.3 reuses identities from a unique, freshly found marked issue when an in-flight `issue.create` POST completed remotely but lost its reply. A separate fresh postcondition check must agree on the identity; the observed numeric `id`/`number` and optional `nodeId` are then bound just as they would be from a normal create response. A mismatch or ambiguous marker halts rather than binding an unrelated issue.
+
+## Post-write identity verification
+
+The M8.1.4 executor validates create-response identities against a **new** authoritative postcondition read before exposing them to downstream requests. The reporter must return a valid matching identity for all creation kinds; issue creates additionally reread the full marker catalog and compare its unique match. A failure stops the run without marking the producer verified or dispatching dependent operations.
 
 ## PR closing references
 
