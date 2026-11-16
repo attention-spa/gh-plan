@@ -9,7 +9,8 @@ permissions:
 
 jobs:
   bootstrap-dry-run:
-    runs-on: ubuntu-latest
+    # workflow_dispatch is manually initiated by a trusted repository operator.
+    runs-on: [self-hosted, Linux, trusted]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
