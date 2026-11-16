@@ -4,7 +4,7 @@ title: "Desired State Graph"
 description: "The normalized, flattened representation of desired repository resources and relationships."
 tags: ["schema", "normalization"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:12:55.558+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:39:10.683+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/normalize.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -22,7 +22,9 @@ The desired-state graph is the deterministic result of [normalization](/concepts
 - `relationships` contains normalized parent, dependency and related-to edges.
 - `relationshipMode` is omitted for default reconciliation or set to `additive`.
 
-Nested `children` declarations become flat issue resources plus directed parent edges. Shorthand values become explicit set/remove instructions. **Absence is intentionally different from removal:** the planner must preserve unspecified properties. An invalid schema produces blocking diagnostics instead of a graph.
+Nested `children` declarations become flat issue resources plus directed parent edges. Milestone `due_on` authoring takes UTC calendar dates rather than timestamps. The observed GitHub timestamp is compared by its UTC date, preserving `{op:"remove"}` versus omission. A missing observed due date field blocks managed comparisons rather than silently assuming no deadline.
+
+Shorthand values become explicit set/remove instructions. **Absence is intentionally different from removal:** the planner must preserve unspecified properties. An invalid schema produces blocking diagnostics instead of a graph.
 
 ## Connections
 

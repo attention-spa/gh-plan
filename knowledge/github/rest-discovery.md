@@ -5,7 +5,7 @@ description: "GitHub REST GET catalog, enrichment and assignee-eligibility endpo
 resource: https://docs.github.com/en/rest/issues/issues
 tags: [github, rest, permissions]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:22:39.331+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:39:10.683+01:00 }
 sources:
   - resource: https://docs.github.com/en/rest/issues/issues
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/rest.ts
@@ -21,7 +21,7 @@ GitHub REST GET catalog, enrichment and assignee-eligibility endpoints used by t
 | --- | --- | --- | --- |
 | GET | /repos/{owner}/{repo} | Repository metadata | Metadata: read |
 | GET | /repos/{owner}/{repo}/issues?state=all&per_page=100 | Issues summary listing | Issues: read |
-| GET | /repos/{owner}/{repo}/milestones?state=all&per_page=100 | Milestones and identity by title | Issues: read |
+| GET | /repos/{owner}/{repo}/milestones?state=all&per_page=100 | Milestones, title identity and nullable ISO `due_on` timestamp | Issues: read |
 | GET | /repos/{owner}/{repo}/issue-types | Optional repository issue types (200 or 404) | Metadata: read |
 | GET | /repos/{owner}/{repo}/labels?per_page=100 | Root/issue label catalog, only when managed | Issues: read |
 | GET | /orgs/{org}/issue-fields | Organization issue-field catalog, only for org-owned repos | Organization Issue Fields: read |
@@ -43,6 +43,8 @@ GitHub REST GET catalog, enrichment and assignee-eligibility endpoints used by t
 | GET | /repos/{owner}/{repo}/compare/{base}...{head} | Verify head contains commits ahead of base | Contents: read |
 
 ## Runtime behavior
+
+Milestone `due_on` is included in the existing paginated milestone GET and requires no additional request. Non-null values are validated as ISO timestamps and normalized to UTC calendar dates for semantic comparison; `null` denotes no deadline.
 
 For declared Projects v2, the transport performs only read-only GETs on the referenced project by owner/number, field metadata, and a repository-filtered item listing with explicit numeric field selectors. It never lists unrelated boards or requests project/field creation. Project list pagination is followed safely as with existing REST catalogs. User-owned board GETs are supported in the adapter but GitHub documents that they do **not** support fine-grained token classes; authentication failures are blockers.
 

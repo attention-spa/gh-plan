@@ -5,7 +5,7 @@ description: "NormalizedDesiredStateGraph, desired-resource unions, observed sna
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:21:42.849+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:39:10.683+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -41,6 +41,8 @@ NormalizedDesiredStateGraph, desired-resource unions, observed snapshots and res
 - `ObservedMilestone`
 - `ObservedLabel`
 - `ResourceResolution`
+
+The `DesiredMilestoneState.due_on` property holds an explicit set/remove of a calendar date. `ObservedMilestone.due_on` holds GitHub's ISO timestamp or `null`; an absent optional value indicates that it was not observed and blocks managed comparisons.
 
 ## Contract boundary
 
