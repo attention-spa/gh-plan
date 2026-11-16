@@ -35,10 +35,7 @@ function matchesMarker(
   if (typeof body !== "string") return false;
   if (!custom) return body.includes(marker);
 
-  const escaped = marker.replace(/[\\^$.*+?()[\]{}|]/g, "\\function effectiveMarker(resource: DesiredResource): string | undefined {
-  if (resource.kind !== "issue") return undefined;
-  return resource.identity?.marker ?? canonicalMarker(resource.logicalId);
-}");
+  const escaped = marker.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
   // A capturing prefix avoids lookbehind, including in constrained JS runtimes.
   return new RegExp("(^|[^A-Za-z0-9_.:/-])" + escaped + "(?![A-Za-z0-9_.:/-])").test(body);
 }
