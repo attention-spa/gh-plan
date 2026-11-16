@@ -196,6 +196,27 @@ const oldApi = actionsApi({
 });
 assert.equal(await oldApi.dispatch(expected, 51), 789,
   "Older HTTP 204 dispatch responses must use uniquely correlated discovery.");
+const ambiguous = actionsApi({
+  token, now: () => 1_800_000_000_000, sleep: async () => {},
+  fetchImpl: async (url) => {
+    if (url.endsWith("/workflows/ci-worker.yml"))
+      return json(200, { id: 444, path: ".github/workflows/ci-worker.yml" });
+    if (url.endsWith("/dispatches")) return { status: 204 };
+    if (url.includes("/runs?")) {
+      const record = {
+        id: 789, workflow_id: 444, event: "workflow_dispatch",
+        head_branch: "main", repository: { full_name: "attention-spa/gh-plan" },
+        display_title: title, created_at: new Date(1_800_000_000_000).toISOString(),
+      };
+      return json(200, { workflow_runs: [record, { ...record, id: 790 }] });
+    }
+    throw Error("Unexpected legacy request " + url);
+  },
+});
+await assert.rejects(ambiguous.dispatch(expected, 51),
+  /CI_FALLBACK_AMBIGUOUS_DISPATCH/,
+  "Two matching legacy runs must abort without guessing or re-dispatching.");
+
 for (const code of [403, 429, 503]) {
   const bad = actionsApi({
     token, fetchImpl: async () => json(code, { message: "secret-token-never-log" }),
