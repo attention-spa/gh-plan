@@ -89,7 +89,7 @@ export function requestReferences(request: PlanRequest): string[] {
 export function validatePlanStepReferences(steps: readonly PlanStep[]): GithubDiagnostic[] {
   const producers = new Map<string, string[]>();
   for (const step of steps) {
-    if ((step.kind === "issue.create" || step.kind === "milestone.create" || step.kind === "pull_request.create") && step.status === "planned") {
+    if ((step.kind === "issue.create" || step.kind === "milestone.create" || step.kind === "pull_request.create" || step.kind === "project.item.add") && step.status === "planned") {
       const entries = producers.get(step.logicalId) ?? [];
       entries.push(step.id);
       producers.set(step.logicalId, entries);

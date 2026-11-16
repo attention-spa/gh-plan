@@ -115,6 +115,22 @@ export interface DesiredRepositoryLabel {
   description?: string;
 }
 
+/** Reference to an existing Projects v2 board, never created or modified. */
+export interface DesiredProjectReference {
+  logicalId: LogicalResourceId;
+  owner: string;
+  number: number;
+  ownerType: "org" | "user";
+}
+
+/** A managed membership for an issue or PR; empty fields means membership only. */
+export interface DesiredProjectItemAssignment {
+  resourceLogicalId: LogicalResourceId;
+  resourceKind: "issue" | "pull_request";
+  projectLogicalId: LogicalResourceId;
+  fields: Record<string, string | number>;
+}
+
 /** Normalized issue intent. Omission leaves a field unchanged; issue types and org fields are named, not keyed by API IDs. */
 export type DesiredIssueState = {
   title?: DesiredSet<string>;
@@ -251,6 +267,9 @@ export interface NormalizedDesiredStateGraph {
   relationships: DesiredRelationship[];
   /** Separate PR resources avoid treating PRs as ordinary issue-mutation targets. */
   pullRequests?: DesiredPullRequestResource[];
+  /** Existing board references and declared issue/PR project item memberships. */
+  projects?: DesiredProjectReference[];
+  projectItems?: DesiredProjectItemAssignment[];
 }
 
 /** Only existing/new are actionable; ambiguous/unresolved identities must block. */
@@ -363,6 +382,35 @@ export interface ObservedLabel {
   description?: string | null;
 }
 
+/** Existing project custom field metadata keyed by numeric REST ID; unsupported types are not applied. */
+export interface ObservedProjectField {
+  id: number;
+  name: string;
+  dataType: string;
+  options?: Array<{ id: string; name: string }>;
+  iterations?: Array<{ id: string; title: string }>;
+}
+
+/** Scoped item snapshot; fields represent observed values by field ID. */
+export interface ObservedProjectItem {
+  id: number;
+  contentType: "Issue" | "PullRequest";
+  contentId: number;
+  contentNumber: number;
+  fields: Record<string, string | number | null>;
+}
+
+/** Read-only metadata and scoped items for a declared existing Projects v2 board. */
+export interface ObservedProject {
+  logicalId: LogicalResourceId;
+  owner: string;
+  number: number;
+  ownerType: "org" | "user";
+  missing?: boolean;
+  fields: ObservedProjectField[];
+  items: ObservedProjectItem[];
+}
+
 /** Read-only observed state; optional catalogs are fetched only when required. */
 export interface GithubStateSnapshot {
   repository: RepositoryRef;
@@ -380,6 +428,8 @@ export interface GithubStateSnapshot {
   /** Case-folded login to repository assignment eligibility (204=true, 404=false). */
   assigneeEligibility?: Record<string, boolean>;
   issueFields: ObservedIssueField[];
+  /** Scoped Projects v2 metadata; absent means not discovered, not empty. */
+  projects?: ObservedProject[];
 }
 
 /** Read-only I/O boundary. discover fetches broad data; enrich fetches targeted details and may reject on transport errors. */
@@ -391,6 +441,8 @@ export interface GithubDiscoveryTransport {
   enrich(snapshot: GithubStateSnapshot, issueNumbers: number[], assigneeLogins?: string[]): Promise<GithubStateSnapshot>;
   /** Optional read-only, PR-specific enrichment; invoked only for declared PRs. */
   enrichPullRequests?(snapshot: GithubStateSnapshot, desired: DesiredPullRequestResource[]): Promise<GithubStateSnapshot>;
+  /** Read only referenced boards, their fields, and items scoped to target repository. */
+  enrichProjects?(snapshot: GithubStateSnapshot, desired: NormalizedDesiredStateGraph): Promise<GithubStateSnapshot>;
 }
 
 /** Only planned operations are executable; noops and blocked/unsupported entries are informational. */
@@ -402,6 +454,8 @@ export type PlanOperationKind =
   | "label.update"
   | "milestone.create"
   | "milestone.update"
+  | "project.item.add"
+  | "project.item.fields.set"
   | "pull_request.create"
   | "pull_request.update"
   | "pull_request.reviewer.add"
@@ -523,7 +577,11 @@ export type DiagnosticCode =
   | "PR_BRANCH_INVALID"
   | "PR_PAIR_CONFLICT"
   | "PR_MERGED"
-  | "PR_DRAFT_UNSUPPORTED";
+  | "PR_DRAFT_UNSUPPORTED"
+  | "UNKNOWN_PROJECT"
+  | "UNKNOWN_PROJECT_FIELD"
+  | "UNKNOWN_PROJECT_FIELD_OPTION"
+  | "UNSUPPORTED_PROJECT_FIELD";
 
 /** Severity label; blocking separately controls whether the plan is safe to execute. */
 export type DiagnosticSeverity = "info" | "warning" | "error";

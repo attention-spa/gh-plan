@@ -31,6 +31,19 @@ export type AuthoringIssueLabels = string[] | AuthoringSet<string[]>
 /** GitHub login assignment using the same exact/incremental forms as labels. Omission never unassigns collaborators. */
 export type AuthoringIssueAssignees = AuthoringIssueLabels;
 
+/** Optional Projects v2 membership, keyed by a declared project logicalId. An empty map adds membership only.
+ * Values are raw text/number/date or option/iteration names, resolved against existing fields. */
+export type AuthoringProjectAssignments = Record<string, Record<string, string | number>>;
+
+/** Referenced existing Projects v2 board; project/field creation is deliberately unsupported. */
+export interface AuthoringProjectReference {
+  logicalId: string;
+  owner: string;
+  number: number;
+  /** Organization is default. A user project requires compatible authentication. */
+  ownerType?: "org" | "user";
+}
+
 /** Managed issue: requested properties are reconciled; absent properties are not touched. Type and organization fields use display names, not REST IDs. */
 export interface AuthoringManagedIssue {
   logicalId: string;
@@ -47,6 +60,8 @@ export interface AuthoringManagedIssue {
   labels?: AuthoringIssueLabels;
   /** GitHub logins; assignment eligibility is checked by GET during discovery. */
   assignees?: AuthoringIssueAssignees;
+  /** Add/reconcile this issue's membership and field values in declared existing Projects v2. */
+  projects?: AuthoringProjectAssignments;
   /** Nested children create directed parent links; nested reference-only issues are allowed. */
   children?: AuthoringIssue[];
   /** Logical IDs of issues that block this issue (incoming dependency edges). */
@@ -61,6 +76,8 @@ export interface AuthoringReferencedIssue {
   logicalId: string;
   management: "reference";
   identity?: AuthoringIdentity;
+  /** Referenced existing issues may still be added to Projects v2 without changing the issue itself. */
+  projects?: AuthoringProjectAssignments;
 }
 /** Discriminated managed-or-reference issue declaration, optionally nested via children. */
 export type AuthoringIssue = AuthoringManagedIssue | AuthoringReferencedIssue;
@@ -128,6 +145,8 @@ export interface AuthoringPullRequest {
   reviewers?: AuthoringIssueAssignees;
   /** Logical IDs of declared issues referenced by a managed Closes #number block. */
   closes?: string[];
+  /** Project memberships and field values keyed by existing board logicalId. */
+  projects?: AuthoringProjectAssignments;
 }
 
 /** Public ergonomic planGithub() input. Fields omitted from managed resources are not touched.
@@ -144,6 +163,8 @@ export interface GithubPlanSchema {
   pullRequests?: AuthoringPullRequest[];
   /** Optional milestones keyed by logical ID. */
   milestones?: AuthoringMilestone[];
+  /** Existing Projects v2 boards only. Does not create projects or fields. */
+  projects?: AuthoringProjectReference[];
   /** Optional repository-label declarations; omitted labels never imply deletion. */
   labels?: AuthoringRepositoryLabel[];
   /** Native directed and symmetric relationship declarations. */
