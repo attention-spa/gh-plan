@@ -18,6 +18,8 @@ jobs:
           node-version: 22
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run schema:check
+        env:
+          GH_PLAN_SCHEMA_BOOTSTRAP: '1'
       - run: npm test
       - run: npm run build
       - run: npm run test:dist
