@@ -507,4 +507,30 @@ await denied("arbitrary GraphQL mutations are never allowed",()=>
   }),"UNSAFE_REQUEST");
 equal(invalidWrite.calls.length,0,"Unsupported mutations never reach GitHub.");
 
+const nodeGuard = new FakeGithub();
+const pinned = createGithubReferenceHttp({
+  repository:{fullName:"a/b"},auth:SECRET,fetch:nodeGuard.fetch,
+});
+await pinned.assertRepository(false);
+const beforeWrongNode = nodeGuard.calls.length;
+await denied("GraphQL CAS cannot target another repository node ID",() =>
+  pinned.fetch(BASE+"/graphql",{
+    method:"POST",redirect:"error",
+    headers:{Authorization:"Bearer "+SECRET,
+      Accept:"application/vnd.github+json",
+      "X-GitHub-Api-Version":"2026-03-10",
+      "Content-Type":"application/json"},
+    body:JSON.stringify({
+      query:"mutation ApplyOwnerCas($input:UpdateRefsInput!){updateRefs(input:$input){clientMutationId}}",
+      variables:{input:{
+        repositoryId:"R_UNRELATED_PRIVATE_REPO",
+        refUpdates:[{name:"refs/heads/gh-plan/locks/repository",
+          beforeOid:ZERO,afterOid:"a".repeat(40),force:false}],
+      }},
+    }),
+  }),"UNSAFE_REQUEST");
+equal(nodeGuard.calls.length,beforeWrongNode,
+  "Foreign GraphQL CAS must be stopped before sending any mutation.");
+
+
 console.log("#189 reference GitHub transport: pinned/allowlisted A1+B1, serial pacing, private-repo guards, full catalog pagination and safe rerun passed.");
