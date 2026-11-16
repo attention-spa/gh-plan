@@ -157,8 +157,12 @@ customPlan.resolutions = [{ kind: "issue", logicalId: "I", status: "new",
 let customWrites = 0;
 const customResult = await executePlanSteps(customPlan,
   async () => { customWrites++; return { number: 10 }; },
-  async () => ({ status: "unsatisfied" }),
-  async () => [{ ...marked(100), body: "prefix " + custom + "x suffix" }]);
+  async () => customWrites
+    ? { status: "satisfied", identity: { number: 10 } }
+    : { status: "unsatisfied" },
+  async () => customWrites
+    ? [{ ...marked(10), body: "prefix " + custom + " suffix" }]
+    : [{ ...marked(100), body: "prefix " + custom + "x suffix" }]);
 equal(customWrites, 1, "Boundary-adjacent custom marker must not cause false adoption.");
 equal(customResult.skippedStepIds, [], "Unmatched custom marker is not a skip.");
 

@@ -1,4 +1,4 @@
-import { executePlanSteps } from "../src/execute-steps.ts";
+import { executePlanSteps, PlanExecutionError } from "../src/execute-steps.ts";
 import type { GithubPlan, PlanRequest, PlanStep } from "../src/types.ts";
 
 function check(value: unknown, message: string): asserts value {
@@ -46,18 +46,30 @@ const marked = {
 };
 const calls: Array<{ method: string; path: string; body?: unknown }> = [];
 const events: string[] = [];
+const written = new Set<string>();
 const original = plan([patch, issue, milestone]);
 const before = JSON.stringify(original);
 const result = await executePlanSteps(original, async (request, s) => {
   check(request.protocol === "rest", "Only REST fixture requests are expected.");
   events.push("write:" + s.id);
+  written.add(s.id);
   calls.push({ method: request.method, path: request.path, body: request.body });
   return request.path.endsWith("/milestones")
     ? { id: 200, number: 7, node_id: "M_7" } :
     request.path.endsWith("/issues") ? { id: 800, number: 12, node_id: "I_12" } : {};
 }, async (s, request, bindings) => {
-  events.push("read:" + s.id);
+  events.push((written.has(s.id) ? "verify:" : "read:") + s.id);
   check(request.protocol === "rest", "Every read receives the bound REST request.");
+  if (written.has(s.id)) {
+    if (s.id === "milestone.create:M") {
+      return { status: "satisfied", identity: { number: 7, id: 200, node_id: "M_7" } };
+    }
+    if (s.id === "issue.create:I") {
+      equal(bindings.I?.number, 12, "Verification read receives the create identity.");
+      return { status: "satisfied", identity: { number: 12, id: 800, node_id: "I_12" } };
+    }
+    return { status: "satisfied" };
+  }
   if (s.id === "issue.create:I") {
     equal(bindings.M?.number, 7, "Reader receives the previous producer binding.");
     equal(request.body, { title: "Issue", body: "<!-- gh-plan:I -->", milestone: 7 },
@@ -68,16 +80,21 @@ const result = await executePlanSteps(original, async (request, s) => {
     equal(request.path, "/repos/a/b/issues/12", "Reader sees resolved update path.");
   }
   return { status: "unsatisfied" };
-}, async () => []);
+}, async () => written.has("issue.create:I") ? [marked] : []);
 
 equal(result.completedStepIds, ["milestone.create:M", "issue.create:I", "issue.update:I"],
   "Unordered plan must execute in complete topological order.");
 equal(result.skippedStepIds, [], "Unsatisfied reads must not be classified as skips.");
 equal(events, [
-  "read:milestone.create:M", "write:milestone.create:M",
-  "read:issue.create:I", "write:issue.create:I",
-  "read:issue.update:I", "write:issue.update:I",
-], "Every step must have a fresh read immediately before its write.");
+  "read:milestone.create:M", "write:milestone.create:M", "verify:milestone.create:M",
+  "read:issue.create:I", "write:issue.create:I", "verify:issue.create:I",
+  "read:issue.update:I", "write:issue.update:I", "verify:issue.update:I",
+], "Every mutation must have independent fresh reads before and after dispatch.");
+equal(result.log, [
+  { stepIndex: 0, outcome: "applied", phase: "verification" },
+  { stepIndex: 1, outcome: "applied", phase: "verification" },
+  { stepIndex: 2, outcome: "applied", phase: "verification" },
+], "Success log must contain only ordinals, outcomes and verified phases.");
 equal(result.bindings, { M: { id: 200, number: 7, nodeId: "M_7" },
   I: { id: 800, number: 12, nodeId: "I_12" } },
 "Create responses populate only identity bindings.");
@@ -156,11 +173,18 @@ equal(resumed.skippedStepIds, ["milestone.create:M", "issue.create:I", "issue.up
 equal(resumed.bindings, result.bindings, "Skipped creates must yield the same identities.");
 equal(rerunEvents, ["read:milestone.create:M", "read:issue.create:I", "read:issue.update:I"],
   "Fully satisfied plan must perform three fresh reads but zero writes.");
+equal(resumed.log, [
+  { stepIndex: 0, outcome: "skipped", phase: "precondition" },
+  { stepIndex: 1, outcome: "skipped", phase: "precondition" },
+  { stepIndex: 2, outcome: "skipped", phase: "precondition" },
+], "Already-satisfied steps must each have a redacted skip log record.");
 
 const mixedEvents: string[] = [];
+let mixedIssueWritten = false;
 const mixed = await executePlanSteps(original, async (bound, s) => {
   mixedEvents.push("write:" + s.id);
   if (s.id === "issue.create:I") {
+    mixedIssueWritten = true;
     check(bound.protocol === "rest", "REST create expected.");
     equal(bound.body, { title: "Issue", body: "<!-- gh-plan:I -->", milestone: 7 },
       "A skipped milestone still binds the issue create request.");
@@ -172,15 +196,18 @@ const mixed = await executePlanSteps(original, async (bound, s) => {
   if (s.id === "milestone.create:M") {
     return { status: "satisfied", identity: { number: 7 } };
   }
+  if (s.id === "issue.create:I" && mixedIssueWritten) {
+    return { status: "satisfied", identity: { number: 12, id: 800 } };
+  }
   return s.id === "issue.update:I"
     ? { status: "satisfied" } : { status: "unsatisfied" };
-}, async () => []);
+}, async () => mixedIssueWritten ? [marked] : []);
 
 equal(mixed.skippedStepIds, ["milestone.create:M", "issue.update:I"],
   "Only satisfied steps should be skipped.");
 equal(mixedEvents, [
   "read:milestone.create:M",
-  "read:issue.create:I", "write:issue.create:I",
+  "read:issue.create:I", "write:issue.create:I", "read:issue.create:I",
   "read:issue.update:I",
 ], "Read-after-prerequisite changes must be authoritative and per step.");
 
@@ -218,15 +245,18 @@ try {
     writesBeforeFailure++; return { number: 7 };
   }, async () => {
     readsBeforeFailure++;
-    if (readsBeforeFailure === 2) throw new Error("Read failed after earlier write.");
-    return { status: "unsatisfied" };
+    if (readsBeforeFailure === 3) throw new Error("Read failed after earlier write. SECRET");
+    return readsBeforeFailure === 2
+      ? { status: "satisfied", identity: { number: 7 } }
+      : { status: "unsatisfied" };
   }, async () => []);
   throw new Error("Expected second reader failure.");
 } catch (error) {
-  check(error instanceof Error && error.message === "Read failed after earlier write.",
-    "Fresh-read transport failure must immediately stop subsequent writes.");
+  check(error instanceof PlanExecutionError && error.phase === "precondition" &&
+    !JSON.stringify(error).includes("SECRET"),
+    "A failed reader must stop with sanitized error and partial execution log.");
 }
-equal(readsBeforeFailure, 2, "Read must be retried on each step.");
+equal(readsBeforeFailure, 3, "Reads must verify the first write before checking the next step.");
 equal(writesBeforeFailure, 1, "Second step cannot write when its read fails.");
 
 console.log("M8.1.2 fresh pre-step postcondition reads and skip fixtures passed.");
