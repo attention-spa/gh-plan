@@ -700,6 +700,17 @@
               "$ref": "#/$defs/AuthoringSet%3C(%22open%22%7C%22closed%22)%3E"
             }
           ]
+        },
+        "due_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSetOrRemove%3Cstring%3E"
+            }
+          ],
+          "description": "UTC date-only YYYY-MM-DD; explicit remove clears the existing deadline."
         }
       },
       "required": [
