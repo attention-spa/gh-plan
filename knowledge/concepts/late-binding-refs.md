@@ -4,7 +4,7 @@ title: "Late-Binding References"
 description: "Identity placeholders for requests that depend on resources not yet created."
 tags: ["planning", "identity"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:21:42.849+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:02:00+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan-bindings.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -18,7 +18,7 @@ A request may need a GitHub `number`, `id` or `nodeId` that does not exist while
 
 The request consumer must list the producing step's **full ID**, for example `issue.create:A`, in its `dependsOn` array. `validatePlanStepReferences()` returns blocking diagnostics when a referenced producer is absent, ambiguous or not an explicit prerequisite.
 
-An **external executor**, after completing the create request, can provide the identity using `PlanBindings` and substitute via `bindPlanRequest()`. Missing or invalid values throw `PlanBindingError`; no network calls occur in the binder.
+An executor, after completing the create request, provides the identity using `PlanBindings` and substitutes via `bindPlanRequest()`. Missing or invalid values throw `PlanBindingError`; no network calls occur in the binder. The internal M8.1.1 `executePlanSteps()` primitive collects validated numeric IDs and optional node IDs from successful create responses, then passes them to the pure binder before dependent requests. It is not yet an idempotent or public apply API.
 
 ## PR closing references
 
