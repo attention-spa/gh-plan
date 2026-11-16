@@ -324,13 +324,24 @@ const userRoutes: Record<string, Route> = {
   }),
   "https://api.github.com/repos/alice/widgets/issues?state=all&per_page=100": response(200, []),
   "https://api.github.com/repos/alice/widgets/milestones?state=all&per_page=100": response(200, []),
-  "https://api.github.com/repos/alice/widgets/issue-types": response(200, []),
+  // User-owned repos can return populated issue types; do not infer absence
+  // from the owner's type (V3 observed a populated response on octocat/Hello-World).
+  "https://api.github.com/repos/alice/widgets/issue-types": response(200, [
+    { id: 3, node_id: "IT_3", name: "Feature" },
+    { id: 1, node_id: "IT_1", name: "Bug" },
+    { id: 2, node_id: "IT_2", name: "Task" },
+  ]),
 };
 const userSnapshot = await createRestDiscoveryTransport({
   auth: "secret-token",
   fetch: fakeFetch(userRoutes, userRequests),
 }).discover(userDesired);
 equal(userSnapshot.issueFields, [], "user-owned repositories have no organization issue fields");
+equal(userSnapshot.issueTypes, [
+  { id: 1, nodeId: "IT_1", name: "Bug" },
+  { id: 3, nodeId: "IT_3", name: "Feature" },
+  { id: 2, nodeId: "IT_2", name: "Task" },
+], "successful user-owned issue-types responses must be preserved and sorted");
 assert(!userRequests.some((request) => request.url.includes("/orgs/")), "user-owned repository must skip org field discovery");
 assert(!userRequests.some((request) => request.url.includes("issue-field-values")), "user-owned repository must skip field-value discovery");
 
@@ -457,3 +468,69 @@ try {
 assert(rejectedRelations instanceof Error, "forbidden native relates_to request should throw");
 assert((rejectedRelations as { code?: string }).code === "FORBIDDEN", "related request failure classification");
 assert(!JSON.stringify(rejectedRelations).includes("secret-token"), "related request errors must redact auth");
+
+
+// M1.5: only the optional issue-types endpoint may return 404 without
+// interrupting otherwise-valid discovery.
+const unavailableTypesRequests: RequestRecord[] = [];
+const unavailableTypesRoutes = baseRoutes();
+unavailableTypesRoutes["https://api.github.com/repos/acme/widgets/issue-types"] =
+  response(404, { message: "Not Found" }, {}, "Not Found");
+const withoutTypes = await discoverWith(unavailableTypesRoutes, unavailableTypesRequests);
+equal(withoutTypes.issueTypes, [], "404 issue-types endpoint should produce an empty type list");
+equal(withoutTypes.issues, snapshot.issues,
+  "optional issue-types 404 must not discard discovered and enriched issues");
+equal(withoutTypes.milestones, snapshot.milestones,
+  "optional issue-types 404 must not discard milestones");
+equal(withoutTypes.issueFields, snapshot.issueFields,
+  "optional issue-types 404 must not skip organization issue-field discovery");
+assert(unavailableTypesRequests.some((request) =>
+  request.url === "https://api.github.com/repos/acme/widgets/issue-types"),
+  "discovery must attempt the issue-types endpoint before optional 404 fallback");
+
+// User-owned repos can likewise have an unavailable issue-types endpoint.
+const unavailableUserRoutes: Record<string, Route> = {
+  ...userRoutes,
+  "https://api.github.com/repos/alice/widgets/issue-types":
+    response(404, { message: "Not Found" }, {}, "Not Found"),
+};
+const unavailableUser = await createRestDiscoveryTransport({
+  auth: "secret-token",
+  fetch: fakeFetch(unavailableUserRoutes),
+}).discover(userDesired);
+equal(unavailableUser.issueTypes, [], "404 on a user-owned issue-types endpoint must not fail discovery");
+equal(unavailableUser.repository.fullName, "alice/widgets", "repository discovery must continue after issue-types 404");
+
+// The 404 fallback must not mask permission failures, unexpected HTTP status
+// codes, or malformed 200 responses.
+for (const [status, expected] of [
+  [401, "AUTH_FAILED"],
+  [403, "FORBIDDEN"],
+  [500, "REST_FAILURE"],
+] as const) {
+  const routes = baseRoutes();
+  routes["https://api.github.com/repos/acme/widgets/issue-types"] =
+    response(status, { message: "secret-token must not be leaked" });
+  let failure: unknown;
+  try {
+    await discoverWith(routes);
+  } catch (error) {
+    failure = error;
+  }
+  assert(failure instanceof Error, "HTTP " + status + " should fail issue-types discovery");
+  assert((failure as { code?: string }).code === expected, "HTTP " + status + " must not be treated as optional 404");
+  assert(!JSON.stringify(failure).includes("secret-token"), "HTTP " + status + " must not leak response body or auth");
+}
+for (const payload of [null, { items: [] }, "not-an-array"]) {
+  const routes = baseRoutes();
+  routes["https://api.github.com/repos/acme/widgets/issue-types"] = response(200, payload);
+  let invalidTypes: unknown;
+  try {
+    await discoverWith(routes);
+  } catch (error) {
+    invalidTypes = error;
+  }
+  assert(invalidTypes instanceof Error, "invalid 200 issue-types shape must fail");
+  assert((invalidTypes as { code?: string }).code === "INVALID_RESPONSE",
+    "invalid 200 shape must not be interpreted as a missing endpoint");
+}

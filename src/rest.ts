@@ -476,9 +476,13 @@ export function createRestDiscoveryTransport(
       const rawMilestones = await client.getPaginated<unknown>(`${repoPath}/milestones?state=all&per_page=100`);
       const milestones = rawMilestones.map(mapMilestone).sort((a, b) => a.number - b.number);
 
-      const rawIssueTypes = await client.getJson<unknown>(`${repoPath}/issue-types`);
-      if (!Array.isArray(rawIssueTypes)) invalidResponse(`${repoPath}/issue-types`);
-      const issueTypes = sortByNameThenId(rawIssueTypes.map(mapIssueType));
+      // Some repositories return 404 for this optional endpoint; others,
+      // including user-owned repositories, can return a populated 200 list.
+      const rawIssueTypes = await client.getJsonOptional404<unknown>(`${repoPath}/issue-types`);
+      if (rawIssueTypes !== undefined && !Array.isArray(rawIssueTypes)) {
+        invalidResponse(`${repoPath}/issue-types`);
+      }
+      const issueTypes = sortByNameThenId((rawIssueTypes ?? []).map(mapIssueType));
 
       let issueFields: ObservedIssueField[] = [];
       const organizationOwned = ownerType === "Organization";
