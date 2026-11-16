@@ -249,6 +249,14 @@ export function createGithubReferenceHttp(options: ReferenceHttpOptions): Github
       catch { return fail("UNSAFE_REQUEST"); }
     } else if (init.body !== undefined) fail("UNSAFE_REQUEST");
     requestAllowed(name, url, method, payload);
+    // GraphQL CAS is repository-node-scoped, NOT REST path-scoped.
+    // Require the exact previously authenticated canonical node ID.
+    if (url.pathname === "/graphql") {
+      if (!verifiedRepo || !record(payload) || !record(payload.variables) ||
+          !record(payload.variables.input) ||
+          payload.variables.input.repositoryId !== verifiedRepo.nodeId)
+        fail("UNSAFE_REQUEST");
+    }
     // Release the FIFO even on malformed response, denied write or abort.
     let unblock!: () => void;
     const prior = pending;
