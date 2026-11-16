@@ -42,11 +42,20 @@ function validId(value: unknown): value is Identity {
       typeof value.nodeId === "string" && value.nodeId.length > 0);
 }
 function identity(value: unknown): Identity | undefined {
-  if (value === undefined) return undefined;
-  if (!validId(value)) return undefined;
+  if (value === undefined || !isRecord(value)) return undefined;
+  // GitHub create REST responses use node_id, while typed readers use nodeId.
+  // If both are supplied, they must agree rather than silently choosing one.
+  if (value.node_id !== undefined && (
+    typeof value.node_id !== "string" || !value.node_id ||
+    value.nodeId !== undefined && value.node_id !== value.nodeId))
+    return undefined;
+  const normalized = value.node_id === undefined ? value :
+    { ...value, nodeId: value.node_id };
+  if (!validId(normalized)) return undefined;
   return {
-    number: value.number, ...(value.id === undefined ? {} : { id: value.id }),
-    ...(value.nodeId === undefined ? {} : { nodeId: value.nodeId }),
+    number: normalized.number,
+    ...(normalized.id === undefined ? {} : { id: normalized.id }),
+    ...(normalized.nodeId === undefined ? {} : { nodeId: normalized.nodeId }),
   };
 }
 function coherent(a: Identity | undefined, b: Identity | undefined): boolean {
@@ -114,6 +123,10 @@ function predicateMatch(spec: ApplyPostconditionSpec,
     if (actual === undefined) return false;
     if (predicate.comparison === "utc_day") {
       if (!dateMatch(actual, wanted)) return false;
+    } else if (predicate.field === "description" && wanted === "" &&
+      actual === null) {
+      // GitHub may represent a cleared description as either "" or null.
+      continue;
     } else if (predicate.comparison === "null") {
       if (actual !== null && !(predicate.field === "description" && actual === ""))
         return false;
@@ -188,6 +201,10 @@ async function catalog(
     if (spec.kind.endsWith(".create")) throw new Error("create-owner-conflict");
     return found;
   }
+  if (spec.kind === "issue.create" &&
+      !spec.predicates.some((p) => p.field === "milestone") &&
+      (row as ObservedIssue).milestoneNumber !== null)
+    throw new Error("create-implicit-milestone-not-null");
   if (!predicateMatch(spec, row, bindings)) throw new Error("catalog-field-mismatch");
   if (spec.kind.endsWith(".create") && !coherent(found, identity(checked.identity)))
     throw new Error("catalog-reader-mismatch");
@@ -240,6 +257,13 @@ function ordered(plan: GithubPlan): PlanStep[] {
   }
   for (const id of [...byId.keys()].sort()) visit(id);
   return output;
+}
+function checkUpdateIdentity(spec: ApplyPostconditionSpec,
+  value: Read, bindings: PlanBindings): void {
+  if (!spec.kind.endsWith(".update") || value.identity === undefined) return;
+  const claimed = identity(value.identity);
+  if (!claimed || claimed.number !== numberFor(spec, bindings))
+    throw new Error("update-identity-not-target");
 }
 function checkCreateIdentity(spec: ApplyPostconditionSpec, first: Read,
   response: unknown, catalogId: Identity | undefined): Identity {
@@ -402,6 +426,7 @@ export async function executeCallbackApplyPlan(
         catalogBefore = await catalog(prepared, readSpec, bindings, first);
       } catch { throw new Error("before-unverified"); }
       if (first.status === "satisfied") {
+        checkUpdateIdentity(spec, first, bindings);
         if (spec.kind.endsWith(".create")) {
           const verified = checkCreateIdentity(spec, first, undefined, catalogBefore);
           bindings[step.logicalId] = verified;
@@ -448,6 +473,7 @@ export async function executeCallbackApplyPlan(
         verified = outcome;
         afterCatalog = await catalog(prepared, spec, bindings, verified);
       } catch { throw new Error("postwrite-unverified"); }
+      checkUpdateIdentity(spec, verified, bindings);
       if (spec.kind.endsWith(".create")) {
         let found: Identity;
         try { found = checkCreateIdentity(spec, verified, response, afterCatalog); }
@@ -496,7 +522,11 @@ export async function executeCallbackApplyPlan(
         if (wrote) releaseSafe = false;
       }
     }
-    if (ownerState === "retained" && releaseSafe && !loggingFailed) {
+    // If the audit sink failed BEFORE any resource mutation, there is no
+    // unknown effect to retain; attempt guarded release despite sink outage.
+    // After a possible write, a failed audit requires manual reconciliation.
+    if (ownerState === "retained" && releaseSafe &&
+        (!loggingFailed || !wrote)) {
       try { await release(); }
       catch {
         // Retain/unknown: never report a clean lock if release was uncertain.
