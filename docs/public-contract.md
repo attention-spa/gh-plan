@@ -1,7 +1,7 @@
 # Public API contract
 
 The public entry point is `@attention-spa/gh-plan` (`src/index.ts`).
-The [M8.1.6a ownership ADR](../knowledge/decisions/github-native-apply-ownership.md) selects a future, unimplemented repository-wide CAS Git-ref lock and manual stale-lock recovery. It does not add an executor or export, and cannot prevent writes from external non-cooperating GitHub clients.
+The [M8.1.6a ownership ADR](../knowledge/decisions/github-native-apply-ownership.md) selects a future, unimplemented repository-wide CAS Git-ref lock and manual stale-lock recovery. The [M8.1.6b progressive coverage ADR](../knowledge/decisions/progressive-apply-postconditions.md) approves only four candidate future issue/milestone operation kinds with typed verification and full-plan fail-closed preflight; this decision implements **no** postcondition reader or public writer. It does not add an executor or export, and cannot prevent writes from external non-cooperating GitHub clients.
 This package **plans**, but does not execute, changes to GitHub. Its return
 value contains proposed HTTP requests, identity resolutions and diagnostics.
 The caller must not execute a plan whose `readiness` is `blocked`.
@@ -109,7 +109,7 @@ The internal signature is now `executePlanSteps(plan, dispatch, readPostconditio
 
 M8.1.5 supplies a stateful synthetic integration test of the full internal execution flow. It verifies successful repeat runs perform zero writes, and that a mid-run issue creation which committed remotely but lost its reply (or whose post-write verification failed) can resume using its unique marker without creating a duplicate. Each resumed run completes only remaining unsatisfied steps, then replays with zero writes. The fixture checks fresh reads, late binding, verification, sanitizer logs and preservation of the original plan.
 
-This staging function is deliberately **not a public package export or safe general-purpose apply API**. The GitHub-specific full-postcondition evaluator is still caller supplied, marker checks are not a cross-process uniqueness lock, and the public `applyPlan()` contract and concurrency policy have not been approved or implemented. Passing synthetic fixtures **does not imply safe general-purpose execution**. The read-only public planner contract is unchanged.
+This staging function is deliberately **not a public package export or safe general-purpose apply API**. The GitHub-specific full-postcondition evaluator is still caller supplied, marker checks are not a cross-process uniqueness lock, and the concurrency architecture (A1) and narrowed capability policy (B1) have been approved **as designs only**; the public `applyPlan()` API choice (C), concrete readers, lock implementation and mutation dispatcher have not been implemented. Passing synthetic fixtures **does not imply safe general-purpose execution**. The read-only public planner contract is unchanged.
 
 All public types and functions are documented in their TypeScript declarations,
 including the distributed `dist/*.d.ts` output. This contract describes the

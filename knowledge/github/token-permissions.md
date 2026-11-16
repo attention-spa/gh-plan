@@ -30,6 +30,10 @@ Required permissions for read-only planning and potential external execution of 
 | Contents: read | Validate head/base refs and compare commits ahead of base | New PR discovery |
 | Pull requests: write | PR create/close/update and add/remove reviewer requests | External executor only |
 
+## B1 planned mutation permissions (not currently exercised)
+
+The [approved B1 four-kind allowlist](/decisions/progressive-apply-postconditions.md) uses `Issues:write` for issue/milestone REST POST/PATCH plus read access for authoritative verification. GitHub also documents `Pull requests:write` as an alternative for certain milestone writes, but not as the uniform MVP requirement. Creating an issue with a milestone additionally requires push access. The A1 Git-ref lock separately needs repository `Contents:read/write`. No live production token/permission check or write was performed by this decision; disposable private-repository tests are required.
+
 ## Verified source and scope
 
 These labels describe **GitHub's documented fine-grained access-token permission sets**, not the currently connected agent-hachi token's actual grants. Read-only planning requires only the read permissions relevant to requested operations. Organization-owned repositories using custom issue fields additionally require the *organization-level* **Issue Fields: read** permission, distinct from repository Issues: read. The repository `/issue-types` catalog uses **Metadata: read**. Writing through a future external executor requires **Issues: write** for issue and relationship mutations. Some generic issue/PR endpoints accept Pull requests permission as an alternative, but Issues: write is the uniform requirement for the issue-centric planner.

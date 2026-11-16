@@ -50,6 +50,10 @@ Planned HTTP methods and endpoint paths mapped to the current PlanOperationKind 
 | POST | /repos/{owner}/{repo}/issues/{number}/relates_to | issue.relates_to.add | Issues: write |
 | DELETE | /repos/{owner}/{repo}/issues/{number}/relates_to/{issue_id} | issue.relates_to.remove | Issues: write |
 
+## Initial live-apply capability (approved design only)
+
+The [B1 coverage decision](/decisions/progressive-apply-postconditions.md) allows only four conditional candidate kinds for a future executor: `milestone.create`, `milestone.update`, `issue.create`, and `issue.update`. This table above lists *everything the planner can propose*; it is **not** an executable allowlist. B1 additionally rejects unsupported request fields/shapes, incomplete/ambiguous postconditions and all other kinds after whole-plan preflight. Unique issue body markers, unique milestone titles and authoritative GETs across open/closed resources are required to verify creates. This is not yet implemented; no runtime writer or public export exists.
+
 ## Interpretation
 
 Projects v2 `project.item.add` accepts an `Issue` or `PullRequest` REST content ID (or repo owner/name/number) to add existing content. New issues/PRs are late-bound after their create steps. `project.item.fields.set` PATCH sends `{fields: [{id: numericFieldId, value: scalarOrOptionId}]}` using existing board field metadata and a discovered or newly created project-item REST ID. Only text, number, date, single-select and iteration values are supported; **no project/field create, item delete or membership remove operations are emitted**. Project-field creation REST exists, but it is deliberately outside gh-plan's authority.
