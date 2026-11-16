@@ -436,4 +436,62 @@ await denied("cross-origin Link next fails closed",() =>
   createGithubReferenceHttp({repository:{fullName:"a/b"},auth:SECRET,
     fetch:badPage.fetch}).issuesCatalog(),"UNSAFE_REQUEST");
 
+
+const competing = new FakeGithub();
+const firstOwner = competing.options();
+const acquired = await firstOwner.ownership.acquire("a/b");
+const contender = await denied("two reference owners cannot acquire the same A1 ref",
+  () => executeCallbackApplyPlan(competing.options()),"OWNER_UNCERTAIN");
+assert(contender instanceof ApplyPlanError && contender.ownerState === "unknown",
+  "Concurrent losing owner cannot claim any resource success.");
+equal(competing.resourceWrites().length,0,
+  "Competing runner never writes an issue or milestone.");
+assert(competing.ownerOid !== null,
+  "Failed contender may not release or steal another owner's CAS.");
+await firstOwner.ownership.release("a/b",acquired.ownerId);
+equal(competing.ownerOid,null,"Original verified owner releases its own lock.");
+
+const failedWrite = new FakeGithub();
+failedWrite.rateLimit=(url,method)=>url===ROOT+"/milestones" && method==="POST"
+  ? {status:429,headers:{"retry-after":"3"}}:undefined;
+const failedWriteTransport=createGithubReferenceHttp({
+  repository:{fullName:"a/b"},auth:SECRET,fetch:failedWrite.fetch,
+  now:()=>failedWrite.now,sleep:failedWrite.sleep,
+});
+await denied("a rate-limited mutation must never be blindly retried",
+  ()=>failedWriteTransport.fetch(ROOT+"/milestones",{
+    method:"POST",redirect:"error",headers:{
+      Authorization:"Bearer "+SECRET,
+      Accept:"application/vnd.github+json",
+      "X-GitHub-Api-Version":"2026-03-10",
+      "Content-Type":"application/json",
+    },body:JSON.stringify({title:"Safe"}),
+  }),"WRITE_UNCERTAIN");
+equal(failedWrite.callsCount.get("POST "+ROOT+"/milestones"),1,
+  "429 on POST causes one attempt, not a rate-limit retry.");
+
+const invalidWrite = new FakeGithub();
+const invalidTransport=createGithubReferenceHttp({
+  repository:{fullName:"a/b"},auth:SECRET,fetch:invalidWrite.fetch,
+});
+await denied("unsupported issue mutation fields fail before network",()=>
+  invalidTransport.fetch(ROOT+"/issues",{
+    method:"POST",redirect:"error",
+    headers:{Authorization:"Bearer "+SECRET,
+      Accept:"application/vnd.github+json",
+      "X-GitHub-Api-Version":"2026-03-10",
+      "Content-Type":"application/json"},
+    body:JSON.stringify({title:"Unsafe",body:token("I"),labels:["DO_NOT_LOG"]}),
+  }),"UNSAFE_REQUEST");
+await denied("arbitrary GraphQL mutations are never allowed",()=>
+  invalidTransport.fetch(BASE+"/graphql",{
+    method:"POST",redirect:"error",
+    headers:{Authorization:"Bearer "+SECRET,
+      Accept:"application/vnd.github+json",
+      "X-GitHub-Api-Version":"2026-03-10",
+      "Content-Type":"application/json"},
+    body:JSON.stringify({query:"mutation { deleteIssue(input:{}){clientMutationId} }"}),
+  }),"UNSAFE_REQUEST");
+equal(invalidWrite.calls.length,0,"Unsupported mutations never reach GitHub.");
+
 console.log("#189 reference GitHub transport: pinned/allowlisted A1+B1, serial pacing, private-repo guards, full catalog pagination and safe rerun passed.");
