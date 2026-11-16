@@ -204,10 +204,14 @@ function baseRoutes(): Record<string, Route> {
 }
 
 async function discoverWith(routes: Record<string, Route>, requests: RequestRecord[] = []): Promise<GithubStateSnapshot> {
-  return createRestDiscoveryTransport({
+  const transport = createRestDiscoveryTransport({
     auth: "secret-token",
     fetch: fakeFetch(routes, requests),
-  }).discover(desired);
+  });
+  // Discovery is now two-phase; these existing fixtures deliberately test
+  // detailed REST mapping for the two known issues.
+  const broad = await transport.discover(desired);
+  return transport.enrich(broad, [1, 2]);
 }
 
 // Injected fetch wins, every request carries the required GitHub headers, pagination follows Link,
