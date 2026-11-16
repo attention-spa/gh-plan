@@ -8,9 +8,10 @@
     "test:normalization": "node --experimental-strip-types tests/normalize.test.ts",
     "test:rest": "node --experimental-strip-types tests/rest-discovery.test.ts && node --experimental-strip-types tests/rest-global-fetch.test.ts && node --experimental-strip-types tests/rest-token-safety.test.ts && node --experimental-strip-types tests/discovery.test.ts",
     "test:identity": "node --experimental-strip-types tests/identity.test.ts",
-    "test": "npm run typecheck && npm run test:normalization && npm run test:rest && npm run test:identity && npm run test:diff && npm run test:bindings",
+    "test": "npm run typecheck && npm run test:normalization && npm run test:rest && npm run test:identity && npm run test:diff && npm run test:bindings && npm run test:milestones",
     "test:diff": "node --experimental-strip-types tests/diff.test.ts",
-    "test:bindings": "node --experimental-strip-types tests/plan-bindings.test.ts"
+    "test:bindings": "node --experimental-strip-types tests/plan-bindings.test.ts",
+    "test:milestones": "node --experimental-strip-types tests/milestone-compiler.test.ts"
   },
   "devDependencies": {
     "typescript": "5.9.3"
