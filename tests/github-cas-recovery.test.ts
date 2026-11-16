@@ -69,9 +69,11 @@ class Fake implements Pick<GithubCasBackend, "repository" | "lockRef" | "commit"
   lostAfter = false;
   lostBefore = false;
   noReadAfter = false;
+  repoDeniedAfter = false;
   async repository(name: string): Promise<CasRepository> {
     this.calls.push("repository");
-    if (this.denied) throw Error("DO_NOT_LOG permission denied");
+    if (this.denied || this.repoDeniedAfter && this.casCalls.length > 0)
+      throw Error("DO_NOT_LOG permission denied");
     return { ...repo, fullName: this.changedRepo ? "wrong/other" : name };
   }
   async lockRef(name: string): Promise<CasRef | null> {
@@ -305,6 +307,16 @@ await denies("verification transport fails after successful CAS", () =>
   recoverAbandonedGithubLock(unreadableAfter.inspection, unreadableAfter.dossier,
     unreadableAfter.context), "RESULT_UNCERTAIN");
 equal(unreadableAfter.backend.current, null, "Unknown readback may follow deletion.");
+const hiddenRepositoryAfter = await setup();
+hiddenRepositoryAfter.backend.repoDeniedAfter = true;
+await denies("ref 404 without canonical repository access cannot prove release", () =>
+  recoverAbandonedGithubLock(hiddenRepositoryAfter.inspection,
+    hiddenRepositoryAfter.dossier, hiddenRepositoryAfter.context), "RESULT_UNCERTAIN");
+equal(hiddenRepositoryAfter.backend.current, null,
+  "Failed post-CAS repo identity check retains uncertain outcome, not a retry.");
+equal(hiddenRepositoryAfter.backend.casCalls.length, 1,
+  "Hidden/denied repository access cannot trigger a second CAS.");
+
 const refusedAudit = await setup();
 refusedAudit.context.recordAudit = async () => { throw Error("DO_NOT_LOG audit storage down"); };
 await denies("audit must persist before ref deletion", () =>
