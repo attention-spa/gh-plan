@@ -198,4 +198,32 @@ denied("malformed request path injection", (p) => {
 denied("partial managed intent ignored by compiler", (p) => {
   p.applyIntent!.managed.push({ logicalId: "J", kind: "issue", fields: ["title"], removes: [] });
 }, "UNSUPPORTED_INTENT");
+denied("new issue cannot already claim an assigned identity", (p) => {
+  p.resolutions[2]!.identity!.id = 10;
+}, "UNSAFE_REQUEST");
+denied("duplicate create marker across steps", (p) => {
+  const other = step("issue.create", "J",
+    { protocol: "rest", method: "POST", path: "/repos/a/b/issues",
+      body: { title: "Second", body: token("I") } });
+  p.steps.push(other);
+  p.summary.planned++;
+  p.resolutions.push({ logicalId: "J", kind: "issue", status: "new",
+    identity: { marker: token("I") } });
+  p.applyIntent!.managed.push({ logicalId: "J", kind: "issue",
+    fields: ["title"], removes: [] });
+  p.applyIntent!.resourceCount++;
+  p.desired.resourceCount++;
+}, "UNSAFE_IDENTITY");
+denied("duplicate milestone title across creates", (p) => {
+  const other = step("milestone.create", "M3",
+    { protocol: "rest", method: "POST", path: "/repos/a/b/milestones",
+      body: { title: "Release" } });
+  p.steps.push(other);
+  p.summary.planned++;
+  p.resolutions.push({ logicalId: "M3", kind: "milestone", status: "new" });
+  p.applyIntent!.managed.push({ logicalId: "M3", kind: "milestone",
+    fields: ["title"], removes: [] });
+  p.applyIntent!.resourceCount++;
+  p.desired.resourceCount++;
+}, "UNSAFE_IDENTITY");
 console.log("B1 typed preflight: mixed DAG, zero-write rejection and strict intent/identity fixtures passed.");
