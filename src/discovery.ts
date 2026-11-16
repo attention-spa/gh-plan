@@ -6,12 +6,20 @@ import type {
   NormalizedDesiredStateGraph,
 } from "./types.ts";
 
+/** Combined observed snapshot and the pure logical-ID resolution decisions. */
 export interface DiscoveryResolutionResult {
   snapshot: GithubStateSnapshot;
   resolution: IdentityResolutionResult;
 }
 
-/** Resolve from broad summaries first; enrich only existing desired issues and relation references. */
+/**
+ * Async, read-only I/O orchestrator for broad discovery then targeted enrichment.
+ * Requests broad repository/issues/milestones/types once (paginated where necessary).
+ * Existing managed issues and reference relationship endpoints receive per-issue
+ * detail reads; newly created issues have no detail calls. Assignee additions
+ * trigger eligibility GETs, but removals do not. Transport failures reject.
+ * Does not issue any mutating HTTP method.
+ */
 export async function discoverAndResolve(
   desired: NormalizedDesiredStateGraph,
   transport: GithubDiscoveryTransport,

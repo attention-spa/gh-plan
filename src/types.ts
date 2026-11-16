@@ -1,20 +1,26 @@
 import type { GithubPlanSchema } from "./authoring-schema.ts";
 
+/** REST reads GitHub; graphql is typed but currently yields NO_GRAPHQL_TRANSPORT without I/O. */
 export type GithubPlannerMode = "rest" | "graphql";
 
+/** JSON-safe primitive that can appear in a desired field or diagnostic. */
 export type JsonPrimitive = string | number | boolean | null;
+/** Recursive JSON value; no functions, undefined, or circular structures. */
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
+/** Minimal response header reader for injected fetch transports. */
 export interface HeaderReaderLike {
   get(name: string): string | null;
 }
 
+/** Request subset used by the read-only REST adapter. */
 export interface FetchRequestInitLike {
   method?: string;
   headers?: Record<string, string>;
   body?: string;
 }
 
+/** Minimal HTTP response contract; no DOM Response instance is required. */
 export interface FetchResponseLike {
   readonly ok: boolean;
   readonly status: number;
@@ -25,32 +31,45 @@ export interface FetchResponseLike {
   text(): Promise<string>;
 }
 
+/** Injectable HTTP reader. The planner makes GET requests only, never writes. */
 export type FetchLike = (
   input: string,
   init?: FetchRequestInitLike,
 ) => Promise<FetchResponseLike>;
 
+/** Read-only planner configuration. Auth stays in runtime headers and is never serialized into a plan. */
 export interface GithubPlannerConfig {
+  /** Typed authoring input; invalid runtime JSON still produces blocking normalization diagnostics. */
   schema: GithubPlanSchema;
+  /** Runtime-only GitHub bearer token; GET headers use it but the result never contains it. */
   auth: string;
+  /** Injected fetch for tests or restricted runtimes; otherwise global fetch is used. */
   fetch?: FetchLike;
+  /** Defaults to REST; graphql returns NO_GRAPHQL_TRANSPORT without discovery. */
   mode?: GithubPlannerMode;
   /** Default false; only explicitly opted-in plans may adopt existing issues by title. */
+  /** Defaults false; issue-title matches require explicit adoption or other identity. */
   adoptByTitle?: boolean;
   /** Per-issue REST enrichment worker count; defaults to four. */
+  /** Positive integer, default four parallel issue/assignee detail requests. */
   enrichConcurrency?: number;
 }
 
+/** Caller-supplied stable logical key for resources and step bindings. */
 export type LogicalResourceId = string;
+/** Issues and milestones use resource identity; root labels are separate declarations. */
 export type ResourceKind = "issue" | "milestone";
+/** Managed means reconciled; reference means existing-only, never created or changed. */
 export type ResourceManagement = "managed" | "reference";
 
+/** Repository identity uses owner/name and optional REST/node identifiers. */
 export interface RepositoryRef {
   fullName: string;
   id?: number;
   nodeId?: string;
 }
 
+/** Explicit identity hints take priority over marker/title fallback; conflicting hints block resolution. */
 export interface DesiredResourceIdentity {
   number?: number;
   id?: number;
@@ -58,21 +77,26 @@ export interface DesiredResourceIdentity {
   marker?: string;
 }
 
+/** Logical reference to an issue/milestone, resolved before request compilation. */
 export interface LogicalResourceRef {
   logicalId: LogicalResourceId;
 }
 
+/** Explicit value reconciliation, distinct from omission. */
 export interface DesiredSet<T> {
   op: "set";
   value: T;
 }
 
+/** Explicitly clear a removable property; omission leaves it untouched. */
 export interface DesiredRemove {
   op: "remove";
 }
 
+/** Normalized property intent: set a value or explicitly remove it. */
 export type DesiredSetOrRemove<T> = DesiredSet<T> | DesiredRemove;
 
+/** Normalized exact set or targeted add/remove; missing labels do not manage the issue. */
 export type DesiredIssueLabels =
   | { op: "set"; value: string[] }
   | { op: "modify"; add: string[]; remove: string[] };
@@ -91,6 +115,7 @@ export interface DesiredRepositoryLabel {
   description?: string;
 }
 
+/** Normalized issue intent. Omission leaves a field unchanged; issue types and org fields are named, not keyed by API IDs. */
 export type DesiredIssueState = {
   title?: DesiredSet<string>;
   body?: DesiredSetOrRemove<string>;
@@ -102,6 +127,7 @@ export type DesiredIssueState = {
   fields?: Record<string, DesiredSetOrRemove<JsonValue>>;
 };
 
+/** Normalized milestone intent; only supplied properties produce comparisons. */
 export type DesiredMilestoneState = {
   title?: DesiredSet<string>;
   description?: DesiredSetOrRemove<string>;
@@ -112,71 +138,84 @@ interface DesiredResourceBase {
   logicalId: LogicalResourceId;
   kind: ResourceKind;
   management: ResourceManagement;
+  /** Explicit number/id/nodeId wins over body markers and title matches; hints must agree. */
   identity?: DesiredResourceIdentity;
 }
 
+/** Managed issue with desired state and stable identity marker for creation. */
 export interface ManagedIssueResource extends DesiredResourceBase {
   kind: "issue";
   management: "managed";
   desired: DesiredIssueState;
 }
 
+/** Existing issue for linking only; no desired state or mutation is permitted. */
 export interface ReferencedIssueResource extends DesiredResourceBase {
   kind: "issue";
   management: "reference";
   desired?: never;
 }
 
+/** Managed milestone; exact title is its fallback identity when no number/id is supplied. */
 export interface ManagedMilestoneResource extends DesiredResourceBase {
   kind: "milestone";
   management: "managed";
   desired: DesiredMilestoneState;
 }
 
+/** Existing milestone reference; unresolved references block the plan. */
 export interface ReferencedMilestoneResource extends DesiredResourceBase {
   kind: "milestone";
   management: "reference";
   desired?: never;
 }
 
+/** Discriminated union of managed/reference issue and milestone resources. */
 export type DesiredResource =
   | ManagedIssueResource
   | ReferencedIssueResource
   | ManagedMilestoneResource
   | ReferencedMilestoneResource;
 
+/** Directed parent-to-child association; each child has at most one declared parent. */
 export interface ParentRelationship {
   kind: "parent";
   parent: LogicalResourceId;
   child: LogicalResourceId;
 }
 
+/** Directed dependency: issue is blocked by blocker. */
 export interface BlockedByRelationship {
   kind: "blocked_by";
   issue: LogicalResourceId;
   blocker: LogicalResourceId;
 }
 
+/** Reverse spelling: issue blocks blocked; normalized into blocked_by. */
 export interface BlocksRelationship {
   kind: "blocks";
   issue: LogicalResourceId;
   blocked: LogicalResourceId;
 }
 
+/** Symmetric association; endpoints are sorted and duplicates deduplicated. */
 export interface RelatesToRelationship {
   kind: "relates_to";
   from: LogicalResourceId;
   to: LogicalResourceId;
 }
 
+/** Supported parent, dependency and symmetric related-to relationships. */
 export type DesiredRelationship =
   | ParentRelationship
   | BlockedByRelationship
   | BlocksRelationship
   | RelatesToRelationship;
 
+/** Reconcile is the default; additive retains undeclared existing relationships. */
 export type RelationshipReconciliationMode = "reconcile" | "additive";
 
+/** Flattened deterministic result of pure schema normalization. */
 export interface NormalizedDesiredStateGraph {
   /** Default reconcile: managed issues own their native relationship sets. */
   relationshipMode?: RelationshipReconciliationMode;
@@ -187,17 +226,20 @@ export interface NormalizedDesiredStateGraph {
   relationships: DesiredRelationship[];
 }
 
+/** Only existing/new are actionable; ambiguous/unresolved identities must block. */
 export type ResourceResolutionStatus =
   | "existing"
   | "new"
   | "unresolved"
   | "ambiguous";
 
+/** Observed REST/node identity, with optional marker and URLs. */
 export interface ResolvedGithubIdentity extends DesiredResourceIdentity {
   apiUrl?: string;
   htmlUrl?: string;
 }
 
+/** Per-logical-ID identity decision; ambiguous candidates are reported rather than guessed. */
 export interface ResourceResolution {
   logicalId: LogicalResourceId;
   kind: ResourceKind;
@@ -206,6 +248,7 @@ export interface ResourceResolution {
   candidates?: ResolvedGithubIdentity[];
 }
 
+/** Read-only issue snapshot. Absent optional collections mean not discovered, not empty. */
 export interface ObservedIssue {
   kind: "issue";
   number: number;
@@ -226,6 +269,7 @@ export interface ObservedIssue {
   relatesToNumbers?: number[];
 }
 
+/** Read-only milestone summary used for identity matching and field comparison. */
 export interface ObservedMilestone {
   kind: "milestone";
   number: number;
@@ -236,18 +280,21 @@ export interface ObservedMilestone {
   state: "open" | "closed";
 }
 
+/** GitHub issue type metadata; authored by name rather than id. */
 export interface ObservedIssueType {
   id?: number;
   nodeId?: string;
   name: string;
 }
 
+/** Metadata for allowed values of an organization issue field. */
 export interface ObservedIssueFieldOption {
   id?: number | string;
   name: string;
   value?: JsonValue;
 }
 
+/** Organization issue-field catalog; authored by name, resolved to API identifiers. */
 export interface ObservedIssueField {
   id: number | string;
   name: string;
@@ -255,6 +302,7 @@ export interface ObservedIssueField {
   options?: ObservedIssueFieldOption[];
 }
 
+/** Repository label entry keyed by case-insensitive name; no implicit deletion. */
 export interface ObservedLabel {
   name: string;
   id?: number;
@@ -263,6 +311,7 @@ export interface ObservedLabel {
   description?: string | null;
 }
 
+/** Read-only observed state; optional catalogs are fetched only when required. */
 export interface GithubStateSnapshot {
   repository: RepositoryRef;
   issues: ObservedIssue[];
@@ -275,6 +324,7 @@ export interface GithubStateSnapshot {
   issueFields: ObservedIssueField[];
 }
 
+/** Read-only I/O boundary. discover fetches broad data; enrich fetches targeted details and may reject on transport errors. */
 export interface GithubDiscoveryTransport {
   readonly mode: GithubPlannerMode;
   /** Broad repository data and issue summaries; no per-issue requests. */
@@ -283,8 +333,10 @@ export interface GithubDiscoveryTransport {
   enrich(snapshot: GithubStateSnapshot, issueNumbers: number[], assigneeLogins?: string[]): Promise<GithubStateSnapshot>;
 }
 
+/** Only planned operations are executable; noops and blocked/unsupported entries are informational. */
 export type PlanStepStatus = "planned" | "noop" | "blocked" | "unsupported";
 
+/** Stable operation names forming plan step IDs and request DAG edges. */
 export type PlanOperationKind =
   | "label.create"
   | "label.update"
@@ -310,15 +362,19 @@ export type PlanOperationKind =
   | "issue.relates_to.remove"
   | "verification.read";
 
+/** HTTP method for a proposed request; the planner never performs mutations. */
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 /** A reference to a GitHub identity that will be available after a create step. */
+/** Identity fields available only after an external executor creates a resource. */
 export type PlanIdentityProperty = "number" | "id" | "nodeId";
+/** Late-bound identity placeholder like { $ref: "A.number" }. Its create step must appear in dependsOn. */
 export type PlanValueRef = {
   $ref: `${LogicalResourceId}.${PlanIdentityProperty}`;
 };
 
 /** Serializable request data; references can occur at any nesting depth. */
+/** JSON request payload that can contain nested late-bound identity references. */
 export type PlanJsonValue =
   | JsonPrimitive
   | PlanValueRef
@@ -326,12 +382,15 @@ export type PlanJsonValue =
   | { [key: string]: PlanJsonValue };
 
 /** Literal path fragments and late-bound identity references in order. */
+/** REST path as a string or ordered literal/reference fragments. */
 export type PlanPath = string | Array<string | PlanValueRef>;
 
 /** Identity values supplied by an external executor after creating a resource. */
+/** External executor's post-create identity map; missing values cause binding errors. */
 export type PlanBindings = Record<LogicalResourceId, Partial<Record<PlanIdentityProperty, number | string>>>;
 
 
+/** Serializable REST request specification without credentials or side effects. */
 export interface RestPlanRequest {
   protocol: "rest";
   method: HttpMethod;
@@ -339,6 +398,7 @@ export interface RestPlanRequest {
   body?: PlanJsonValue;
 }
 
+/** Reserved GraphQL request descriptor; GraphQL planning currently blocks. */
 export interface GraphqlPlanRequest {
   protocol: "graphql";
   document: string;
@@ -346,8 +406,10 @@ export interface GraphqlPlanRequest {
   variables?: Record<string, PlanJsonValue>;
 }
 
+/** Transport-neutral proposed action, never executed by the planner itself. */
 export type PlanRequest = RestPlanRequest | GraphqlPlanRequest;
 
+/** A DAG node; dependsOn contains full step IDs. A partial reversible step cannot guarantee rollback (e.g., creation). */
 export interface PlanStep {
   id: string;
   kind: PlanOperationKind;
@@ -356,14 +418,18 @@ export interface PlanStep {
   current: JsonValue | null;
   desired: JsonValue | null;
   reason: string;
+  /** Full prerequisite step IDs, such as "issue.create:A", not bare resource logical IDs. */
   dependsOn: string[];
+  /** Inert proposal until an external executor explicitly runs it. */
   request?: PlanRequest;
   preconditions: string[];
   expectedPostconditions: string[];
   destructive: boolean;
+  /** "partial" means compensating operations cannot promise restoration of prior state. */
   reversible: boolean | "partial";
 }
 
+/** Stable machine-readable error and warning categories. */
 export type DiagnosticCode =
   | "INVALID_SCHEMA"
   | "AUTH_FAILED"
@@ -385,8 +451,10 @@ export type DiagnosticCode =
   | "UNSUPPORTED_SCHEMA_FEATURE"
   | "PARENT_CONFLICT";
 
+/** Severity label; blocking separately controls whether the plan is safe to execute. */
 export type DiagnosticSeverity = "info" | "warning" | "error";
 
+/** Scoped actionable diagnostic, optionally including JSON details. */
 export interface GithubDiagnostic {
   code: DiagnosticCode;
   severity: DiagnosticSeverity;
@@ -397,17 +465,20 @@ export interface GithubDiagnostic {
   details?: JsonValue;
 }
 
+/** Planner/version/mode metadata; version comes from GITHUB_PLAN_VERSION. */
 export interface GithubPlanMetadata {
   planner: "gh-plan";
   version: string;
   mode: GithubPlannerMode;
 }
 
+/** Count of normalized resources (including root labels) and relationships. */
 export interface DesiredStateSummary {
   resourceCount: number;
   relationshipCount: number;
 }
 
+/** Counts of proposed operations and diagnostics; never observed execution outcomes. */
 export interface GithubPlanSummary {
   planned: number;
   noops: number;
@@ -416,8 +487,10 @@ export interface GithubPlanSummary {
   warnings: number;
 }
 
+/** Ready has no blockers, ready_with_warnings has warnings, blocked forbids execution. */
 export type GithubPlanReadiness = "ready" | "ready_with_warnings" | "blocked";
 
+/** Deterministic read-only proposal. Check readiness before executing the topologically ordered steps. */
 export interface GithubPlan {
   metadata: GithubPlanMetadata;
   repository: RepositoryRef;
@@ -429,13 +502,17 @@ export interface GithubPlan {
   blockers: GithubDiagnostic[];
   unsupported: GithubDiagnostic[];
   summary: GithubPlanSummary;
+  /** A blocked plan must not be executed; warnings alone do not block. */
   readiness: GithubPlanReadiness;
 }
 
+/** Asynchronous read-only planning entrypoint type; REST discovery may perform GET requests. */
 export type PlanGithub = (config: GithubPlannerConfig) => Promise<GithubPlan>;
 
 /** Pure, transport-independent reconciliation intent. */
+/** Pure semantic delta classification independent of REST request compilation. */
 export type GithubDiffStatus = "create" | "update" | "noop" | "conflict" | "unsupported";
+/** One pure desired/observed delta with optional references. */
 export interface GithubDiff {
   id: string;
   logicalId: LogicalResourceId;
@@ -447,6 +524,7 @@ export interface GithubDiff {
   desired?: JsonValue;
   references?: LogicalResourceRef[];
 }
+/** Pure semantic deltas and diagnostics; no network traffic. */
 export interface GithubDiffResult {
   diffs: GithubDiff[];
   blockers: GithubDiagnostic[];

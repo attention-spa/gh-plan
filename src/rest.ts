@@ -17,6 +17,8 @@ import type {
 const API_BASE = "https://api.github.com";
 const API_VERSION = "2026-03-10";
 
+/** Stable GET discovery failure codes. Authentication, permission, rate limit,
+ * unsafe pagination and malformed HTTP responses are differentiated. */
 export type GithubRestTransportErrorCode =
   | "NO_REST_TRANSPORT"
   | "AUTH_FAILED"
@@ -28,6 +30,7 @@ export type GithubRestTransportErrorCode =
   | "UNSAFE_PAGINATION_URL"
   | "REST_FAILURE";
 
+/** Sanitized transport error data: method/path/status only, never credentials. */
 export interface GithubRestTransportErrorData {
   code: GithubRestTransportErrorCode;
   method: "GET";
@@ -36,6 +39,11 @@ export interface GithubRestTransportErrorData {
   statusText?: string;
 }
 
+/**
+ * Typed exception from the read-only transport. The planner maps expected
+ * failures to blockers, without copying response bodies or bearer tokens.
+ * Direct transport consumers may catch this error and inspect code/status.
+ */
 export class GithubRestTransportError extends Error {
   readonly code: GithubRestTransportErrorCode;
   readonly method = "GET" as const;
@@ -68,8 +76,12 @@ export class GithubRestTransportError extends Error {
   }
 }
 
+/** Runtime-only REST transport options; bearer auth is not stored in snapshots.
+ * An injected fetch can intercept GET requests for deterministic tests. */
 export interface RestDiscoveryTransportConfig {
+  /** Bearer credential used exclusively in outgoing GET headers. */
   auth: string;
+  /** Optional injected GET reader; otherwise uses globalThis.fetch. */
   fetch?: FetchLike;
   /** Maximum concurrent issue enrichments (default 4). */
   enrichConcurrency?: number;
@@ -532,6 +544,17 @@ async function mapBounded<T, R>(
   return results;
 }
 
+/**
+ * Create a read-only GitHub REST discovery adapter. Factory construction
+ * does not perform I/O; discover() and enrich() do. Request failures reject
+ * with GithubRestTransportError; invalid concurrency throws RangeError.
+ * Broad discovery starts with four GETs (repo, issues, milestones, issue types),
+ * then reads organization issue-field definitions and/or label catalogs if
+ * needed. Collections are paginated; each selected existing issue adds parent,
+ * blocked_by and relates_to GETs, plus issue-field values when available.
+ * Newly assigned logins add one eligibility GET per distinct login. Reads use
+ * a bounded concurrency pool (default four). No HTTP mutation is performed.
+ */
 export function createRestDiscoveryTransport(
   config: RestDiscoveryTransportConfig,
 ): GithubDiscoveryTransport {

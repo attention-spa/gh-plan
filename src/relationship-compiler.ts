@@ -4,6 +4,7 @@ import type {
   PlanPath, PlanStep, PlanValueRef, ResourceResolution,
 } from "./types.ts";
 
+/** Pure output: native relation operations, noops, blockers, warnings and unsupported cases. */
 export interface RelationshipCompilationResult {
   steps: PlanStep[];
   noops: PlanStep[];
@@ -45,7 +46,14 @@ function canonical(edge: DesiredRelationship): CanonicalEdge {
 }
 const pair = (a: number, b: number): string => [a, b].sort((x, y) => x - y).join(":");
 
-/** Pure compiler: REST only; never makes a network request or mutates snapshots. */
+/**
+ * Pure REST relationship compiler. Parent and blocked_by are directional;
+ * blocks is normalized to the inverse blocked_by direction, while relates_to
+ * is symmetric. Reconciliation may plan removals; additive mode only adds.
+ * Late-bound endpoints use PlanValueRef and dependsOn create-step IDs.
+ * Parent conflicts/unknown endpoints block rather than silently re-parenting.
+ * No network requests or snapshot mutations.
+ */
 export function compileRelationshipSteps(
   desired: NormalizedDesiredStateGraph, diff: GithubDiffResult,
   observed: GithubStateSnapshot, resolutions: ResourceResolution[],

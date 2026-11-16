@@ -43,6 +43,12 @@ function bodyWithoutMarker(body: string | null | undefined, token: string): stri
   return value;
 }
 
+/**
+ * Compare normalized desired intent to a read-only snapshot and identity resolutions.
+ * Pure: returns deterministic property/relationship deltas with blockers and warnings.
+ * Does not inspect the network or emit HTTP requests. Missing catalogs, identities,
+ * unknown issue types/field names/options and unknown labels block unsafe changes.
+ */
 export function diffGithubState(
   desired: NormalizedDesiredStateGraph,
   observed: GithubStateSnapshot,

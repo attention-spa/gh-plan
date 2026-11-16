@@ -4,6 +4,7 @@ import type {
   PlanStep, ResourceResolution,
 } from "./types.ts";
 
+/** Pure output: selected organization issue-field writes, noops, blockers and unsupported definitions. */
 export interface IssueFieldCompilationResult {
   steps: PlanStep[];
   noops: PlanStep[];
@@ -55,7 +56,12 @@ function step(
   };
 }
 
-/** Only explicit organization fields are reconciled. Never PUT (replace all). */
+/**
+ * Pure compiler for explicitly managed organization issue fields, looked up
+ * by user-facing field/option names in discovered metadata. Emits only targeted
+ * field requests, never a PUT replacing unrelated fields. Unknown fields/options
+ * block or yield unsupported diagnostics; no transport calls or mutations.
+ */
 export function compileIssueFieldSteps(
   desired: NormalizedDesiredStateGraph,
   result: GithubDiffResult,

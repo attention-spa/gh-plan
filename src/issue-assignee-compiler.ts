@@ -4,6 +4,7 @@ import type {
   PlanValueRef, ResourceResolution,
 } from "./types.ts";
 
+/** Pure output: assignee add/remove reconciliation, noops and eligibility blockers. */
 export interface IssueAssigneeCompilationResult {
   steps: PlanStep[];
   noops: PlanStep[];
@@ -32,9 +33,11 @@ function step(id: string, kind: PlanStep["kind"], status: "planned" | "noop",
 }
 
 /**
- * Plan only explicitly managed assignees. GitHub's REST API has no PUT
- * equivalent for assignees: exact sets are reconciled as deltas, and
- * incremental operations retain every unmentioned assignee.
+ * Pure compiler for explicitly managed GitHub login assignees. GitHub has no
+ * PUT equivalent: exact sets become targeted POST/DELETE deltas; incremental
+ * operations preserve unrelated assignees. New issues wait for issue.create.
+ * Eligibility for additions is pre-discovered by GET (not checked here).
+ * Ineligible or unobserved identities yield blockers; no HTTP I/O.
  */
 export function compileIssueAssigneeSteps(
   desired: NormalizedDesiredStateGraph,

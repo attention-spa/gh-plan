@@ -4,6 +4,7 @@ import type {
   PlanJsonValue, PlanStep, ResourceResolution,
 } from "./types.ts";
 
+/** Pure output: core issue create/PATCH steps, noops and blocking identity/field diagnostics. */
 export interface IssueCompilationResult {
   steps: PlanStep[];
   noops: PlanStep[];
@@ -49,7 +50,13 @@ function issueStep(
   };
 }
 
-/** Compile safe core issue mutations from semantic deltas. Never performs network I/O. */
+/**
+ * Pure issue compiler. Emits issue.create and minimally scoped PATCH operations
+ * from resolved, explicitly managed title/body/state/milestone intent; existing
+ * reference-only issues never change. Future milestone numbers use PlanValueRef
+ * and explicit create-step dependencies. Unsafe identity or missing reference
+ * returns a blocker, not a speculative request. No HTTP I/O.
+ */
 export function compileIssueSteps(
   desired: NormalizedDesiredStateGraph,
   result: GithubDiffResult,
