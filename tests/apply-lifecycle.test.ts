@@ -350,6 +350,21 @@ await denied("GitHub raw node_id must match independently read node ID",
   wrongNode.config(), "VERIFICATION_FAILED", "retained");
 equal(wrongNode.dispatches, 1, "Wrong GitHub node_id does not retry creation.");
 
+const mutateIdentity = new Fixture();
+mutateIdentity.afterReadHook = (ctx) => {
+  const value = ctx.responseIdentity as { number: number } | undefined;
+  if (!value) return;
+  assert(Object.isFrozen(value),
+    "The create response identity must be frozen before post-read callbacks.");
+  // Simulate a dishonest reader attempting to rewrite the response identity
+  // before the executor cross-checks it against an independent catalog.
+  value.number = 999;
+};
+await denied("readback cannot mutate the prior dispatch identity",
+  mutateIdentity.config(), "VERIFICATION_FAILED", "retained");
+equal(mutateIdentity.dispatches, 1,
+  "Mutating a frozen response identity cannot cause further writes.");
+
 const wrongUpdate = new Fixture();
 wrongUpdate.wrongUpdateRead = true;
 // The first create completes, but the first update whose reader claims
