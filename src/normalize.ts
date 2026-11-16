@@ -53,8 +53,10 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
+const LOGICAL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
+
 function isLogicalId(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && /^\S+$/.test(value);
+  return typeof value === "string" && LOGICAL_ID_PATTERN.test(value);
 }
 
 function isJsonValue(value: unknown): value is JsonValue {
@@ -280,7 +282,7 @@ function normalizeManagement(value: unknown, path: string, diagnostics: GithubDi
 
 function normalizeLogicalId(value: unknown, path: string, diagnostics: GithubDiagnostic[]): string | undefined {
   if (!isLogicalId(value)) {
-    diagnostics.push(diagnostic("INVALID_SCHEMA", "logicalId must be a non-empty string without whitespace.", path));
+    diagnostics.push(diagnostic("INVALID_SCHEMA", "logicalId must match ^[A-Za-z0-9][A-Za-z0-9._:/-]*$ (start with an ASCII letter or digit).", path));
     return undefined;
   }
   return value;
