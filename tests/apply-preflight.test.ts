@@ -41,10 +41,10 @@ const iClose = step("issue.update", "I",
 const manifest: ApplyIntentManifest = {
   version: 1, repository: "a/b", resourceCount: 4, relationshipCount: 0,
   managed: [
-    { logicalId: "I", kind: "issue", fields: ["milestone", "state", "title"] },
-    { logicalId: "I2", kind: "issue", fields: ["milestone", "state"] },
-    { logicalId: "M", kind: "milestone", fields: ["description", "due_on", "title"] },
-    { logicalId: "M2", kind: "milestone", fields: ["description", "due_on"] },
+    { logicalId: "I", kind: "issue", fields: ["milestone", "state", "title"], removes: [], desiredState: "closed" },
+    { logicalId: "I2", kind: "issue", fields: ["milestone", "state"], removes: ["milestone"], desiredState: "closed" },
+    { logicalId: "M", kind: "milestone", fields: ["description", "due_on", "title"], removes: [] },
+    { logicalId: "M2", kind: "milestone", fields: ["description", "due_on"], removes: ["description", "due_on"] },
   ],
   unsupported: [],
 };
