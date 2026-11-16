@@ -42,6 +42,32 @@ const required = [
 assert.deepEqual([...paths.keys()].sort(), required.sort(),
   "Knowledge bundle must include all requested M6.1–M6.2 OKF pages.");
 
+// Guard the approved four-kind coverage as the planner operation union evolves.
+const operationTypes = readFileSync(new URL("../src/types.ts", import.meta.url), "utf8");
+const union = operationTypes.match(/export type PlanOperationKind =([\s\S]*?);/);
+assert(union, "Canonical PlanOperationKind union missing.");
+const types = [...union[1].matchAll(/^\s*\|\s+"([^"]+)"/gm)].map(x => x[1]);
+assert.equal(new Set(types).size, types.length);
+const b1 = paths.get("decisions/progressive-apply-postconditions.md");
+assert(b1, "Missing B1 capability ADR.");
+const section = b1.split("## Complete current PlanOperationKind disposition (33)")[1]
+  ?.split("## Independent implementation and disposable-test evidence")[0];
+assert(section, "B1 matrix missing.");
+const rows = [...section.matchAll(/^\| `([^`]+)` \| ([^\n]+)$/gm)]
+  .map(m => ({ kind: m[1], policy: m[2] }));
+assert.deepEqual(rows.map(r => r.kind), types,
+  "All PlanOperationKind values must be in B1 matrix, exactly once, source order.");
+const supported = rows.filter(r => r.policy.includes("**Conditional B1 candidate**"))
+  .map(r => r.kind);
+assert.deepEqual(supported, [
+  "milestone.create", "milestone.update", "issue.create", "issue.update",
+], "Only four owner-approved kinds can enter initial apply.");
+assert(rows.filter(r => !supported.includes(r.kind))
+  .every(r => r.policy.includes("**Excluded from initial apply**")),
+  "Every other kind needs an explicit rejected entry.");
+
+
+
 function frontmatter(id, text) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);
   assert(match, id + " must begin with valid YAML frontmatter.");
