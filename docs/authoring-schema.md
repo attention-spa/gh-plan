@@ -55,3 +55,7 @@ npm test
 Commit the generated `schema/gh-plan.schema.json` with source changes. CI
 runs `schema:check` against the checked-in artifact before tests. The package
 remains `private: true` until a separate publication decision.
+
+## Existing Projects v2 references
+
+Root `projects` only **references** existing boards by `logicalId`, `owner`, `number` and optional `ownerType` (default `org`). An issue or PR can declare `projects: {boardId: {Status: "Doing"}}`, with an empty field map requesting membership alone. Referenced issues may declare project memberships without managing issue properties. The runtime resolves board/field metadata, maps existing select/iteration names to option IDs and emits read-only plans for membership and text/number/date/single-select/iteration values. Project/field creation and membership removal are not supported. See the [Projects v2 schema element](../knowledge/schema/projects-v2.md).

@@ -8,7 +8,7 @@ import YAML from "yaml";
 import { normalizeSchema } from "../src/normalize.ts";
 
 const repo = fileURLToPath(new URL("../", import.meta.url));
-const schemaNames = ["repository", "issue", "milestone", "label", "relationship", "set-remove-operations","pull-request"];
+const schemaNames = ["repository", "issue", "milestone", "label", "relationship", "set-remove-operations","pull-request","projects-v2"];
 const validate = new Ajv2020({ allErrors: true, strict: true }).compile(JSON.parse(
   readFileSync(join(repo, "schema/gh-plan.schema.json"), "utf8")
 ));
@@ -64,7 +64,7 @@ const functions = [
   "createRestDiscoveryTransport", "diffGithubState", "compileMilestoneSteps",
   "compileIssueSteps", "compileIssueFieldSteps", "compileIssueLabelSteps",
   "compileIssueAssigneeSteps", "compileRepositoryLabelSteps",
-  "compileRelationshipSteps", "compilePullRequestSteps", "requestReferences", "validatePlanStepReferences",
+  "compileRelationshipSteps", "compilePullRequestSteps", "compileProjectItemSteps", "requestReferences", "validatePlanStepReferences",
   "bindPlanRequest",
 ];
 const entrypoint = readFileSync(join(repo, "src/index.ts"), "utf8");
@@ -109,4 +109,4 @@ for (const required of ["Metadata: read", "Issues: read", "Issues: write",
   "Organization Issue Fields: read"]) {
   assert(permissions.includes(required), "Missing documented token permission: " + required);
 }
-console.log("Seven OKF examples passed JSON Schema, normalization and TypeScript checks; public exports/REST maps verified.");
+console.log("Eight OKF examples passed JSON Schema, normalization and TypeScript checks; public exports/REST maps verified.");

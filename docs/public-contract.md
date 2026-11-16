@@ -31,6 +31,8 @@ whose title matches but whose marker does not is **not adopted** unless
 `adoptByTitle: true` is explicitly supplied. Conflicts and ambiguous matches
 block planning; reference-only resources never silently become new resources.
 
+Existing Projects v2 boards may be declared via root `projects: [{logicalId, owner, number}]`, defaulting to organization-owned boards; individual issues and PRs may assign `projects: {boardId: {FieldName: value}}`. Project item membership can be planned for reference-only issues. Existing board/field catalogs and repository-scoped items are discovered by REST. Only text, number, date, single-select and iteration fields are reconciled; root project creation or field creation is explicitly unsupported, as is removing membership. New item and newly created content identities use dependency-ordered late binding.
+
 Managed PRs use a unique open head/base pair or an explicit number; the head is immutable and changing the base requires an explicit number. New PRs require existing head/base branch refs with commits ahead of base. GitHub issue-label/assignee endpoints are reused for PRs, while reviewer requests use `requested_reviewers`. Logical `closes` references write only an isolated managed body block and use late-bound issue numbers if needed. Initial draft creation is supported, but changing draft status on an existing PR is **not** supported by REST; merging is not planned.
 
 Relationships are normalized into native edges. `parent` points from parent
@@ -47,12 +49,15 @@ mode is `reconcile`; `additive` avoids removing undeclared relationships.
 | `diffGithubState` | Computes deterministic desired-vs-observed deltas. | **Pure.** Returns blockers/unsupported diagnostics; no requests. |
 | `compileMilestoneSteps`, `compileIssueSteps`, `compileIssueFieldSteps` | Convert explicit semantic deltas to proposed REST steps. | **Pure.** Block unsupported or unsafe identities/fields; no requests. |
 | `compileIssueLabelSteps`, `compileIssueAssigneeSteps`, `compileRepositoryLabelSteps` | Compile exact or targeted label/assignee and repository-label changes. | **Pure.** Unknown catalog entries/eligibility block; no requests. |
+| `compileProjectItemSteps` | Plans membership and selective field values in existing Projects v2 boards only. | **Pure.** Unknown boards/fields, unsupported kinds/options and ambiguous items block; no I/O or project/field creation. |
 | `compilePullRequestSteps` | Plans managed PR creation/partial updates, reviewer add/remove and M4 label/assignee operations. | **Pure.** Missing branch checks, ambiguous PR identity, merged PRs and existing draft toggles block. No I/O or merging. |
 | `compileRelationshipSteps` | Emits native parent, dependency and related-to requests. | **Pure.** Invalid edges become blockers; no requests. |
 | `requestReferences`, `validatePlanStepReferences`, `bindPlanRequest` | Inspect/create-step binding dependencies and substitute post-create identities. | **Pure.** Binding functions can throw `PlanBindingError`; validation returns diagnostics; no requests. |
 | `createRestDiscoveryTransport` | Constructs a read-only GET transport; `discover` and `enrich` perform reads. | Factory performs no I/O. Its methods may throw `GithubRestTransportError`; invalid worker concurrency throws `RangeError`. |
 | `discoverAndResolve` | Performs broad discovery, resolves identities, and enriches selected issues. | **Read-only I/O.** Propagates transport exceptions; its request volume depends on pagination and selected resources. |
 | `planGithub` | Orchestrates normalization, discovery, resolution, diff, compilers and a sorted DAG. | **Read-only I/O.** Converts expected transport failures to blocking diagnostics; no GitHub writes or SDK needed. |
+
+Existing Projects v2 references add conditional GETs for project metadata, field catalog and repo-filtered item list, including numeric field selectors. No projects are queried when they are omitted. Organization Projects read is needed; user project REST token compatibility differs. Project field writes are *only proposed*, never executed.
 
 PR discovery is conditional: `/issues` provides PR candidate numbers, a filtered open head/base query selects matches, and only those candidates receive detailed `/pulls/{number}` and review-request GETs. New head/base pairs receive branch-ref and compare reads. PRs are never merged.
 
