@@ -48,7 +48,7 @@ assert.equal((r.diffs.find((item) => item.id === "issue.create:N")?.desired as R
 const p = existing("P", "issue", 1), m = existing("M", "milestone", 2);
 r = run([issue("P", { title: set("Parent"), body: set("hello"), state: set("open"),
   milestone: set({ logicalId: "M" }), issueType: set("Task"),
-  fields: { Priority: set("High"), Empty: undefined } }), milestone("M", {})], [p, m]);
+  fields: { Priority: set("High") } }), milestone("M", {})], [p, m]);
 assert.equal(status(r, "issue.body:P"), "noop");
 assert.equal(status(r, "issue.title:P"), "noop");
 assert.equal(status(r, "issue.state:P"), "noop");
