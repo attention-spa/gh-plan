@@ -4,7 +4,7 @@ title: "Plans and Steps"
 description: "Deterministic read-only reconciliation proposals with dependency-ordered REST requests."
 tags: ["planning", "dag"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T09:00:00+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T09:12:00+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -49,4 +49,6 @@ M8.1.4 requires a **second, independent postcondition read after every dispatche
 
 The internal executor now returns a `log` of `{stepIndex, outcome, phase}` entries, including skipped steps. A fifth optional `onLog` callback can persist each sanitized entry sequentially; a failing callback stops execution. The index identifies the step in dependency order; no potentially sensitive user-supplied IDs or request payloads are logged. See [the no-secrets decision](/decisions/no-secrets-in-plans.md).
 
-This remains staging, **not** a safe public `applyPlan()`: recovery checks are not a cross-process transaction lock, a concrete GitHub-specific postcondition reader is not supplied, and final M8.1.5 integration fixtures are pending. Do not use it against a live repository until the remaining M8.1 gates are implemented. Deterministic output and [secret-free plans](/decisions/no-secrets-in-plans.md) make review possible before writing.
+M8.1.5 adds stateful, all-steps integration fixtures for the exact same `GithubPlan`: an initial milestone/issue create and issue update, a zero-write rerun, a simulated issue create that commits remotely but loses its response, and a simulated post-write read failure. The interrupted runs then re-query the issue catalog, skip recovered creates, finish the pending update and replay with zero additional writes. The fixtures also assert dependency ordering, fresh read counts, identity binding, no duplicate issue markers, unchanged input and sanitized execution logs.
+
+This remains staging, **not** a safe public `applyPlan()`. Green synthetic fixtures validate the *injected* reader and dispatch contracts, but no concrete GitHub-specific postcondition reader for all operation kinds or cross-process uniqueness lock is supplied. The implementation is not exported from the package entrypoint and should not be used against live repositories until a separate public apply contract and missing safety mechanisms are designed and approved. Deterministic output and [secret-free plans](/decisions/no-secrets-in-plans.md) make review possible before writing.
