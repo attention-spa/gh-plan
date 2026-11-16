@@ -70,6 +70,13 @@ function cloned<T>(value: T): T {
   try { return structuredClone(value) as T; }
   catch { return reject(); }
 }
+function deepFreeze<T>(input: T): T {
+  if (input && typeof input === "object" && !Object.isFrozen(input)) {
+    for (const item of Object.values(input)) deepFreeze(item);
+    Object.freeze(input);
+  }
+  return input;
+}
 function needPush(plan: GithubPlan): boolean {
   return plan.steps.some((step) => step.kind === "issue.create" &&
     step.request?.protocol === "rest" && record(step.request.body) &&
@@ -105,23 +112,24 @@ export function createGithubReferenceApplyOptions(config: GithubReferenceApplyCo
   const plan = cloned(config.plan);
   const preflight = preflightApplyPlan(plan);
   if (!preflight.ok) throw new GithubReferenceError("INVALID_CONFIG");
-  const fixed = cloned(plan);
+  const fixed = deepFreeze(cloned(plan));
+  const auth = config.auth; // Snapshot the runtime token; never reread caller config.
   const specs = new Map(preflight.postconditions.map((spec) => [spec.stepId, spec]));
   const steps = new Map(fixed.steps.map((step) => [step.id, step]));
   const transport = createGithubReferenceHttp({
-    repository: fixed.repository, auth: config.auth,
+    repository: fixed.repository, auth,
     ...(config.fetch === undefined ? {} : { fetch: config.fetch }),
     ...(config.now === undefined ? {} : { now: config.now }),
     ...(config.sleep === undefined ? {} : { sleep: config.sleep }),
     // Intentionally NO signal here: abort during an in-flight mutation must
     // still allow definitive GitHub readback and conditional lock release.
   });
-  const backend = createGithubCasHttpBackend({ auth: config.auth, fetch: transport.fetch });
+  const backend = createGithubCasHttpBackend({ auth, fetch: transport.fetch });
   const issues = createRestIssuePostconditionReader({
-    auth: config.auth, fetch: transport.fetch,
+    auth, fetch: transport.fetch,
   });
   const milestones = createRestMilestonePostconditionReader({
-    auth: config.auth, fetch: transport.fetch,
+    auth, fetch: transport.fetch,
   });
   const readBefore = new Map<string, Before>();
   const seenBefore = new Map<string, { request: string; bindings: PlanBindings;
@@ -198,7 +206,7 @@ export function createGithubReferenceApplyOptions(config: GithubReferenceApplyCo
     const url = BASE + "/repos/" + repo + "/issues/" + row.number;
     const response = await transport.fetch(url, {
       method: "GET", redirect: "error", headers: {
-        Authorization: "Bearer " + config.auth,
+        Authorization: "Bearer " + auth,
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": GITHUB_REST_API_VERSION,
       },
@@ -327,7 +335,7 @@ export function createGithubReferenceApplyOptions(config: GithubReferenceApplyCo
       const response = await transport.fetch(url, {
         method: request.method, redirect: "error",
         headers: {
-          Authorization: "Bearer " + config.auth,
+          Authorization: "Bearer " + auth,
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": GITHUB_REST_API_VERSION,
           "Content-Type": "application/json",
