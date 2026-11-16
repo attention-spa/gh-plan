@@ -158,12 +158,21 @@ blocked({
 // 15. Repository selector must be owner/name.
 blocked({ repository: "not-a-repo", issues: [] }, "INVALID_SCHEMA");
 
-// 16. Unknown top-level constructs fail closed instead of being silently ignored.
-blocked({
+// 16. Unknown top-level constructs are ignored with non-blocking warnings.
+const rootUnknown = normalizeSchema({
   repository: "attention-spa/example",
-  issues: [],
+  issues: [{ logicalId: "A", title: "Alpha" }],
   projects: [{ id: 1 }],
-}, "UNSUPPORTED_SCHEMA_FEATURE");
+});
+assert(rootUnknown.ok && rootUnknown.graph, "unknown root key alone must not block normalization");
+equal(rootUnknown.graph, minimal, "unknown root key must not enter the normalized graph");
+equal(rootUnknown.diagnostics, [{
+  code: "UNSUPPORTED_SCHEMA_FEATURE",
+  severity: "warning",
+  blocking: false,
+  schemaPath: "$.projects",
+  message: "Unsupported schema property 'projects' was ignored.",
+}], "unknown root key should produce one non-blocking warning");
 
 // Unsupported removal also fails closed.
 blocked({
@@ -238,13 +247,26 @@ blocked({
   issues: [{ logicalId: "A", title: "Alpha" }, { logicalId: "B", title: "Beta" }],
   relationships: [{ kind: "related", from: "A", to: "B" }],
 }, "UNSUPPORTED_SCHEMA_FEATURE");
-blocked({
+const oldInlineAlias = normalizeSchema({
   repository: "attention-spa/example",
   issues: [
     { logicalId: "A", title: "Alpha", related: ["B"] },
     { logicalId: "B", title: "Beta" },
   ],
-}, "UNSUPPORTED_SCHEMA_FEATURE");
+});
+assert(oldInlineAlias.ok && oldInlineAlias.graph, "unsupported inline property alone should warn, not block");
+equal(oldInlineAlias.graph.relationships, [], "the legacy related key must not create relates_to edges");
+equal(oldInlineAlias.diagnostics.map((item) => ({
+  code: item.code,
+  severity: item.severity,
+  blocking: item.blocking,
+  schemaPath: item.schemaPath,
+})), [{
+  code: "UNSUPPORTED_SCHEMA_FEATURE",
+  severity: "warning",
+  blocking: false,
+  schemaPath: "$.issues[0].related",
+}], "unsupported inline alias is discarded as an unknown property");
 
 // JSON-encoded pairs avoid collisions for valid logical IDs containing colons.
 
@@ -299,3 +321,80 @@ blocked({
   repository: "attention-spa/example",
   issues: [{ logicalId: "A", title: "Example", blockedBy: ["B-->"] }],
 }, "INVALID_SCHEMA");
+
+
+// M1.3: unknown keys at each supported level are discarded without changing valid work.
+const unknownNested = normalizeSchema({
+  futureRoot: { enabled: true },
+  repository: { fullName: "attention-spa/example", futureRepo: 1 },
+  milestones: [
+    { logicalId: "M1", title: "Foundation", futureMilestone: "ignored" },
+  ],
+  issues: [
+    {
+      logicalId: "A", title: "Alpha",
+      milestone: "M1",
+      identity: { number: 42, futureIdentity: "ignored" },
+      futureIssue: { not: "recognized" },
+    },
+    { logicalId: "B", title: "Beta" },
+  ],
+  relationships: [
+    { kind: "relates_to", from: "A", to: "B", futureRelation: true },
+  ],
+});
+assert(unknownNested.ok && unknownNested.graph, "unknown nested keys must not block valid work");
+const cleanNested = valid({
+  repository: { fullName: "attention-spa/example" },
+  milestones: [{ logicalId: "M1", title: "Foundation" }],
+  issues: [
+    { logicalId: "A", title: "Alpha", milestone: "M1", identity: { number: 42 } },
+    { logicalId: "B", title: "Beta" },
+  ],
+  relationships: [{ kind: "relates_to", from: "A", to: "B" }],
+});
+equal(unknownNested.graph, cleanNested, "unknown schema properties must never appear in normalized output");
+const expectedWarningPaths = [
+  "$.futureRoot",
+  "$.issues[0].futureIssue",
+  "$.issues[0].identity.futureIdentity",
+  "$.milestones[0].futureMilestone",
+  "$.relationships[0].futureRelation",
+  "$.repository.futureRepo",
+];
+equal(unknownNested.diagnostics.map((item) => item.schemaPath), expectedWarningPaths,
+  "warnings must remain sorted deterministically by code, path and details");
+for (const item of unknownNested.diagnostics) {
+  equal(item.code, "UNSUPPORTED_SCHEMA_FEATURE", "unknown property diagnostic code");
+  equal(item.severity, "warning", "unknown properties must be warnings");
+  equal(item.blocking, false, "unknown properties must not block");
+}
+const reorderedUnknown = normalizeSchema({
+  repository: { futureRepo: 1, fullName: "attention-spa/example" },
+  futureRoot: { enabled: true },
+  issues: [
+    {
+      futureIssue: { not: "recognized" },
+      milestone: "M1", identity: { futureIdentity: "ignored", number: 42 },
+      title: "Alpha", logicalId: "A",
+    },
+    { title: "Beta", logicalId: "B" },
+  ],
+  milestones: [{ futureMilestone: "ignored", title: "Foundation", logicalId: "M1" }],
+  relationships: [{ futureRelation: true, to: "B", from: "A", kind: "relates_to" }],
+});
+equal(reorderedUnknown, unknownNested, "unknown-key ordering must not affect graph or diagnostics");
+
+// Unknown properties cannot suppress independent validation failures.
+const invalidKnownWithUnknown = normalizeSchema({
+  repository: "attention-spa/example",
+  experimental: true,
+  issues: [{ logicalId: "A", title: { op: "remove" }, extra: true }],
+});
+assert(!invalidKnownWithUnknown.ok && !invalidKnownWithUnknown.graph,
+  "malformed known properties must still block when unknown properties coexist");
+assert(invalidKnownWithUnknown.diagnostics.some((d) => d.code === "INVALID_SCHEMA" && d.blocking),
+  "malformed known property must retain its blocking diagnostic");
+assert(invalidKnownWithUnknown.diagnostics.filter((d) => d.code === "UNSUPPORTED_SCHEMA_FEATURE")
+  .every((d) => d.severity === "warning" && !d.blocking),
+  "unknown keys must remain warnings even in an otherwise invalid schema");
