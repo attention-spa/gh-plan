@@ -316,8 +316,8 @@ const inputConfig = {
     immutable.auditable.push({ ...entry });
   },
 };
-const pinned = createGithubReferenceApplyOptions(inputConfig);
-assert(Object.isFrozen(pinned.plan) &&
+const pinnedOptions = createGithubReferenceApplyOptions(inputConfig);
+assert(Object.isFrozen(pinnedOptions.plan) &&
   Object.isFrozen(pinned.plan.repository) &&
   Object.isFrozen(pinned.plan.steps) &&
   Object.isFrozen(pinned.plan.steps[0]),
@@ -325,7 +325,7 @@ assert(Object.isFrozen(pinned.plan) &&
 externalPlan.repository.fullName = "different/repository";
 externalPlan.steps[0]!.kind = "label.create";
 inputConfig.auth = "DO_NOT_LOG_CHANGED_TOKEN";
-const isolated = await executeCallbackApplyPlan(pinned);
+const isolated = await executeCallbackApplyPlan(pinnedOptions);
 equal(isolated.status,"applied",
   "Changes to caller config/plan after construction cannot redirect GitHub writes.");
 equal(immutable.resourceWrites().length,5,
