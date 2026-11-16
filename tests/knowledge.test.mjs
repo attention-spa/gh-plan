@@ -26,13 +26,20 @@ const decisions = [
   "markers-in-body", "deterministic-output", "no-secrets-in-plans",
   "relationship-reconciliation", "issue-deletion-policy", "title-adoption-opt-in",
 ];
+const schema = ["repository","issue","milestone","label","relationship","set-remove-operations"];
+const api = ["planGithub","normalizeSchema","resolveResourceIdentities","discoverAndResolve","createRestDiscoveryTransport","diffGithubState","compileMilestoneSteps","compileIssueSteps","compileIssueFieldSteps","compileIssueLabelSteps","compileIssueAssigneeSteps","compileRepositoryLabelSteps","compileRelationshipSteps","requestReferences","validatePlanStepReferences","bindPlanRequest","types-authoring","types-state","types-plan","types-errors","types-transport"];
+const github = ["rest-discovery","rest-step-operations","token-permissions"];
 const required = [
   "index.md", "log.md", "overview.md", "concepts/index.md", "decisions/index.md",
+  "schema/index.md", "api/index.md", "github/index.md",
   ...concepts.map((x) => "concepts/" + x + ".md"),
   ...decisions.map((x) => "decisions/" + x + ".md"),
+  ...schema.map((x) => "schema/" + x + ".md"),
+  ...api.map((x) => "api/" + x + ".md"),
+  ...github.map((x) => "github/" + x + ".md"),
 ];
 assert.deepEqual([...paths.keys()].sort(), required.sort(),
-  "M6.1 must include all requested OKF pages and no unexpected markdown assets.");
+  "Knowledge bundle must include all requested M6.1–M6.2 OKF pages.");
 
 function frontmatter(id, text) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);
@@ -59,8 +66,14 @@ for (const [id, text] of paths) {
     assert(!text.startsWith("---"), "Non-root index and log must have no frontmatter: " + id);
   } else {
     const { meta, body } = frontmatter(id, text);
-    assert.equal(meta.type, id === "overview.md" ? "Overview" :
-      id.startsWith("concepts/") ? "Concept" : "Decision", "Invalid OKF type: " + id);
+    const types = { concepts: "Concept", decisions: "Decision",
+      schema: "Schema Element", api: "API", github: "GitHub Reference" };
+    assert.equal(meta.type, id === "overview.md" ? "Overview" : types[id.split("/")[0]],
+      "Invalid OKF type: " + id);
+    if (/^(?:schema|api|github)\//.test(id)) {
+      assert(typeof meta.resource === "string" && meta.resource.startsWith("https://"),
+        "M6.2 pages must identify their canonical resource: " + id);
+    }
     assert(typeof meta.title === "string" && meta.title.trim(), "Missing title in " + id);
     assert(typeof meta.description === "string" && meta.description.trim(),
       "Missing description in " + id);
@@ -95,7 +108,10 @@ for (const [id, text] of paths) {
   }
 }
 
-for (const [dir, slugs] of [["concepts", concepts], ["decisions", decisions]]) {
+for (const [dir, slugs] of [
+  ["concepts", concepts], ["decisions", decisions], ["schema", schema],
+  ["api", api], ["github", github],
+]) {
   const index = paths.get(dir + "/index.md");
   assert(index && /^#\s+.+/m.test(index), dir + " index must contain a heading.");
   for (const slug of slugs) {
@@ -105,10 +121,11 @@ for (const [dir, slugs] of [["concepts", concepts], ["decisions", decisions]]) {
     assert(index.includes(pages.get(id).description),
       dir + " index descriptions should match page frontmatter for " + id);
   }
-  const refs = [...index.matchAll(/\]\(\/(concepts|decisions)\/([^/]+)\.md\)/g)];
+  const refs = [...index.matchAll(new RegExp("\\]\\(\\/" + dir + "\\/([^/]+)\\.md\\)", "g"))];
   assert.equal(refs.length, slugs.length, dir + " index must not omit/duplicate entries.");
 }
-for (const id of ["overview.md", "concepts/index.md", "decisions/index.md", "log.md"]) {
+for (const id of ["overview.md", "concepts/index.md", "decisions/index.md",
+  "schema/index.md", "api/index.md", "github/index.md", "log.md"]) {
   assert(paths.get("index.md").includes("](/" + id + ")"),
     "Root index must reveal " + id);
 }
@@ -125,6 +142,8 @@ for (let n = 2; n <= 9; n++) {
 for (let m = 1; m <= 5; m++) {
   assert(new RegExp("\\bM" + m + "\\b").test(log), "Milestone M" + m + " missing from history.");
 }
+assert(log.includes("M6.2") && log.includes("issues/31"),
+  "Log needs an entry for the M6.2 reference expansion.");
 assert(log.includes("M6.1") && log.includes("issues/30"),
   "Log needs a creation entry for M6.1.");
 console.log("OKF v0.2 structure, YAML metadata, provenance, offsets, links, indexes and history passed.");
