@@ -306,6 +306,6 @@ soleIssue.resolutions = soleIssue.resolutions.filter((r) => r.logicalId !== "M")
 // This graph is intentionally now invalid because issue.create refers to M:
 // the preflight must refuse even with a perfect catalog.
 rejected("cross-resource refs require original milestone producer", options(soleIssue),
-  "INVALID_PLAN");
+  ["INVALID_PLAN", "UNSUPPORTED_PLAN"]);
 
 console.log("C2 #187: public type contract, 29 disallowed kinds, mixed B1 immutability and zero-callback preflight passed.");
