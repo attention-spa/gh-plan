@@ -9,5 +9,5 @@ okf_version: "0.2"
 - [Schema Elements](/schema/index.md) — Nine authoring schema components and executable examples.
 - [Public API](/api/index.md) — Runtime functions and grouped public TypeScript contracts.
 - [GitHub REST](/github/index.md) — Endpoint-to-step maps and verified permission requirements.
-- [Decisions](/decisions/index.md) — Eight accepted or documented safety and reconciliation policies.
-- [Update history](/log.md) — Newest-first M1–M6 and legacy issue provenance.
+- [Decisions](/decisions/index.md) — Nine accepted or documented safety and reconciliation policies.
+- [Update history](/log.md) — Newest-first M1–M8 and legacy issue provenance.
