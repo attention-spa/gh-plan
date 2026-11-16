@@ -83,7 +83,7 @@ export function requestReferences(request: PlanRequest): string[] {
 export function validatePlanStepReferences(steps: readonly PlanStep[]): GithubDiagnostic[] {
   const producers = new Map<string, string[]>();
   for (const step of steps) {
-    if ((step.kind === "issue.create" || step.kind === "milestone.create") && step.status === "planned") {
+    if ((step.kind === "issue.create" || step.kind === "milestone.create" || step.kind === "pull_request.create") && step.status === "planned") {
       const entries = producers.get(step.logicalId) ?? [];
       entries.push(step.id);
       producers.set(step.logicalId, entries);
@@ -138,6 +138,14 @@ function bindRef(ref: PlanValueRef, bindings: PlanBindings): number | string {
 
 function bindValue(value: PlanJsonValue, bindings: PlanBindings): JsonValue {
   if (isReferenceObject(value)) return bindRef(value, bindings);
+  if (isObject(value) && Object.hasOwn(value, "$template")) {
+    if (Object.keys(value).length !== 1 || !Array.isArray(value.$template) ||
+        !value.$template.every((part) => typeof part === "string" || isReferenceObject(part))) {
+      throw new PlanBindingError("INVALID_PLAN_REFERENCE", "malformed $template");
+    }
+    return value.$template.map((part) => typeof part === "string"
+      ? part : String(bindRef(part as PlanValueRef, bindings))).join("");
+  }
   if (Array.isArray(value)) return value.map((entry) => bindValue(entry, bindings));
   if (isObject(value)) {
     const output: Record<string, JsonValue> = Object.create(null) as Record<string, JsonValue>;

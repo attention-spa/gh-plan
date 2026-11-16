@@ -58,7 +58,7 @@ export interface GithubPlannerConfig {
 /** Caller-supplied stable logical key for resources and step bindings. */
 export type LogicalResourceId = string;
 /** Issues and milestones use resource identity; root labels are separate declarations. */
-export type ResourceKind = "issue" | "milestone";
+export type ResourceKind = "issue" | "milestone" | "pull_request";
 /** Managed means reconciled; reference means existing-only, never created or changed. */
 export type ResourceManagement = "managed" | "reference";
 
@@ -126,6 +126,31 @@ export type DesiredIssueState = {
   assignees?: DesiredIssueAssignees;
   fields?: Record<string, DesiredSetOrRemove<JsonValue>>;
 };
+
+/** Normalized pull request desired properties. Title/body/state are partial intent.
+ * The head is immutable; base can be updated only for an explicitly identified PR.
+ * Draft changes after creation cannot be expressed by REST. */
+export interface DesiredPullRequestState {
+  title?: DesiredSet<string>;
+  body?: DesiredSetOrRemove<string>;
+  state?: DesiredSet<"open" | "closed">;
+  draft?: DesiredSet<boolean>;
+  labels?: DesiredIssueLabels;
+  assignees?: DesiredIssueAssignees;
+  reviewers?: DesiredIssueAssignees;
+  closes?: LogicalResourceRef[];
+}
+
+/** Same-repository managed PR with a stable logical key and head/base identity. */
+export interface DesiredPullRequestResource {
+  kind: "pull_request";
+  management: "managed";
+  logicalId: LogicalResourceId;
+  head: string;
+  base: string;
+  identity?: DesiredResourceIdentity;
+  desired: DesiredPullRequestState;
+}
 
 /** Normalized milestone intent; only supplied properties produce comparisons. */
 export type DesiredMilestoneState = {
@@ -224,6 +249,8 @@ export interface NormalizedDesiredStateGraph {
   /** Optional root repository-label declarations; never imply deletions. */
   labels?: DesiredRepositoryLabel[];
   relationships: DesiredRelationship[];
+  /** Separate PR resources avoid treating PRs as ordinary issue-mutation targets. */
+  pullRequests?: DesiredPullRequestResource[];
 }
 
 /** Only existing/new are actionable; ambiguous/unresolved identities must block. */
@@ -280,6 +307,31 @@ export interface ObservedMilestone {
   state: "open" | "closed";
 }
 
+/** Enriched PR. Unlike a /issues listing entry, head/base and reviewer state are authoritative. */
+export interface ObservedPullRequest {
+  kind: "pull_request";
+  number: number;
+  id: number;
+  nodeId?: string;
+  title: string;
+  body?: string | null;
+  state: "open" | "closed";
+  head: string;
+  base: string;
+  draft: boolean;
+  merged: boolean;
+  labels: string[];
+  assignees: string[];
+  requestedReviewers: string[];
+}
+
+/** Validated same-repo branch refs and compare status for a proposed new PR. */
+export interface PullRequestBranchCheck {
+  headExists: boolean;
+  baseExists: boolean;
+  differs: boolean;
+}
+
 /** GitHub issue type metadata; authored by name rather than id. */
 export interface ObservedIssueType {
   id?: number;
@@ -315,6 +367,12 @@ export interface ObservedLabel {
 export interface GithubStateSnapshot {
   repository: RepositoryRef;
   issues: ObservedIssue[];
+  /** PR numbers identified by pull_request metadata in the broad /issues list. */
+  pullRequestIssueNumbers?: number[];
+  /** Only PRs matching desired open head/base or an explicit number are enriched. */
+  pullRequests?: ObservedPullRequest[];
+  /** Checks for new-PR head/base refs and nonidentical commits. */
+  pullRequestBranchChecks?: Record<LogicalResourceId, PullRequestBranchCheck>;
   milestones: ObservedMilestone[];
   issueTypes: ObservedIssueType[];
   /** Undefined until catalog discovery is requested. */
@@ -331,6 +389,8 @@ export interface GithubDiscoveryTransport {
   discover(desired: NormalizedDesiredStateGraph): Promise<GithubStateSnapshot>;
   /** Targeted per-issue detail requests; preserves untargeted summaries. */
   enrich(snapshot: GithubStateSnapshot, issueNumbers: number[], assigneeLogins?: string[]): Promise<GithubStateSnapshot>;
+  /** Optional read-only, PR-specific enrichment; invoked only for declared PRs. */
+  enrichPullRequests?(snapshot: GithubStateSnapshot, desired: DesiredPullRequestResource[]): Promise<GithubStateSnapshot>;
 }
 
 /** Only planned operations are executable; noops and blocked/unsupported entries are informational. */
@@ -342,6 +402,10 @@ export type PlanOperationKind =
   | "label.update"
   | "milestone.create"
   | "milestone.update"
+  | "pull_request.create"
+  | "pull_request.update"
+  | "pull_request.reviewer.add"
+  | "pull_request.reviewer.remove"
   | "issue.create"
   | "issue.update"
   | "issue.type.set"
@@ -373,11 +437,17 @@ export type PlanValueRef = {
   $ref: `${LogicalResourceId}.${PlanIdentityProperty}`;
 };
 
+/** Template for a string containing late-bound IDs (e.g., a Closes #number body). */
+export interface PlanStringTemplate {
+  $template: Array<string | PlanValueRef>;
+}
+
 /** Serializable request data; references can occur at any nesting depth. */
 /** JSON request payload that can contain nested late-bound identity references. */
 export type PlanJsonValue =
   | JsonPrimitive
   | PlanValueRef
+  | PlanStringTemplate
   | PlanJsonValue[]
   | { [key: string]: PlanJsonValue };
 
@@ -449,7 +519,11 @@ export type DiagnosticCode =
   | "RATE_LIMITED"
   | "NO_GRAPHQL_TRANSPORT"
   | "UNSUPPORTED_SCHEMA_FEATURE"
-  | "PARENT_CONFLICT";
+  | "PARENT_CONFLICT"
+  | "PR_BRANCH_INVALID"
+  | "PR_PAIR_CONFLICT"
+  | "PR_MERGED"
+  | "PR_DRAFT_UNSUPPORTED";
 
 /** Severity label; blocking separately controls whether the plan is safe to execute. */
 export type DiagnosticSeverity = "info" | "warning" | "error";

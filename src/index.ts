@@ -1,6 +1,7 @@
 export type {
   GithubPlanSchema, AuthoringIssue, AuthoringManagedIssue, AuthoringReferencedIssue,
   AuthoringMilestone, AuthoringRepositoryLabel, AuthoringRelationship,
+  AuthoringPullRequest,
   AuthoringIssueLabels, AuthoringIssueAssignees, AuthoringIdentity,
   AuthoringMilestoneRef, AuthoringSet, AuthoringRemove,
 } from "./authoring-schema.ts";
@@ -49,6 +50,8 @@ export type {
   BlockedByRelationship,
   BlocksRelationship,
   DesiredIssueState,
+  DesiredPullRequestState,
+  DesiredPullRequestResource,
   DesiredIssueLabels,
   DesiredIssueAssignees,
   DesiredRepositoryLabel,
@@ -88,6 +91,8 @@ export type {
   ManagedMilestoneResource,
   NormalizedDesiredStateGraph,
   ObservedIssue,
+  ObservedPullRequest,
+  PullRequestBranchCheck,
   ObservedIssueField,
   ObservedIssueFieldOption,
   ObservedIssueType,
@@ -98,6 +103,7 @@ export type {
   PlanBindings,
   PlanIdentityProperty,
   PlanJsonValue,
+  PlanStringTemplate,
   PlanPath,
   PlanValueRef,
   PlanOperationKind,
