@@ -6,6 +6,10 @@ This package **plans**, but does not execute, changes to GitHub. Its return
 value contains proposed HTTP requests, identity resolutions and diagnostics.
 The caller must not execute a plan whose `readiness` is `blocked`.
 
+## Internal B1 capability preflight — #178 staging
+
+The internal `src/apply-preflight.ts` builds a versioned normalized-intent manifest and exposes `preflightApplyPlan(plan)` **only to repository implementation and test code**. It statically rejects whole plans with unsupported operations, unmanaged side effects, missing intent evidence, wrong repository/method/path/field shape, bad identity/references, an invalid DAG or unresolved noops. Four issue/milestone create/update kinds are conditional; all 29 other kinds are rejected. It compiles versioned typed `ApplyPostconditionSpec` descriptors for future independently authoritative readers, not executable proof of verified GitHub state. A plan's human-readable `expectedPostconditions` does not authorize a write. This is a pure check: it does not acquire an A1 lock, call GitHub, dispatch requests, or export a public writer. Runtime live verification and the C2 public API remain blocked by their independently tested implementation leaves.
+
 ## Future apply boundary — C2 approved, NOT IMPLEMENTED
 
 The future `applyPlan()` is opt-in via explicit `acknowledgeCallbackTrust: true`, requires callback dispatch, readback and ownership inputs, and must reject the entire plan before any resource writes if a B1 kind/shape/intent is unsupported. Its result/errors will carry only typed phases, stable codes and safe audit records; cancellation is cooperative, unknown GitHub writes must not be blindly retried, and callback honesty cannot be mechanically established by the package. The public `auth` and `fetch` options previously proposed under C1 are **not** approved for C2. This is a design only; `src/index.ts` has no such export, and `planGithub()` remains read-only.

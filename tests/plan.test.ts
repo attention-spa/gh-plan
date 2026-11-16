@@ -1,4 +1,5 @@
 import { GITHUB_PLAN_VERSION, planGithub } from "../src/index.ts";
+import { preflightApplyPlan } from "../src/apply-preflight.ts";
 import type { FetchLike, FetchResponseLike, GithubPlan, GithubPlanSchema } from "../src/index.ts";
 
 function check(condition: unknown, text: string): asserts condition {
@@ -78,6 +79,14 @@ equal(plan.metadata, { planner: "gh-plan", version: GITHUB_PLAN_VERSION, mode: "
 equal(plan.desired, { resourceCount: 3, relationshipCount: 3 },
   "Normalization includes inline and explicit relationships.");
 equal(plan.summary.blocked, 0, "New resource DAG is unblocked.");
+check(plan.applyIntent?.version === 1 &&
+  plan.applyIntent.repository === repo &&
+  plan.applyIntent.relationshipCount === 3 &&
+  plan.applyIntent.unsupported.includes("relationships"),
+  "Planner must preserve unsupported normalized relation intent for fail-closed preflight.");
+const apply = preflightApplyPlan(plan);
+check(!apply.ok && apply.errors.some((e) => e.code === "UNSUPPORTED_INTENT"),
+  "Real planner output with native relationships must be rejected in full by B1 preflight.");
 equal(plan.summary.planned, 6, "Milestone and two issues plus three relationships.");
 equal(plan.steps.map((s) => s.kind), [
   "milestone.create", "issue.create", "issue.create",
