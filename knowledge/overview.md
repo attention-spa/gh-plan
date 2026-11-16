@@ -4,7 +4,7 @@ title: "gh-plan overview"
 description: "A read-only GitHub desired-state planner that emits deterministic request DAGs."
 tags: ["github", "planning", "architecture"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T09:00:00+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T09:12:00+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/normalize.ts
@@ -12,7 +12,7 @@ sources:
 
 ## Summary
 
-`gh-plan` is a TypeScript ESM package for **planning**, not applying, GitHub repository changes. It interprets typed desired-state documents, reads GitHub REST state, resolves identities, computes a semantic diff and emits deterministic, dependency-ordered mutation requests. Its public entrypoint never performs GitHub writes. The internal M8 staging primitive supports injected dispatch, pre/post-write verification, exact-marker interrupted-issue-create recovery and secret-free appendable outcome logs. It remains unexported pending final replay fixtures and the separate public-API decision. The package remains private pending a separate release decision.
+`gh-plan` is a TypeScript ESM package for **planning**, not applying, GitHub repository changes. It interprets typed desired-state documents, reads GitHub REST state, resolves identities, computes a semantic diff and emits deterministic, dependency-ordered mutation requests. Its public entrypoint never performs GitHub writes. The internal M8 staging primitive supports injected dispatch, pre/post-write verification, exact-marker interrupted-issue-create recovery and secret-free appendable outcome logs. M8.1.5 adds end-to-end synthetic repeat-run and lost-response recovery fixtures. The primitive remains unexported: a concrete GitHub postcondition reader, cross-process safety policy and separate public-API decision are still required. The package remains private pending a separate release decision.
 
 ## Pipeline
 
