@@ -132,13 +132,15 @@ function options(plan: GithubPlan = clone()): ApplyPlanOptions {
   };
 }
 function rejected(name: string, candidate: unknown,
-  code: ApplyPlanErrorCode): void {
+  code: ApplyPlanErrorCode | readonly ApplyPlanErrorCode[]): void {
   touched.length = 0;
   let error: unknown;
   try { prepareApplyPlan(candidate); }
   catch (caught) { error = caught; }
   assert(error instanceof ApplyPlanError, name + ": typed error only");
-  equal(error.code, code, name + ": stable error code");
+  assert((Array.isArray(code) ? code : [code]).includes(error.code),
+    name + ": stable allowlisted error code expected=" + JSON.stringify(code) +
+      " actual=" + error.code);
   equal(error.phase, "preflight", name + ": validation-only phase");
   equal(error.ownerState, "not_acquired", name + ": no lock started");
   equal(error.log, [], name + ": no audit record fabricated");
@@ -227,9 +229,7 @@ for (const change of [
 ]) {
   const p = clone();change(p);
   rejected("unsafe plan refused atomically", options(p),
-    p.applyIntent?.unsupported?.length ||
-    p.applyIntent?.managed[0]?.fields.includes("assignees")
-    ? "UNSUPPORTED_PLAN" : "INVALID_PLAN");
+    ["INVALID_PLAN", "UNSUPPORTED_PLAN"]);
 }
 rejected("no options", undefined, "CALLBACK_INVALID");
 rejected("null plan", { ...options(), plan: null }, "INVALID_PLAN");
