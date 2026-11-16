@@ -36,7 +36,7 @@ function effectiveMarker(resource: DesiredResource): string | undefined {
 }
 
 /** Canonical markers are complete HTML comments; custom markers require whole-token boundaries. */
-function matchesMarker(
+export function matchesMarker(
   body: string | null | undefined,
   marker: string,
   custom: boolean,

@@ -5,15 +5,20 @@ description: "GitHub REST GET catalog, enrichment and assignee-eligibility endpo
 resource: https://docs.github.com/en/rest/issues/issues
 tags: [github, rest, permissions]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:59:33.118+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:25:57+01:00 }
 sources:
   - resource: https://docs.github.com/en/rest/issues/issues
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/rest.ts
+  - resource: https://github.com/attention-spa/gh-plan/blob/main/src/execute-steps.ts
 ---
 
 ## Summary
 
 GitHub REST GET catalog, enrichment and assignee-eligibility endpoints used by the planner.
+
+## Recovery-specific read contract
+
+M8.1.3's internal `createRestIssueCatalogReader()` uses `GET /repos/{owner}/{repo}/issues?state=all&per_page=100` with **every** Link pagination page, without relying on the original planning snapshot. It uses the existing sanitized transport errors, validates issue response shapes, excludes pull-request entries and never performs a mutation. The complete list allows an exact-marker uniqueness check immediately before each `issue.create`; failed pages prohibit dispatch. This read requires repository Issues: read. It does not provide a cross-process uniqueness lock.
 
 ## Verified endpoints and access
 

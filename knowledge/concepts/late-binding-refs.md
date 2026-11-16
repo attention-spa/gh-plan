@@ -4,7 +4,7 @@ title: "Late-Binding References"
 description: "Identity placeholders for requests that depend on resources not yet created."
 tags: ["planning", "identity"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:15:46+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:25:57+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan-bindings.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -19,6 +19,10 @@ A request may need a GitHub `number`, `id` or `nodeId` that does not exist while
 The request consumer must list the producing step's **full ID**, for example `issue.create:A`, in its `dependsOn` array. `validatePlanStepReferences()` returns blocking diagnostics when a referenced producer is absent, ambiguous or not an explicit prerequisite.
 
 An executor, after completing the create request, provides the identity using `PlanBindings` and substitutes via `bindPlanRequest()`. Missing or invalid values throw `PlanBindingError`; no network calls occur in the binder. The internal M8 staging `executePlanSteps()` primitive collects validated numeric IDs and optional node IDs from successful create responses. M8.1.2 also permits *skipping* a create when a mandatory fresh postcondition read finds it already satisfied; the read must then return a validated existing identity to bind dependent requests. A satisfied create without usable identity fails closed, rather than guessing IDs. This is not yet an idempotent public apply API.
+
+## Interrupted-create bindings
+
+M8.1.3 reuses identities from a unique, freshly found marked issue when an in-flight `issue.create` POST completed remotely but lost its reply. A separate fresh postcondition check must agree on the identity; the observed numeric `id`/`number` and optional `nodeId` are then bound just as they would be from a normal create response. A mismatch or ambiguous marker halts rather than binding an unrelated issue.
 
 ## PR closing references
 
