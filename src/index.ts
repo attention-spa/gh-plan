@@ -1,3 +1,5 @@
+export { bindPlanRequest, requestReferences, validatePlanStepReferences, PlanBindingError } from "./plan-bindings.ts";
+export type { BoundPlanRequest, PlanBindingErrorCode } from "./plan-bindings.ts";
 export { diffGithubState } from "./diff.ts";
 export { normalizeSchema } from "./normalize.ts";
 export { discoverAndResolve } from "./discovery.ts";
@@ -68,6 +70,11 @@ export type {
   ObservedMilestone,
   ParentRelationship,
   PlanGithub,
+  PlanBindings,
+  PlanIdentityProperty,
+  PlanJsonValue,
+  PlanPath,
+  PlanValueRef,
   PlanOperationKind,
   PlanRequest,
   PlanStep,
