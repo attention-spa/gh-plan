@@ -6,7 +6,7 @@ okf_version: "0.2"
 
 - [Overview](/overview.md) — Purpose, read-only planner pipeline and maintenance boundaries.
 - [Concepts](/concepts/index.md) — Eight foundational types and planning semantics.
-- [Schema Elements](/schema/index.md) — Eight authoring schema components and executable examples.
+- [Schema Elements](/schema/index.md) — Nine authoring schema components and executable examples.
 - [Public API](/api/index.md) — Runtime functions and grouped public TypeScript contracts.
 - [GitHub REST](/github/index.md) — Endpoint-to-step maps and verified permission requirements.
 - [Decisions](/decisions/index.md) — Six accepted or documented safety and reconciliation policies.

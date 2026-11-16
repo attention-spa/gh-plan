@@ -4,7 +4,7 @@ title: "Identity Resolution"
 description: "Safe matching from logical resources to existing GitHub identities or proposed creates."
 tags: ["identity", "safety"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:00:14.448+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/identity.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/discovery.ts
@@ -19,6 +19,8 @@ Identity resolution maps each desired logical issue or milestone to `existing`, 
 1. **Explicit identity**: supplied REST `id`, node `nodeId` and `number` must all match the same observed resource.
 2. **Unique issue marker**: a canonical or custom body marker identifies one issue. Marker conflicts with explicit identity block.
 3. **Title fallback**: milestones can use an exact title; an issue-title match requires `adoptByTitle: true`.
+
+When `prune:"close"` is explicitly selected, consistent explicit identity hints can designate a canonical issue despite other observed issues carrying its marker. Without this explicit opt-in, multiple matches remain ambiguous. Titles alone never justify closing or deleting another issue.
 
 Unknown reference-only targets produce blockers instead of creates. Multiple matches or contradictory hints are reported as ambiguity, not silently adopted. Unmatched managed resources can be planned as new.
 

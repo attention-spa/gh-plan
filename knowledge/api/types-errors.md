@@ -5,7 +5,7 @@ description: "GithubDiagnostic and related typed error outcomes for planning and
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:23:20.409+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:59:33.118+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -29,6 +29,8 @@ GithubDiagnostic and related typed error outcomes for planning and request bindi
 - `GithubRestTransportErrorCode`
 
 ## Contract boundary
+
+Prune diagnostics include informational `ORPHAN_ISSUE`, `DUPLICATE_ISSUE_MARKER` and `DUPLICATE_ISSUE_TITLE`. Unsafe canonical selection and `DUPLICATE_DELETION_UNSUPPORTED` in REST mode are blocking. A title match is never proof of issue ownership.
 
 Normalization and compilation report blockers. Direct bind/transport calls may throw typed errors; planners sanitize expected transport failures.
 

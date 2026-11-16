@@ -13,6 +13,8 @@ import type {
  * explicit IDs and unique body markers do not require this opt-in. */
 export interface IdentityResolutionOptions {
   adoptByTitle?: boolean;
+  /** Only for explicit canonical issue identity under opted-in duplicate close. */
+  allowDuplicateMarkerWithExplicitIdentity?: boolean;
 }
 
 /** Pure identity-resolution decisions with candidate details and blocking diagnostics. */
@@ -249,7 +251,9 @@ function resolveOne(
     const selected = explicitMatches[0]!;
     if (resource.kind === "issue" && marker !== undefined) {
       const markerMatches = snapshot.issues.filter((issue) => matchesMarker(issue.body, marker, identity?.marker !== undefined));
-      if (markerMatches.length > 1) {
+      if (markerMatches.length > 1 &&
+          !(options.allowDuplicateMarkerWithExplicitIdentity === true &&
+            markerMatches.some((item) => resourceKey(item) === resourceKey(selected)))) {
         return ambiguous(
           resource,
           markerMatches,

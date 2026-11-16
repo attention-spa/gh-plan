@@ -5,7 +5,7 @@ description: "Planned HTTP methods and endpoint paths mapped to the current Plan
 resource: https://docs.github.com/en/rest/issues/issues
 tags: [github, rest, permissions]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:39:10.683+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:11:04.172+01:00 }
 sources:
   - resource: https://docs.github.com/en/rest/issues/issues
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/relationship-compiler.ts
@@ -27,6 +27,9 @@ Planned HTTP methods and endpoint paths mapped to the current PlanOperationKind 
 | PATCH | /repos/{owner}/{repo}/pulls/{number} | pull_request.update | Pull requests: write |
 | POST | /repos/{owner}/{repo}/pulls/{number}/requested_reviewers | pull_request.reviewer.add | Pull requests: write |
 | DELETE | /repos/{owner}/{repo}/pulls/{number}/requested_reviewers | pull_request.reviewer.remove | Pull requests: write |
+| PATCH | /repos/{owner}/{repo}/issues/{number} | issue.orphan.close, issue.duplicate.close | Issues: write |
+| POST | /repos/{owner}/{repo}/issues/{number}/comments | issue.duplicate.comment | Issues: write |
+| GraphQL (non-REST) | deleteIssue(input:{issueId:ID!}) | issue.duplicate.delete (pure GraphQL proposal; public planner mode blocked) | Separate GraphQL transport / deletion authorization |
 | POST | /repos/{owner}/{repo}/milestones | milestone.create | Issues: write |
 | PATCH | /repos/{owner}/{repo}/milestones/{number} | milestone.update | Issues: write |
 | POST | /repos/{owner}/{repo}/issues | issue.create | Issues: write |
@@ -51,6 +54,8 @@ Planned HTTP methods and endpoint paths mapped to the current PlanOperationKind 
 
 Projects v2 `project.item.add` accepts an `Issue` or `PullRequest` REST content ID (or repo owner/name/number) to add existing content. New issues/PRs are late-bound after their create steps. `project.item.fields.set` PATCH sends `{fields: [{id: numericFieldId, value: scalarOrOptionId}]}` using existing board field metadata and a discovered or newly created project-item REST ID. Only text, number, date, single-select and iteration values are supported; **no project/field create, item delete or membership remove operations are emitted**. Project-field creation REST exists, but it is deliberately outside gh-plan's authority.
 
+The [M7.4 prune policy](/schema/prune-duplicates.md) reports markers/title collisions by default. Explicit `prune:"close"` plans `PATCH /issues/{number}` with `state:"closed",state_reason:"not_planned"` for uniquely marked orphans. Duplicates with an explicitly identified canonical issue receive a prior reason comment, then `state_reason:"duplicate"` and `duplicate_issue_id` (canonical REST ID). Both closures are non-destructive and reversible. `issue.duplicate.delete` is an irreversible GraphQL-only pure proposal, **never a REST mutation**; top-level GraphQL planning permits only dual-opt-in duplicate deletion proposals, while all other GraphQL use remains blocked.
+
 Milestone `due_on` is a date-only `YYYY-MM-DD` in authoring. The planner proposes `YYYY-MM-DDT00:00:00Z` for POST/PATCH sets, and `due_on: null` on PATCH when explicitly cleared; omission leaves the existing date untouched. A matching observed timestamp on the same UTC calendar date is a noop. This is based on the documented ISO 8601 REST field; no real clear operation was executed in M7.3.
 
 PR create includes `head`, `base`, title and optional initial `draft` flag. PR PATCH supports only explicitly managed title, body, base and open/closed state. Existing **draft transitions** and **merging** are deliberately unsupported. Reviewers are user logins via `requested_reviewers`, not approvals. PR label/assignee operations continue to use the issue endpoints with the PR number, depending on `pull_request.create` when new.
@@ -61,4 +66,4 @@ For parent relations, a POST targets the **parent's** `sub_issues` path; removal
 
 The *documented* minimum for this all-issue workflow is fine-grained repository **Issues: write**; a number of generic labels/assignee/milestone operations also accept **Pull requests: write** as an alternative. Organization issue-field discovery additionally requires organization **Issue Fields: read**. Actual token grants have **not** been inspected or tested for writes.
 
-Official docs: [Issues](https://docs.github.com/en/rest/issues/issues), [Milestones](https://docs.github.com/en/rest/issues/milestones), [Labels](https://docs.github.com/en/rest/issues/labels), [Assignees](https://docs.github.com/en/rest/issues/assignees), [Issue-field values](https://docs.github.com/en/rest/issues/issue-field-values), [Sub-issues](https://docs.github.com/en/rest/issues/sub-issues) [Dependencies](https://docs.github.com/en/rest/issues/issue-dependencies), [Pull requests](https://docs.github.com/en/rest/pulls/pulls) and [Review requests](https://docs.github.com/en/rest/pulls/review-requests), [Projects](https://docs.github.com/en/rest/projects/projects), [Project fields](https://docs.github.com/en/rest/projects/fields) and [Project items](https://docs.github.com/en/rest/projects/items).
+Official docs: [Issues](https://docs.github.com/en/rest/issues/issues), [Milestones](https://docs.github.com/en/rest/issues/milestones), [Labels](https://docs.github.com/en/rest/issues/labels), [Assignees](https://docs.github.com/en/rest/issues/assignees), [Issue-field values](https://docs.github.com/en/rest/issues/issue-field-values), [Sub-issues](https://docs.github.com/en/rest/issues/sub-issues) [Dependencies](https://docs.github.com/en/rest/issues/issue-dependencies), [Pull requests](https://docs.github.com/en/rest/pulls/pulls) and [Review requests](https://docs.github.com/en/rest/pulls/review-requests), [Issue comments](https://docs.github.com/en/rest/issues/comments), [GraphQL issue deletion](https://docs.github.com/en/graphql/reference/issues), [Projects](https://docs.github.com/en/rest/projects/projects), [Project fields](https://docs.github.com/en/rest/projects/fields) and [Project items](https://docs.github.com/en/rest/projects/items).

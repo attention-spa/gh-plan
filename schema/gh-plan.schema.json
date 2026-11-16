@@ -36,6 +36,18 @@
           ],
           "description": "owner/name shorthand or repository identity object."
         },
+        "prune": {
+          "type": "string",
+          "enum": [
+            "report",
+            "close"
+          ],
+          "description": "Default report-only orphan/duplicate diagnostics; close is an explicit opt-in."
+        },
+        "deleteDuplicates": {
+          "type": "boolean",
+          "description": "Permanent deletion is a separate explicit, GraphQL-only duplicate opt-in."
+        },
         "issues": {
           "type": "array",
           "items": {

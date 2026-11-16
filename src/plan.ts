@@ -10,6 +10,7 @@ import { compileIssueAssigneeSteps } from "./issue-assignee-compiler.ts";
 import { compileRelationshipSteps } from "./relationship-compiler.ts";
 import { compilePullRequestSteps } from "./pull-request-compiler.ts";
 import { compileProjectItemSteps } from "./project-item-compiler.ts";
+import { compilePruneSteps } from "./prune-compiler.ts";
 import { validatePlanStepReferences } from "./plan-bindings.ts";
 import { createRestDiscoveryTransport, GithubRestTransportError } from "./rest.ts";
 import type {
@@ -179,10 +180,15 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     ]);
   }
   const normalizationWarnings = normalization.diagnostics.filter((d) => !d.blocking);
-  if (mode === "graphql") {
+  // M7.4's explicit, duplicate-only deletion opt-in may *describe* a
+  // GraphQL mutation, while discovery still uses authenticated REST GETs.
+  // Every other graphql request remains unsupported; this is not an executor.
+  const allowGraphqlDuplicatePlan =
+    graph.prune === "close" && graph.deleteDuplicates === true;
+  if (mode === "graphql" && !allowGraphqlDuplicatePlan) {
     return assemble(repository, mode, counts, [], [
       { blockers: [diagnostic("NO_GRAPHQL_TRANSPORT",
-        "GraphQL planning is unavailable; use the REST transport.")] },
+        "GraphQL planning requires explicit prune:close and deleteDuplicates:true.")] },
       { warnings: normalizationWarnings },
     ]);
   }
@@ -195,6 +201,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     });
     ({ snapshot, resolution } = await discoverAndResolve(graph, rest, {
       adoptByTitle: config.adoptByTitle,
+      allowDuplicateMarkerWithExplicitIdentity: graph.prune === "close",
     }));
   } catch (error) {
     return assemble(repository, mode, counts, [], [
@@ -214,6 +221,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
   const pullRequests = compilePullRequestSteps(graph, snapshot, resolution.resolutions);
   const projectItems = compileProjectItemSteps(graph, snapshot,
     [...resolution.resolutions, ...pullRequests.resolutions]);
+  const pruning = compilePruneSteps(graph, snapshot, resolution.resolutions, mode);
   return assemble(snapshot.repository, mode, counts,
     [...resolution.resolutions, ...pullRequests.resolutions], [
     { warnings: normalizationWarnings },
@@ -228,5 +236,6 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     relationships,
     pullRequests,
     projectItems,
+    pruning,
   ]);
 }
