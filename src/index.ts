@@ -2,6 +2,8 @@ export type {
   GithubPlanSchema, AuthoringIssue, AuthoringManagedIssue, AuthoringReferencedIssue,
   AuthoringMilestone, AuthoringRepositoryLabel, AuthoringRelationship,
   AuthoringPullRequest,
+  AuthoringProjectReference,
+  AuthoringProjectAssignments,
   AuthoringIssueLabels, AuthoringIssueAssignees, AuthoringIdentity,
   AuthoringMilestoneRef, AuthoringSet, AuthoringRemove,
 } from "./authoring-schema.ts";
@@ -14,6 +16,8 @@ export type { IssueLabelCompilationResult } from "./issue-label-compiler.ts";
 export { planGithub, GITHUB_PLAN_VERSION } from "./plan.ts";
 export { compileRelationshipSteps } from "./relationship-compiler.ts";
 export { compilePullRequestSteps } from "./pull-request-compiler.ts";
+export { compileProjectItemSteps } from "./project-item-compiler.ts";
+export type { ProjectItemCompilationResult } from "./project-item-compiler.ts";
 export type { PullRequestCompilationResult } from "./pull-request-compiler.ts";
 export type { RelationshipCompilationResult } from "./relationship-compiler.ts";
 export { compileIssueFieldSteps } from "./issue-field-compiler.ts";
@@ -53,6 +57,8 @@ export type {
   BlocksRelationship,
   DesiredIssueState,
   DesiredPullRequestState,
+  DesiredProjectReference,
+  DesiredProjectItemAssignment,
   DesiredPullRequestResource,
   DesiredIssueLabels,
   DesiredIssueAssignees,
@@ -94,6 +100,9 @@ export type {
   NormalizedDesiredStateGraph,
   ObservedIssue,
   ObservedPullRequest,
+  ObservedProject,
+  ObservedProjectItem,
+  ObservedProjectField,
   PullRequestBranchCheck,
   ObservedIssueField,
   ObservedIssueFieldOption,

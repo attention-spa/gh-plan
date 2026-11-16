@@ -6,7 +6,7 @@ const jsonSchema = JSON.parse(readFileSync(
   new URL("../schema/gh-plan.schema.json", import.meta.url), "utf8"));
 assert.equal(jsonSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
 assert.equal(typeof jsonSchema.$id, "string");
-const ajv = new Ajv2020({ allErrors: true, strict: true });
+const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
 const validate = ajv.compile(jsonSchema);
 
 function accepted(value, message) {

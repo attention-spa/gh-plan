@@ -9,6 +9,7 @@ import { compileRepositoryLabelSteps } from "./repository-label-compiler.ts";
 import { compileIssueAssigneeSteps } from "./issue-assignee-compiler.ts";
 import { compileRelationshipSteps } from "./relationship-compiler.ts";
 import { compilePullRequestSteps } from "./pull-request-compiler.ts";
+import { compileProjectItemSteps } from "./project-item-compiler.ts";
 import { validatePlanStepReferences } from "./plan-bindings.ts";
 import { createRestDiscoveryTransport, GithubRestTransportError } from "./rest.ts";
 import type {
@@ -168,7 +169,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     { fullName: "" };
   const counts = {
     resourceCount: (graph?.resources.length ?? 0) + (graph?.labels?.length ?? 0) +
-      (graph?.pullRequests?.length ?? 0),
+      (graph?.pullRequests?.length ?? 0) + (graph?.projects?.length ?? 0),
     relationshipCount: graph?.relationships.length ?? 0,
   };
   if (!normalization.ok || !graph) {
@@ -211,6 +212,8 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
   const assignees = compileIssueAssigneeSteps(graph, semantic, snapshot, resolution.resolutions);
   const relationships = compileRelationshipSteps(graph, semantic, snapshot, resolution.resolutions, mode);
   const pullRequests = compilePullRequestSteps(graph, snapshot, resolution.resolutions);
+  const projectItems = compileProjectItemSteps(graph, snapshot,
+    [...resolution.resolutions, ...pullRequests.resolutions]);
   return assemble(snapshot.repository, mode, counts,
     [...resolution.resolutions, ...pullRequests.resolutions], [
     { warnings: normalizationWarnings },
@@ -224,5 +227,6 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     assignees,
     relationships,
     pullRequests,
+    projectItems,
   ]);
 }

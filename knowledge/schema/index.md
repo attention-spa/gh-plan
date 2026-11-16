@@ -2,6 +2,7 @@
 
 - [Repository schema element](/schema/repository.md) — Target repository selector and the scope of all desired GitHub resources.
 - [Issue schema element](/schema/issue.md) — Managed and reference-only issues, nested children, named fields, labels, assignees and identity hints.
+- [Projects v2 schema element](/schema/projects-v2.md) — Reference existing Projects v2 boards by owner and number; issue and pull-request field maps manage membership and five supported field types.
 - [Pull request schema element](/schema/pull-request.md) — Managed same-repository pull requests keyed by an open head/base pair, with named reviewers and safe Closes references.
 - [Milestone schema element](/schema/milestone.md) — Managed milestones with partial title/description/state and reference-only milestone identities.
 - [Label schema element](/schema/label.md) — Repository label creation and metadata updates by name, plus issue label assignments.

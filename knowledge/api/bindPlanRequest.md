@@ -5,7 +5,7 @@ description: "Substitutes externally obtained post-create identities in inert re
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan-bindings.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:21:42.849+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan-bindings.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -22,6 +22,8 @@ bindPlanRequest(request: PlanRequest, bindings: PlanBindings) => BoundPlanReques
 ```
 
 An additional `PlanStringTemplate` can contain literal strings and `PlanValueRef` tokens, allowing a PR `Closes #` body to be assembled from post-create issue numbers. Its producer must be an explicit `dependsOn` step; malformed templates raise `PlanBindingError`.
+
+A new Project v2 item uses an `item.id` reference produced by `project.item.add` to bind the subsequent REST PATCH path. The producer is explicitly listed in `dependsOn`, and newly created issue/PR content must also precede membership.
 
 Returns a new object and does not mutate the original PlanRequest or bindings.
 

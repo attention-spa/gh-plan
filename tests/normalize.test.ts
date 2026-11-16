@@ -162,7 +162,7 @@ blocked({ repository: "not-a-repo", issues: [] }, "INVALID_SCHEMA");
 const rootUnknown = normalizeSchema({
   repository: "attention-spa/example",
   issues: [{ logicalId: "A", title: "Alpha" }],
-  projects: [{ id: 1 }],
+  futureFeature: [{ id: 1 }],
 });
 assert(rootUnknown.ok && rootUnknown.graph, "unknown root key alone must not block normalization");
 equal(rootUnknown.graph, minimal, "unknown root key must not enter the normalized graph");
@@ -170,8 +170,8 @@ equal(rootUnknown.diagnostics, [{
   code: "UNSUPPORTED_SCHEMA_FEATURE",
   severity: "warning",
   blocking: false,
-  schemaPath: "$.projects",
-  message: "Unsupported schema property 'projects' was ignored.",
+  schemaPath: "$.futureFeature",
+  message: "Unsupported schema property 'futureFeature' was ignored.",
 }], "unknown root key should produce one non-blocking warning");
 
 // Unsupported removal also fails closed.

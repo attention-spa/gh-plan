@@ -2,6 +2,7 @@
 
 ## 2026-11-16
 
+- **M7.2 Projects v2 item planning ([#34](https://github.com/attention-spa/gh-plan/issues/34))**: Added [existing board references and per-issue/PR field maps](/schema/projects-v2.md), read-only REST discovery of boards, fields and repository-scoped items, and the [pure membership/field compiler](/api/compileProjectItemSteps.md). Only text/number/date/single-select/iteration fields are reconciled; project/field creation is explicitly unsupported. Added synthetic fixtures, typed authoring JSON Schema, API/REST permission references and DAG late binding.
 - **M7.1 PR planning ([#33](https://github.com/attention-spa/gh-plan/issues/33))**: Added typed [pull-request authoring](/schema/pull-request.md), targeted open head/base discovery and comparison reads, the [pure PR compiler](/api/compilePullRequestSteps.md), reviewer/label/assignee proposals, managed Closes references with late string binding, and an explicit REST draft-transition/merge exclusion. Updated [REST operations and permissions](/github/rest-step-operations.md) with synthetic regression coverage.
 
 - **M6.3 README generation ([#32](https://github.com/attention-spa/gh-plan/issues/32))**: Added a deterministic [README](https://github.com/attention-spa/gh-plan/blob/main/README.md) concept synopsis from the ordered [OKF concept index](/concepts/index.md), with separate handwritten install/quickstart, strict generated-section boundaries, doc regeneration checks, and the M7+ knowledge maintenance definition of done.

@@ -1,5 +1,7 @@
 import type {
   DesiredIssueState,
+  DesiredProjectReference,
+  DesiredProjectItemAssignment,
   DesiredPullRequestResource,
   DesiredMilestoneState,
   DesiredRelationship,
@@ -22,7 +24,7 @@ export interface NormalizationResult {
 
 type RecordLike = Record<string, unknown>;
 
-const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships", "relationshipMode", "labels", "pullRequests", "$schema"]);
+const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships", "relationshipMode", "labels", "pullRequests", "projects", "$schema"]);
 const ISSUE_KEYS = new Set([
   "logicalId",
   "management",
@@ -35,6 +37,7 @@ const ISSUE_KEYS = new Set([
   "fields",
   "labels",
   "assignees",
+  "projects",
   "children",
   "blockedBy",
   "blocks",
@@ -43,7 +46,7 @@ const ISSUE_KEYS = new Set([
 const REPOSITORY_LABEL_KEYS = new Set(["logicalId", "name", "color", "description", "management"]);
 const PULL_REQUEST_KEYS = new Set([
   "logicalId", "head", "base", "identity", "title", "body", "state", "draft",
-  "labels", "assignees", "reviewers", "closes",
+  "labels", "assignees", "reviewers", "closes", "projects",
 ]);
 const MILESTONE_KEYS = new Set([
   "logicalId",
@@ -536,6 +539,8 @@ export function normalizeSchema(schema: object): NormalizationResult {
   const repositoryLabels: DesiredRepositoryLabel[] = [];
   const relationships: DesiredRelationship[] = [];
   const pullRequests: DesiredPullRequestResource[] = [];
+  const projects: DesiredProjectReference[] = [];
+  const projectItems: DesiredProjectItemAssignment[] = [];
   const seenPullPairs = new Set<string>();
   const seenLogicalIds = new Set<string>();
 
@@ -569,6 +574,42 @@ export function normalizeSchema(schema: object): NormalizationResult {
     resources.push(resource);
   }
 
+  function parseProjectAssignments(
+    raw: unknown, path: string, logicalId: string, resourceKind: "issue" | "pull_request",
+  ): void {
+    if (!isPlainObject(raw)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA",
+        "Project memberships must map project logical IDs to field maps.", path, logicalId));
+      return;
+    }
+    for (const projectLogicalId of Object.keys(raw).sort()) {
+      const at = path + "." + projectLogicalId;
+      if (!isLogicalId(projectLogicalId)) {
+        diagnostics.push(diagnostic("INVALID_SCHEMA",
+          "Project membership key must be a logicalId.", at, logicalId));
+        continue;
+      }
+      const fields = raw[projectLogicalId];
+      if (!isPlainObject(fields)) {
+        diagnostics.push(diagnostic("INVALID_SCHEMA",
+          "Project fields must be an object; use {} for membership only.", at, logicalId));
+        continue;
+      }
+      const normalized: Record<string, string | number> = {};
+      for (const name of Object.keys(fields).sort()) {
+        const value = fields[name];
+        if (!name.trim() || name.trim() !== name ||
+            !(typeof value === "string" || typeof value === "number" && Number.isFinite(value))) {
+          diagnostics.push(diagnostic("INVALID_SCHEMA",
+            "Project field names must be trimmed and values finite numbers or strings.", at + "." + name, logicalId));
+          continue;
+        }
+        normalized[name] = value;
+      }
+      projectItems.push({ resourceLogicalId: logicalId, resourceKind, projectLogicalId, fields: normalized });
+    }
+  }
+
   function parseIssue(value: unknown, path: string, parent?: string): void {
     if (!isPlainObject(value)) {
       diagnostics.push(diagnostic("INVALID_SCHEMA", "Issue entries must be objects.", path));
@@ -579,6 +620,8 @@ export function normalizeSchema(schema: object): NormalizationResult {
     if (!logicalId) return;
     const management = normalizeManagement(value.management, `${path}.management`, diagnostics, logicalId);
     const identity = normalizeIdentity(value.identity, `${path}.identity`, diagnostics, logicalId);
+    if ("projects" in value) parseProjectAssignments(value.projects,
+      path + ".projects", logicalId, "issue");
 
     if (management === "reference") {
       const forbidden = ["title", "body", "state", "milestone", "type", "fields", "labels", "assignees", "children", "blockedBy", "blocks", "relatesTo"].filter((key) => key in value);
@@ -813,6 +856,8 @@ export function normalizeSchema(schema: object): NormalizationResult {
     if ("labels" in raw) desired.labels = normalizeLabels(raw.labels, path + ".labels", diagnostics, logicalId);
     if ("assignees" in raw) desired.assignees = normalizeAssignees(raw.assignees, path + ".assignees", diagnostics, logicalId);
     if ("reviewers" in raw) desired.reviewers = normalizeAssignees(raw.reviewers, path + ".reviewers", diagnostics, logicalId);
+    if ("projects" in raw) parseProjectAssignments(raw.projects,
+      path + ".projects", logicalId, "pull_request");
     if ("closes" in raw) desired.closes = normalizeStringRefArray(raw.closes, path + ".closes", diagnostics, logicalId)
       .map((ref) => ({ logicalId: ref }))
       .filter((ref, index, values) => values.findIndex((other) => other.logicalId === ref.logicalId) === index)
@@ -823,6 +868,39 @@ export function normalizeSchema(schema: object): NormalizationResult {
     });
   }
 
+  function parseProject(raw: unknown, path: string): void {
+    if (!isPlainObject(raw)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "Project reference must be an object.", path));
+      return;
+    }
+    const logicalId = normalizeLogicalId(raw.logicalId, path + ".logicalId", diagnostics);
+    if (!logicalId) return;
+    if (seenLogicalIds.has(logicalId)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "Duplicate project logicalId: " + logicalId, path, logicalId));
+      return;
+    }
+    seenLogicalIds.add(logicalId);
+    const extras = Object.keys(raw).filter((name) =>
+      !["logicalId", "owner", "number", "ownerType", "management"].includes(name));
+    if (extras.length || (raw.management !== undefined && raw.management !== "reference")) {
+      diagnostics.push(diagnostic("UNSUPPORTED_SCHEMA_FEATURE",
+        "Projects are reference-only; project and field creation are unsupported.", path, logicalId, extras));
+    }
+    if (typeof raw.owner !== "string" || !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(raw.owner) ||
+        !isPositiveInteger(raw.number) || (raw.ownerType !== undefined &&
+        raw.ownerType !== "org" && raw.ownerType !== "user")) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "Project requires valid owner, number and optional ownerType.", path, logicalId));
+      return;
+    }
+    projects.push({ logicalId, owner: raw.owner, number: raw.number,
+      ownerType: raw.ownerType === "user" ? "user" : "org" });
+  }
+
+  if ("projects" in schema) {
+    if (!Array.isArray(schema.projects)) diagnostics.push(diagnostic("INVALID_SCHEMA",
+      "Root projects must be an array of existing project references.", "$.projects"));
+    else schema.projects.forEach((raw, index) => parseProject(raw, "$.projects[" + index + "]"));
+  }
   if ("pullRequests" in schema) {
     if (!Array.isArray(schema.pullRequests))
       diagnostics.push(diagnostic("INVALID_SCHEMA", "pullRequests must be an array.", "$.pullRequests"));
@@ -850,6 +928,19 @@ export function normalizeSchema(schema: object): NormalizationResult {
   }
 
   const resourceById = new Map(resources.map((resource) => [resource.logicalId, resource] as const));
+  const projectById = new Map(projects.map((project) => [project.logicalId, project]));
+  const projectIdentityKeys = new Set<string>();
+  for (const project of projects) {
+    const key = project.ownerType + ":" + project.owner.toLowerCase() + ":" + project.number;
+    if (projectIdentityKeys.has(key)) diagnostics.push(diagnostic("INVALID_SCHEMA",
+      "The same existing Project was declared under multiple logical IDs.", "$.projects", project.logicalId));
+    projectIdentityKeys.add(key);
+  }
+  for (const item of projectItems) {
+    if (!projectById.has(item.projectLogicalId)) diagnostics.push(diagnostic("UNKNOWN_PROJECT",
+      "Project membership references an undeclared project " + item.projectLogicalId + ".",
+      "$.projects", item.resourceLogicalId));
+  }
   for (const pr of pullRequests) {
     for (const reference of pr.desired.closes ?? []) {
       const target = resourceById.get(reference.logicalId);
@@ -929,6 +1020,9 @@ export function normalizeSchema(schema: object): NormalizationResult {
     return { ok: false, diagnostics };
   }
 
+  projects.sort((a, b) => a.logicalId.localeCompare(b.logicalId));
+  projectItems.sort((a, b) => a.projectLogicalId.localeCompare(b.projectLogicalId) ||
+    a.resourceLogicalId.localeCompare(b.resourceLogicalId));
   pullRequests.sort((a, b) => a.logicalId.localeCompare(b.logicalId));
   resources.sort((a, b) => `${a.kind}:${a.logicalId}`.localeCompare(`${b.kind}:${b.logicalId}`));
   repositoryLabels.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
@@ -941,6 +1035,8 @@ export function normalizeSchema(schema: object): NormalizationResult {
       ...(relationshipMode === "additive" ? { relationshipMode: "additive" as const } : {}),
       resources,
       ...(pullRequests.length ? { pullRequests } : {}),
+      ...(projects.length ? { projects } : {}),
+      ...(projectItems.length ? { projectItems } : {}),
       ...(repositoryLabels.length ? { labels: repositoryLabels } : {}),
       relationships: deduped,
     },

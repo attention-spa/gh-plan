@@ -4,7 +4,7 @@ title: "Late-Binding References"
 description: "Identity placeholders for requests that depend on resources not yet created."
 tags: ["planning", "identity"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:21:42.849+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan-bindings.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -23,6 +23,10 @@ An **external executor**, after completing the create request, can provide the i
 ## PR closing references
 
 When a PR body contains managed `Closes #` references to issues that the same plan would create, `PlanStringTemplate` uses `{$template: [string, {$ref: "ISSUE.number"}, ...]}` to emit a body that becomes a plain string only after binding. A PR create/update request must depend on the corresponding full `issue.create:ISSUE` step. The template never embeds guessed numbers or changes human-authored copy outside the managed block.
+
+## Projects v2 item references
+
+`project.item.add` produces an item REST `id`. When the same plan specifies field values for that new membership, the `project.item.fields.set` PATCH path contains a `PlanValueRef` to `project-item:PROJECT:RESOURCE.id` and its dependencies include the corresponding `project.item.add` step. Adding newly planned issue or PR content also references its `number` produced by `issue.create` or `pull_request.create`.
 
 ## Safety
 
