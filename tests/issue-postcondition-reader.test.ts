@@ -172,6 +172,32 @@ equal((await close.verify.readAfter(closeCreated, closeBefore)).status, "satisfi
 equal((await close.verify.readBefore(closeCreated,
   { bindings: { I: { number: 11 } } })).status, "satisfied",
   "Bound created issue is idempotently closeable.");
+await reject("producer REST id contradicts matched marker owner", () =>
+  close.verify.readBefore(closeCreated, { bindings: {
+    I: { number: 11, id: 9999, nodeId: "I_1100" },
+  } }), "IDENTITY_MISMATCH");
+await reject("producer nodeId contradicts matched marker owner", () =>
+  close.verify.readBefore(closeCreated, { bindings: {
+    I: { number: 11, id: 1100, nodeId: "I_wrong" },
+  } }), "IDENTITY_MISMATCH");
+await reject("explicit hint contradicts verified producer identity", () =>
+  close.verify.readBefore(closeCreated, {
+    bindings: { I: { number: 11, id: 1100, nodeId: "I_1100" } },
+    expectedIdentity: { id: 9999 },
+  }), "IDENTITY_MISMATCH");
+
+
+const trickyReference: ApplyPostconditionSpec = {
+  ...create, predicates: create.predicates.map((p) => p.field === "milestone"
+    ? { ...p, expected: { $ref: "M.number-sub.number" } } : p),
+};
+const tricky = reader({
+  [LIST]: () => response([issue()]),
+  [ROOT + "/11"]: () => response(issue()),
+});
+equal((await tricky.verify.readBefore(trickyReference, {
+  bindings: { "M.number-sub": { number: 7 } },
+})).status, "satisfied", "Logical IDs containing .number must bind exactly.");
 
 const setMilestone: ApplyPostconditionSpec = {
   ...update, predicates: [{ field: "milestone", comparison: "exact",
