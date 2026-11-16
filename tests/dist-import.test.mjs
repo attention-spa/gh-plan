@@ -27,7 +27,7 @@ assert(!files.some((entry) => entry.endsWith(".ts") && !entry.endsWith(".d.ts"))
   "Distribution must not include TypeScript sources.");
 for (const filename of files.filter((entry) => entry.endsWith(".d.ts"))) {
   const declarations = readFileSync(new URL(filename, dist), "utf8");
-  assert(!/from\s+["'][^"']+\.ts["']/.test(declarations),
+  assert(!/(?:\bfrom\s+|\bimport\s*(?:\(\s*)?)(["'])(?:\.\.?\/[^"'\r\n]+)\.ts\1/.test(declarations),
     "Declaration imports must point to compilable .js paths: " + filename);
 }
 

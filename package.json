@@ -20,7 +20,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/rewrite-declarations.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:normalization": "node --experimental-strip-types tests/normalize.test.ts",
     "test:rest": "node --experimental-strip-types tests/rest-discovery.test.ts && node --experimental-strip-types tests/rest-global-fetch.test.ts && node --experimental-strip-types tests/rest-token-safety.test.ts && node --experimental-strip-types tests/discovery.test.ts",
