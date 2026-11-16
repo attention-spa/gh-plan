@@ -160,6 +160,7 @@ let closed = false;
 const close = reader({
   [LIST]: () => response([issue({ state: closed ? "closed" : "open" })]),
   [ROOT + "/11"]: () => response(issue({ state: closed ? "closed" : "open" })),
+  [ROOT + "/77"]: () => response(issue()), // path/returned issue-number mismatch
 });
 const closeBefore = await close.verify.readBefore(closeCreated,
   { bindings: { I: { number: 11, id: 1100, nodeId: "I_1100" } },
