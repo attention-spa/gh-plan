@@ -31,6 +31,8 @@ whose title matches but whose marker does not is **not adopted** unless
 `adoptByTitle: true` is explicitly supplied. Conflicts and ambiguous matches
 block planning; reference-only resources never silently become new resources.
 
+Managed PRs use a unique open head/base pair or an explicit number; the head is immutable and changing the base requires an explicit number. New PRs require existing head/base branch refs with commits ahead of base. GitHub issue-label/assignee endpoints are reused for PRs, while reviewer requests use `requested_reviewers`. Logical `closes` references write only an isolated managed body block and use late-bound issue numbers if needed. Initial draft creation is supported, but changing draft status on an existing PR is **not** supported by REST; merging is not planned.
+
 Relationships are normalized into native edges. `parent` points from parent
 to child; `blocked_by` points from blocked issue to its blocker; `blocks`
 means the reverse; and `relates_to` is symmetric. The default relationship
@@ -45,11 +47,14 @@ mode is `reconcile`; `additive` avoids removing undeclared relationships.
 | `diffGithubState` | Computes deterministic desired-vs-observed deltas. | **Pure.** Returns blockers/unsupported diagnostics; no requests. |
 | `compileMilestoneSteps`, `compileIssueSteps`, `compileIssueFieldSteps` | Convert explicit semantic deltas to proposed REST steps. | **Pure.** Block unsupported or unsafe identities/fields; no requests. |
 | `compileIssueLabelSteps`, `compileIssueAssigneeSteps`, `compileRepositoryLabelSteps` | Compile exact or targeted label/assignee and repository-label changes. | **Pure.** Unknown catalog entries/eligibility block; no requests. |
+| `compilePullRequestSteps` | Plans managed PR creation/partial updates, reviewer add/remove and M4 label/assignee operations. | **Pure.** Missing branch checks, ambiguous PR identity, merged PRs and existing draft toggles block. No I/O or merging. |
 | `compileRelationshipSteps` | Emits native parent, dependency and related-to requests. | **Pure.** Invalid edges become blockers; no requests. |
 | `requestReferences`, `validatePlanStepReferences`, `bindPlanRequest` | Inspect/create-step binding dependencies and substitute post-create identities. | **Pure.** Binding functions can throw `PlanBindingError`; validation returns diagnostics; no requests. |
 | `createRestDiscoveryTransport` | Constructs a read-only GET transport; `discover` and `enrich` perform reads. | Factory performs no I/O. Its methods may throw `GithubRestTransportError`; invalid worker concurrency throws `RangeError`. |
 | `discoverAndResolve` | Performs broad discovery, resolves identities, and enriches selected issues. | **Read-only I/O.** Propagates transport exceptions; its request volume depends on pagination and selected resources. |
 | `planGithub` | Orchestrates normalization, discovery, resolution, diff, compilers and a sorted DAG. | **Read-only I/O.** Converts expected transport failures to blocking diagnostics; no GitHub writes or SDK needed. |
+
+PR discovery is conditional: `/issues` provides PR candidate numbers, a filtered open head/base query selects matches, and only those candidates receive detailed `/pulls/{number}` and review-request GETs. New head/base pairs receive branch-ref and compare reads. PRs are never merged.
 
 REST discovery normally begins with four broad GETs: repository metadata,
 issues, milestones and issue types. Repositories owned by organizations add
