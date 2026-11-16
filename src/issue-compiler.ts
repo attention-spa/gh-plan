@@ -130,7 +130,7 @@ export function compileIssueSteps(
     }
     const requestedType = d.issueType?.value;
     if (requestedType !== undefined && observed.issueTypes.filter((type) => type.name === requestedType).length !== 1) {
-      blockers.push(blocker(id, "Unknown or ambiguous issue type " + d.issueType.value + ".", "UNKNOWN_ISSUE_TYPE"));
+      blockers.push(blocker(id, "Unknown or ambiguous issue type " + requestedType + ".", "UNKNOWN_ISSUE_TYPE"));
       continue;
     }
 
