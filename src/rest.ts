@@ -432,11 +432,20 @@ async function enrichIssue(
     return requiredNumber(dependency.number, `${repoPath}/issues/${issue.number}/dependencies/blocked_by/${index}.number`);
   }))].sort((a, b) => a - b);
 
+  const rawRelations = await client.getPaginated<unknown>(
+    `${repoPath}/issues/${issue.number}/relates_to?per_page=100`,
+  );
+  const relatesToNumbers = [...new Set(rawRelations.map((related, index) => {
+    if (!isRecord(related)) invalidResponse(`${repoPath}/issues/${issue.number}/relates_to/${index}`);
+    return requiredNumber(related.number, `${repoPath}/issues/${issue.number}/relates_to/${index}.number`);
+  }))].sort((a, b) => a - b);
+
   return {
     ...issue,
     fields,
     parentNumber,
     blockedByNumbers,
+    relatesToNumbers,
   };
 }
 

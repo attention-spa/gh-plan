@@ -188,6 +188,18 @@ function baseRoutes(): Record<string, Route> {
       { number: 2 },
     ]),
     "https://api.github.com/repos/acme/widgets/issues/2/dependencies/blocked_by?per_page=100": response(200, []),
+    "https://api.github.com/repos/acme/widgets/issues/1/relates_to?per_page=100": response(200, [
+      { id: 202, number: 2 },
+      { id: 202, number: 2 },
+    ], {
+      link: '<https://api.github.com/repos/acme/widgets/issues/1/relates_to?per_page=100&page=2>; rel="next"',
+    }),
+    "https://api.github.com/repos/acme/widgets/issues/1/relates_to?per_page=100&page=2": response(200, [
+      { id: 209, number: 9 },
+    ]),
+    "https://api.github.com/repos/acme/widgets/issues/2/relates_to?per_page=100": response(200, [
+      { id: 201, number: 1 },
+    ]),
   };
 }
 
@@ -213,6 +225,10 @@ assert(
   requests.some((request) => request.url.endsWith("page=2")),
   "Link rel=next pagination should be followed",
 );
+assert(
+  requests.some((request) => request.url.endsWith("/issues/1/relates_to?per_page=100&page=2")),
+  "Native relates_to relationships should follow pagination",
+);
 
 equal(snapshot, {
   repository: { fullName: "acme/widgets", id: 101, nodeId: "R_101" },
@@ -236,6 +252,7 @@ equal(snapshot, {
       },
       parentNumber: null,
       blockedByNumbers: [2],
+      relatesToNumbers: [2, 9],
     },
     {
       kind: "issue",
@@ -250,6 +267,7 @@ equal(snapshot, {
       fields: {},
       parentNumber: 1,
       blockedByNumbers: [],
+      relatesToNumbers: [1],
     },
   ],
   milestones: [{
@@ -410,3 +428,32 @@ try {
 }
 assert(unsafePagination instanceof Error, "foreign pagination URL should throw");
 assert((unsafePagination as { code?: string }).code === "UNSAFE_PAGINATION_URL", "foreign pagination URL classification");
+
+// Invalid native relationship responses must fail safely rather than emit unsound IDs.
+const invalidRelationsRoutes = baseRoutes();
+invalidRelationsRoutes["https://api.github.com/repos/acme/widgets/issues/1/relates_to?per_page=100"] = response(200, [
+  { number: "not-a-number" },
+]);
+let invalidRelations: unknown;
+try {
+  await discoverWith(invalidRelationsRoutes);
+} catch (error) {
+  invalidRelations = error;
+}
+assert(invalidRelations instanceof Error, "invalid native relates_to response should throw");
+assert((invalidRelations as { code?: string }).code === "INVALID_RESPONSE", "invalid native relates_to error classification");
+
+// Native relationship failures retain the existing redaction rules.
+const rejectedRelationsRoutes = baseRoutes();
+rejectedRelationsRoutes["https://api.github.com/repos/acme/widgets/issues/1/relates_to?per_page=100"] = response(403, {
+  message: "server echoed secret-token",
+}, {}, "Forbidden");
+let rejectedRelations: unknown;
+try {
+  await discoverWith(rejectedRelationsRoutes);
+} catch (error) {
+  rejectedRelations = error;
+}
+assert(rejectedRelations instanceof Error, "forbidden native relates_to request should throw");
+assert((rejectedRelations as { code?: string }).code === "FORBIDDEN", "related request failure classification");
+assert(!JSON.stringify(rejectedRelations).includes("secret-token"), "related request errors must redact auth");

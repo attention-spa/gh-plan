@@ -67,7 +67,7 @@ export type {
   PlanStepStatus,
   ReferencedIssueResource,
   ReferencedMilestoneResource,
-  RelatedRelationship,
+  RelatesToRelationship,
   RepositoryRef,
   ResolvedGithubIdentity,
   ResourceKind,

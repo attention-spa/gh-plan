@@ -32,7 +32,7 @@ const ISSUE_KEYS = new Set([
   "children",
   "blockedBy",
   "blocks",
-  "related",
+  "relatesTo",
 ]);
 const MILESTONE_KEYS = new Set([
   "logicalId",
@@ -310,13 +310,20 @@ function relationKey(relation: DesiredRelationship): string {
     case "parent": return `parent:${relation.parent}:${relation.child}`;
     case "blocked_by": return `blocked_by:${relation.issue}:${relation.blocker}`;
     case "blocks": return `blocked_by:${relation.blocked}:${relation.issue}`;
-    case "related": return `related:${relation.from}:${relation.to}`;
+    case "relates_to": {
+      const [from, to] = [relation.from, relation.to].sort();
+      return JSON.stringify(["relates_to", from, to]);
+    }
   }
 }
 
 function canonicalRelation(relation: DesiredRelationship): DesiredRelationship {
   if (relation.kind === "blocks") {
     return { kind: "blocked_by", issue: relation.blocked, blocker: relation.issue };
+  }
+  if (relation.kind === "relates_to") {
+    const [from, to] = [relation.from, relation.to].sort();
+    return { kind: "relates_to", from, to };
   }
   return relation;
 }
@@ -355,13 +362,13 @@ function parseExplicitRelationship(
     }
     return { kind: "blocks", issue: value.issue, blocked: value.blocked };
   }
-  if (value.kind === "related") {
+  if (value.kind === "relates_to") {
     reportUnknownKeys(value, new Set(["kind", "from", "to"]), path, diagnostics);
     if (!isLogicalId(value.from) || !isLogicalId(value.to)) {
-      diagnostics.push(diagnostic("INVALID_SCHEMA", "related relationships require from and to logical IDs.", path));
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "relates_to relationships require from and to logical IDs.", path));
       return undefined;
     }
-    return { kind: "related", from: value.from, to: value.to };
+    return { kind: "relates_to", from: value.from, to: value.to };
   }
 
   diagnostics.push(diagnostic("UNSUPPORTED_SCHEMA_FEATURE", `Unsupported relationship kind '${value.kind}'.`, `${path}.kind`));
@@ -437,7 +444,7 @@ export function normalizeSchema(schema: object): NormalizationResult {
     const identity = normalizeIdentity(value.identity, `${path}.identity`, diagnostics, logicalId);
 
     if (management === "reference") {
-      const forbidden = ["title", "body", "state", "milestone", "type", "fields", "children", "blockedBy", "blocks", "related"].filter((key) => key in value);
+      const forbidden = ["title", "body", "state", "milestone", "type", "fields", "children", "blockedBy", "blocks", "relatesTo"].filter((key) => key in value);
       if (forbidden.length > 0) {
         diagnostics.push(diagnostic("INVALID_SCHEMA", "Reference-only issues cannot contain desired state or inline relationships.", path, logicalId, forbidden));
       }
@@ -493,8 +500,8 @@ export function normalizeSchema(schema: object): NormalizationResult {
     for (const blocked of normalizeStringRefArray(value.blocks, `${path}.blocks`, diagnostics, logicalId)) {
       relationships.push({ kind: "blocked_by", issue: blocked, blocker: logicalId });
     }
-    for (const target of normalizeStringRefArray(value.related, `${path}.related`, diagnostics, logicalId)) {
-      relationships.push({ kind: "related", from: logicalId, to: target });
+    for (const target of normalizeStringRefArray(value.relatesTo, `${path}.relatesTo`, diagnostics, logicalId)) {
+      relationships.push({ kind: "relates_to", from: logicalId, to: target });
     }
 
     if ("children" in value) {
@@ -614,11 +621,11 @@ export function normalizeSchema(schema: object): NormalizationResult {
       const blocker = resourceById.get(relation.blocker);
       if (issue && issue.kind !== "issue") diagnostics.push(diagnostic("INVALID_SCHEMA", "Dependency endpoint must be an issue.", "$.relationships", relation.issue));
       if (blocker && blocker.kind !== "issue") diagnostics.push(diagnostic("INVALID_SCHEMA", "Dependency blocker must be an issue.", "$.relationships", relation.blocker));
-    } else if (relation.kind === "related") {
+    } else if (relation.kind === "relates_to") {
       const from = resourceById.get(relation.from);
       const to = resourceById.get(relation.to);
-      if (from && from.kind !== "issue") diagnostics.push(diagnostic("INVALID_SCHEMA", "Related endpoint must be an issue.", "$.relationships", relation.from));
-      if (to && to.kind !== "issue") diagnostics.push(diagnostic("INVALID_SCHEMA", "Related endpoint must be an issue.", "$.relationships", relation.to));
+      if (from && from.kind !== "issue") diagnostics.push(diagnostic("INVALID_SCHEMA", "Relates-to endpoint must be an issue.", "$.relationships", relation.from));
+      if (to && to.kind !== "issue") diagnostics.push(diagnostic("INVALID_SCHEMA", "Relates-to endpoint must be an issue.", "$.relationships", relation.to));
     }
   }
 
