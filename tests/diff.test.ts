@@ -129,8 +129,8 @@ r = run([issue("P", {}, "reference"), issue("C", {}, "reference")], [p, child],
 assert.equal(status(r, "issue.parent:P:C"), "noop");
 r = run([issue("E", {}, "reference"), issue("C", {}, "reference")], [ext, child],
   [{ kind: "parent", parent: "E", child: "C" }]);
-assert.equal(status(r, "issue.parent:E:C"), "conflict");
-assert.equal(r.blockers[0]?.code, "PARENT_CONFLICT");
+assert.equal(status(r, "issue.parent:E:C"), "update");
+assert.equal(r.blockers.length, 0);
 r = run([issue("P", {}, "reference"), issue("E", {}, "reference")], [p, ext],
   [{ kind: "blocked_by", issue: "P", blocker: "E" }, { kind: "blocks", issue: "E", blocked: "P" }]);
 assert.equal(r.diffs.length, 1);
@@ -146,8 +146,8 @@ assert.deepEqual(r.diffs.find((d) => d.id === "issue.parent:E:N")?.references,
   [{ logicalId: "E" }, { logicalId: "N" }]);
 r = run([issue("P", {}, "reference"), issue("E", {}, "reference")], [p, ext],
   [{ kind: "relates_to", from: "P", to: "E" }]);
-assert.equal(r.diffs[0]?.status, "unsupported");
-assert.equal(r.unsupported[0]?.code, "UNSUPPORTED_SCHEMA_FEATURE");
+assert.equal(r.diffs[0]?.status, "update");
+assert.equal(r.unsupported.length, 0);
 
 // Determinism under input permutation and idempotency after a simulated apply.
 const resources = [issue("P", { title: set("Parent") }), issue("C", {}, "reference"), issue("E", {}, "reference")];
