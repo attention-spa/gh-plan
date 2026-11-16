@@ -121,7 +121,7 @@ result = run([resource("A", { body: remove })], [existing("A", 2)]);
 equal((request(result, "issue.update:A") as { body: Record<string,string> }).body,
   { body: marker("A") }, "Body remove retains identity marker.");
 result = run([resource("E", { body: remove })], [existing("E", 5)]);
-equal(request(result, "issue.marker.adopt:E"), {
+equal(request(result, "issue.update:E"), {
   protocol: "rest", method: "PATCH", path: "/repos/acme/widgets/issues/5", body: { body: marker("E") },
 }, "Marker adoption into an empty issue retains identity even when body removal is noop.");
 
