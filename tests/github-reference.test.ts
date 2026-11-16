@@ -318,9 +318,9 @@ const inputConfig = {
 };
 const pinnedOptions = createGithubReferenceApplyOptions(inputConfig);
 assert(Object.isFrozen(pinnedOptions.plan) &&
-  Object.isFrozen(pinned.plan.repository) &&
-  Object.isFrozen(pinned.plan.steps) &&
-  Object.isFrozen(pinned.plan.steps[0]),
+  Object.isFrozen(pinnedOptions.plan.repository) &&
+  Object.isFrozen(pinnedOptions.plan.steps) &&
+  Object.isFrozen(pinnedOptions.plan.steps[0]),
   "Reference adapter must deep-freeze its captured plan.");
 externalPlan.repository.fullName = "different/repository";
 externalPlan.steps[0]!.kind = "label.create";
