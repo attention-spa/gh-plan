@@ -1,4 +1,13 @@
-import assert from "node:assert/strict";
+const assert = {
+  equal(actual: unknown, expected: unknown): void {
+    if (actual !== expected) throw new Error("Expected " + JSON.stringify(expected) + ", got " + JSON.stringify(actual));
+  },
+  deepEqual(actual: unknown, expected: unknown): void {
+    if (JSON.stringify(actual) !== JSON.stringify(expected))
+      throw new Error("Expected " + JSON.stringify(expected) + ", got " + JSON.stringify(actual));
+  },
+  ok(value: unknown): void { if (!value) throw new Error("Assertion failed"); },
+};
 import { diffGithubState } from "../src/diff.ts";
 import type { GithubStateSnapshot, NormalizedDesiredStateGraph, ResourceResolution } from "../src/types.ts";
 
