@@ -322,6 +322,15 @@ export async function recoverAbandonedGithubLock(
   catch { return fail("RESULT_UNCERTAIN", "verify"); }
   if (lostReply) fail("CAS_UNCERTAIN", "verify");
   if (afterCas !== null) fail("RESULT_UNCERTAIN", "verify");
+  // A bare 404 for the ref is not sufficient if repository identity/permission
+  // became unreadable. Recheck the canonical target after ref absence.
+  let afterRepo: CasRepository;
+  try { afterRepo = await context.backend.repository(current.repository); }
+  catch { return fail("RESULT_UNCERTAIN", "verify"); }
+  if (!record(afterRepo) || afterRepo.fullName !== current.repository ||
+      afterRepo.id !== current.repositoryId ||
+      afterRepo.nodeId !== current.repositoryNodeId)
+    fail("RESULT_UNCERTAIN", "verify");
   const completed: RecoveryAuditRecord = Object.freeze({
     ...shared, event: "confirmed_release", recordedAt: new Date().toISOString(),
   });
