@@ -24,13 +24,13 @@ export function checkContext(env) {
 export function actionsApi({ token, fetchImpl = globalThis.fetch,
   now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
   if (!token || typeof fetchImpl !== "function") throw fail("INVALID_TRANSPORT");
-  const base = "https://api.github.com/repos/" + REPO;
+  const base = "https://api.github.com/repos/" + REPO + "/actions";
   const headers = {
     Accept: "application/vnd.github+json", Authorization: "Bearer " + token,
     "X-GitHub-Api-Version": "2026-03-10",
   };
   async function request(method, path, body) {
-    if (!path.startsWith("/actions/") || path.includes("..") || path.includes("://"))
+    if (!/^\/(runs|workflows)\//.test(path) || path.includes("..") || path.includes("://"))
       throw fail("INVALID_PATH");
     let response;
     try {
