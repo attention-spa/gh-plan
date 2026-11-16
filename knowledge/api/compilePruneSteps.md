@@ -5,7 +5,7 @@ description: "Purely reports orphaned issue markers and duplicate clashes, and c
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/prune-compiler.ts
 tags: [api, safety, prune, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:56:12.762+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:04:40.638+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/prune-compiler.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -30,7 +30,7 @@ compilePruneSteps(
 
 ## I/O and failure behavior
 
-**Pure.** No network calls or writes. Returns deterministic `steps`, `noops`, informational `warnings`, blocking `blockers` and explicitly `unsupported` diagnostics. Default report produces no mutations. Issue discovery already excludes PR entries; no additional HTTP GET is needed.
+**Pure.** No network calls or writes. Returns deterministic `steps`, `noops`, informational `warnings`, blocking `blockers` and explicitly `unsupported` diagnostics. Default report produces no mutations. A report may recognize a standalone marker later in a body; every mutation proposal additionally requires the marker on the first line, never merely quoted in body content. Issue discovery already excludes PR entries; no additional HTTP GET is needed.
 
 `prune:"close"` permits only a safely recognized canonical marker orphan close (`state_reason:not_planned`) or exact shared-marker duplicate close against an explicitly selected canonical issue. The duplicate comment step precedes the close PATCH, which carries `state_reason:duplicate` and the canonical REST ID. No step uses an issue title as authorization. Both closes are marked non-destructive and reversible.
 

@@ -5,7 +5,7 @@ description: "Report orphaned gh-plan issue markers and duplicate clashes by def
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/authoring-schema.ts
 tags: [schema, prune, safety, issues]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:56:12.762+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:04:40.638+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/authoring-schema.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/normalize.ts
@@ -24,7 +24,7 @@ Report orphaned gh-plan issue markers and duplicate clashes by default; opt in t
 | `prune` | `"report"` or `"close"` | `"report"` |
 | `deleteDuplicates` | boolean; true requires `prune: "close"` | false |
 
-A gh-plan owned orphan is an ordinary issue whose **entire standalone marker comment** (`<!-- gh-plan:logicalId -->`) is not declared among authored issue logical IDs. Report-only mode emits `ORPHAN_ISSUE` informational diagnostics. `prune:"close"` proposes `PATCH /issues/{number}` with `{state:"closed",state_reason:"not_planned"}` for a uniquely marked, currently open orphan; previously closed issues are left alone.
+A gh-plan owned orphan is an ordinary issue whose **entire standalone marker comment** (`<!-- gh-plan:logicalId -->`) is not declared among authored issue logical IDs. Reporting may recognize standalone markers later in a document, but **proposed closure or deletion requires the exact marker as the issue body's first line**. Quoted examples cannot authorize mutation. Report-only mode emits `ORPHAN_ISSUE` informational diagnostics. `prune:"close"` proposes `PATCH /issues/{number}` with `{state:"closed",state_reason:"not_planned"}` for a uniquely marked, currently open orphan; previously closed issues are left alone.
 
 Duplicate marker collisions and issue-title collisions are reported. A **duplicate close** requires the same exact gh-plan marker on both observed issues, plus an explicitly identified and safely resolved **managed** canonical issue. Before a reversible duplicate close (`state_reason:"duplicate"`, `duplicate_issue_id` canonical REST ID), a comment on the duplicate must record the canonical URL and reason. Titles alone never authorize closing or deletion; unmarked issues, PRs, multiple-marker bodies and independently declared resources remain protected.
 
