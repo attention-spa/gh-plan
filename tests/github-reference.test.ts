@@ -307,6 +307,32 @@ equal(replay.skippedStepIds.length, 5, "All replay steps verified skipped.");
 equal(replay.bindings.I?.number, 37, "Closed create marker retains identity.");
 equal(live.ownerOid, null, "Replay releases its independently acquired CAS owner.");
 
+const immutable = new FakeGithub();
+const externalPlan = structuredClone(good);
+const inputConfig = {
+  plan: externalPlan, auth: SECRET, fetch: immutable.fetch,
+  now: () => immutable.now, sleep: immutable.sleep,
+  onLog: async (entry: SafeApplyLogEntry) => {
+    immutable.auditable.push({ ...entry });
+  },
+};
+const pinned = createGithubReferenceApplyOptions(inputConfig);
+assert(Object.isFrozen(pinned.plan) &&
+  Object.isFrozen(pinned.plan.repository) &&
+  Object.isFrozen(pinned.plan.steps) &&
+  Object.isFrozen(pinned.plan.steps[0]),
+  "Reference adapter must deep-freeze its captured plan.");
+externalPlan.repository.fullName = "different/repository";
+externalPlan.steps[0]!.kind = "label.create";
+inputConfig.auth = "DO_NOT_LOG_CHANGED_TOKEN";
+const isolated = await executeCallbackApplyPlan(pinned);
+equal(isolated.status,"applied",
+  "Changes to caller config/plan after construction cannot redirect GitHub writes.");
+equal(immutable.resourceWrites().length,5,
+  "Original validated B1 plan remains operative despite external mutation.");
+assert(immutable.calls.every((call) => call.url.startsWith(BASE)),
+  "No caller mutation can change canonical target.");
+
 const malicious = new FakeGithub();
 const options = malicious.options();
 await denied("dispatch directly before owner/pre-read", () =>
