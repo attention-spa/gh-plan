@@ -4,7 +4,7 @@ title: "Plans and Steps"
 description: "Deterministic read-only reconciliation proposals with dependency-ordered REST requests."
 tags: ["planning", "dag"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:09:43.760+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:02:00+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -38,4 +38,4 @@ The default [prune policy](/schema/prune-duplicates.md) reports orphaned canonic
 
 ## Execution boundary
 
-An external executor may later use the proposed HTTP method/path/body and [late-bound references](/concepts/late-binding-refs.md). Such execution is not part of v0.1. Deterministic output and [secret-free plans](/decisions/no-secrets-in-plans.md) make review possible before writing.
+An external executor may later use the proposed HTTP method/path/body and [late-bound references](/concepts/late-binding-refs.md). M8.1.1 introduces an internal (not package-exported) `executePlanSteps()` staging primitive. It checks the entire DAG for blocked/incomplete steps, duplicate IDs, missing dependencies, cycles and invalid future references **before any dispatch**; it orders requests by dependency, uses `bindPlanRequest()` just before dispatch, and records validated create-response identities for downstream references. Its dispatcher is explicitly injected. It does **not** reread postconditions, recover interrupted creates, verify writes or provide an idempotent public `applyPlan()`. Do not use it against a live repository until the remaining M8.1 gates are implemented. Deterministic output and [secret-free plans](/decisions/no-secrets-in-plans.md) make review possible before writing.

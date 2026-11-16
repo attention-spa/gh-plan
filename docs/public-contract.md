@@ -98,6 +98,8 @@ A `GithubPlan` contains `resolutions`, topologically sorted `steps`,
   original state, notably after resource creation. The plan itself does not
   implement rollback, transactionality or write execution.
 
+An internal M8.1.1 staging function, `executePlanSteps(plan, dispatch)`, now validates the complete DAG before running any injected dispatcher, sorts operations by dependency and late-binds validated post-create IDs. This is deliberately **not a public package export or safe general-purpose apply API**. It does not reread postconditions, recover creates after interruption or verify mutations. These safeguards remain required before `applyPlan()` can be exposed. The read-only planner contract is unchanged.
+
 All public types and functions are documented in their TypeScript declarations,
 including the distributed `dist/*.d.ts` output. This contract describes the
-current v0.1 planner rather than promising an execution engine.
+current v0.1 planner rather than promising a completed execution engine.
