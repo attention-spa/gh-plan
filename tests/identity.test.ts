@@ -308,3 +308,87 @@ const secondPass = resolveResourceIdentities(
 );
 equal(resolution(secondPass, "replan").status, "existing", "second pass should recover created issue");
 equal(resolution(secondPass, "replan").identity?.number, 44, "replan should recover concrete issue number");
+
+
+// M1.2: canonical markers must match the complete comment, not a longer logical ID.
+const prefixSnapshot = snapshot({
+  issues: [
+    { kind: "issue", number: 10, id: 110, title: "AB", body: "<!-- gh-plan:AB -->", state: "open" },
+    { kind: "issue", number: 11, id: 111, title: "A", body: "<!-- gh-plan:A -->", state: "open" },
+  ],
+});
+equal(
+  resolution(resolveResourceIdentities(
+    graph([managedIssue("A", "No matching title")]), prefixSnapshot), "A").identity?.number,
+  11,
+  "canonical marker A must identify only the exact A HTML comment",
+);
+equal(
+  resolution(resolveResourceIdentities(
+    graph([managedIssue("AB", "No matching title")]), prefixSnapshot), "AB").identity?.number,
+  10,
+  "canonical marker AB must identify the exact AB HTML comment",
+);
+const longCanonicalOnly = resolveResourceIdentities(
+  graph([managedIssue("A", "No matching title")]),
+  snapshot({ issues: [prefixSnapshot.issues[0]!] }),
+);
+equal(resolution(longCanonicalOnly, "A").status, "new",
+  "canonical A must never adopt an issue with only the AB marker");
+
+// M1.2: custom markers are literal regex-escaped strings, matched on BOTH token edges.
+const customMarkers = snapshot({
+  issues: [
+    { kind: "issue", number: 12, id: 112, title: "Long", body: "gh-plan:AB", state: "open" },
+    { kind: "issue", number: 13, id: 113, title: "Left", body: "prefixgh-plan:A", state: "open" },
+    { kind: "issue", number: 14, id: 114, title: "Right", body: "gh-plan:A-suffix", state: "open" },
+    { kind: "issue", number: 15, id: 115, title: "Exact", body: "notes (gh-plan:A) more", state: "open" },
+  ],
+});
+const shortCustom = managedIssue("A", "No matching title", { marker: "gh-plan:A" });
+equal(
+  resolution(resolveResourceIdentities(graph([shortCustom]), customMarkers), "A").identity?.number,
+  15,
+  "custom marker should ignore longer prefixes/suffixes and match whole tokens",
+);
+for (const body of ["gh-plan:AB", "prefixgh-plan:A", "gh-plan:A-suffix", "x:gh-plan:A"]) {
+  const result = resolveResourceIdentities(graph([shortCustom]), snapshot({
+    issues: [{ kind: "issue", number: 20, id: 120, title: "Other", body, state: "open" }],
+  }));
+  equal(resolution(result, "A").status, "new", "custom marker must not match embedded token: " + body);
+}
+const punctuatedMarker = "ticket.[A]+(v2)*?";
+const punctuationSnapshot = snapshot({
+  issues: [
+    { kind: "issue", number: 21, id: 121, title: "Wrong", body: "ticket0A+v2xx", state: "open" },
+    { kind: "issue", number: 22, id: 122, title: "Correct", body: "before " + punctuatedMarker + " after", state: "open" },
+  ],
+});
+equal(
+  resolution(resolveResourceIdentities(
+    graph([managedIssue("literal", "No matching title", { marker: punctuatedMarker })]),
+    punctuationSnapshot,
+  ), "literal").identity?.number,
+  22,
+  "custom markers containing regex syntax must be matched literally",
+);
+const punctuationNegative = resolveResourceIdentities(
+  graph([managedIssue("literal", "No matching title", { marker: punctuatedMarker })]),
+  snapshot({ issues: [punctuationSnapshot.issues[0]!] }),
+);
+equal(resolution(punctuationNegative, "literal").status, "new",
+  "custom markers must not interpret regex metacharacters as patterns");
+
+// Explicit identity must not become ambiguous due to a different issue's longer custom marker.
+const customExplicit = resolveResourceIdentities(
+  graph([managedIssue("A", "No matching title", { number: 1, marker: "gh-plan:A" })]),
+  snapshot({
+    issues: [
+      { kind: "issue", number: 1, id: 101, title: "Selected", body: null, state: "open" },
+      { kind: "issue", number: 2, id: 102, title: "Unrelated", body: "gh-plan:AB", state: "open" },
+    ],
+  }),
+);
+equal(resolution(customExplicit, "A").identity?.number, 1,
+  "a longer custom marker must not conflict with explicit numeric identity");
+equal(customExplicit.blockers, [], "no marker collision should produce an ambiguity blocker");

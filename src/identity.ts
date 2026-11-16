@@ -26,6 +26,24 @@ function effectiveMarker(resource: DesiredResource): string | undefined {
   return resource.identity?.marker ?? canonicalMarker(resource.logicalId);
 }
 
+/** Canonical markers are complete HTML comments; custom markers require whole-token boundaries. */
+function matchesMarker(
+  body: string | null | undefined,
+  marker: string,
+  custom: boolean,
+): boolean {
+  if (typeof body !== "string") return false;
+  if (!custom) return body.includes(marker);
+
+  const escaped = marker.replace(/[\\^$.*+?()[\]{}|]/g, "\\function effectiveMarker(resource: DesiredResource): string | undefined {
+  if (resource.kind !== "issue") return undefined;
+  return resource.identity?.marker ?? canonicalMarker(resource.logicalId);
+}");
+  // A capturing prefix avoids lookbehind, including in constrained JS runtimes.
+  return new RegExp("(^|[^A-Za-z0-9_.:/-])" + escaped + "(?![A-Za-z0-9_.:/-])").test(body);
+}
+
+
 function resourceKey(resource: ObservedResource): string {
   return [
     resource.kind,
@@ -223,7 +241,7 @@ function resolveOne(
 
     const selected = explicitMatches[0]!;
     if (resource.kind === "issue" && marker !== undefined) {
-      const markerMatches = snapshot.issues.filter((issue) => issue.body?.includes(marker) === true);
+      const markerMatches = snapshot.issues.filter((issue) => matchesMarker(issue.body, marker, identity?.marker !== undefined));
       if (markerMatches.length > 1) {
         return ambiguous(
           resource,
@@ -251,7 +269,7 @@ function resolveOne(
   }
 
   if (resource.kind === "issue" && marker !== undefined) {
-    const markerMatches = snapshot.issues.filter((issue) => issue.body?.includes(marker) === true);
+    const markerMatches = snapshot.issues.filter((issue) => matchesMarker(issue.body, marker, identity?.marker !== undefined));
     if (markerMatches.length > 1) {
       return ambiguous(
         resource,
