@@ -1,4 +1,4 @@
-import { planGithub, normalizeSchema, compilePullRequestSteps, bindPlanRequest } from "../src/index.ts";
+import { planGithub, normalizeSchema, compilePullRequestSteps, bindPlanRequest, requestReferences } from "../src/index.ts";
 import type { FetchLike, FetchResponseLike, GithubPlanSchema, GithubStateSnapshot } from "../src/index.ts";
 
 function check(value: unknown, message: string): asserts value {
@@ -174,4 +174,47 @@ check(deferredCreate.request?.protocol === "rest", "Expected REST create.");
 const bound = bindPlanRequest(deferredCreate.request!, { NEW: { number: 123 } });
 check(bound.protocol === "rest" && JSON.stringify(bound.body).includes("Closes #123"),
   "Late-bound Closes text must substitute the created issue number.");
+const duplicate = normalizeSchema({
+  repository: repo, pullRequests: [
+    { logicalId: "P1", head: "feature", base: "main", identity: { number: 50 } },
+    { logicalId: "P2", head: "feature", base: "release", identity: { number: 50 } },
+  ],
+}).graph!;
+const collisions = compilePullRequestSteps(duplicate, snapshot, []);
+check(collisions.blockers.some((x) => x.code === "PR_PAIR_CONFLICT"),
+  "Two distinct logical PRs targeting one existing number must block readiness.");
+const manualPrefix = "Lead   \n\n";
+const manualSuffix = "\n\nFooter\n";
+const managed = "<!-- gh-plan:closes:begin -->\nCloses #10\n<!-- gh-plan:closes:end -->";
+const humanState: GithubStateSnapshot = {
+  ...snapshot,
+  pullRequests: [{ ...snapshot.pullRequests![0]!,
+    body: manualPrefix + managed + manualSuffix }],
+};
+const updateClosure = normalizeSchema({
+  repository: repo,
+  issues: [{ logicalId: "OTHER", management: "reference", identity: { number: 12 } }],
+  pullRequests: [{ logicalId: "PR", head: "feature", base: "main",
+    identity: { number: 50 }, closes: ["OTHER"] }],
+}).graph!;
+const closurePlan = compilePullRequestSteps(updateClosure, humanState, [
+  { logicalId: "OTHER", kind: "issue", status: "existing", identity: { number: 12 } },
+]);
+const bodyPatch = closurePlan.steps.find((x) => x.kind === "pull_request.update");
+check(bodyPatch?.request?.protocol === "rest", "Closes diff requires a managed PR PATCH.");
+const bodyPatchString = JSON.stringify(bodyPatch.request.body);
+check(bodyPatchString.includes("Closes #12") && !bodyPatchString.includes("Closes #10"),
+  "Managed closure must be replaced without leaving stale refs.");
+check(bodyPatchString.includes("Lead   ") && bodyPatchString.includes("Footer"),
+  "Closes replacement must retain human text outside the block.");
+const invalidTemplate = { protocol: "rest", method: "POST", path: "/issues",
+  body: { body: { $template: "not-an-array" } } };
+let malformedTemplateRejected = false;
+try {
+  requestReferences(invalidTemplate as unknown as Parameters<typeof requestReferences>[0]);
+} catch {
+  malformedTemplateRejected = true;
+}
+check(malformedTemplateRejected, "Request validation must reject malformed string templates.");
+
 console.log("PR create/update, safe head/base identity, scoped reads, M4 endpoints, Closes and draft fixtures passed.");
