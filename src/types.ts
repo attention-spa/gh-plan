@@ -438,9 +438,9 @@ export type PlanValueRef = {
 };
 
 /** Template for a string containing late-bound IDs (e.g., a Closes #number body). */
-export interface PlanStringTemplate {
+export type PlanStringTemplate = {
   $template: Array<string | PlanValueRef>;
-}
+};
 
 /** Serializable request data; references can occur at any nesting depth. */
 /** JSON request payload that can contain nested late-bound identity references. */
