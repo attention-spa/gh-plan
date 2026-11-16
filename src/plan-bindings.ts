@@ -8,12 +8,14 @@ const REF_PATTERN = /^([A-Za-z0-9][A-Za-z0-9._:/-]*)\.(number|id|nodeId)$/;
 export type PlanBindingErrorCode = "INVALID_PLAN_REFERENCE" | "UNRESOLVED_PLAN_REFERENCE";
 
 export class PlanBindingError extends Error {
-  constructor(
-    readonly code: PlanBindingErrorCode,
-    readonly reference: string,
-  ) {
+  readonly code: PlanBindingErrorCode;
+  readonly reference: string;
+
+  constructor(code: PlanBindingErrorCode, reference: string) {
     super(code + ": " + reference);
     this.name = "PlanBindingError";
+    this.code = code;
+    this.reference = reference;
   }
 }
 
