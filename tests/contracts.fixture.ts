@@ -30,6 +30,7 @@ const config = {
   fetch: customFetch,
   octokit: { graphql: async () => ({}) },
   mode: "graphql",
+  adoptByTitle: true,
 } satisfies GithubPlannerConfig;
 
 void config;

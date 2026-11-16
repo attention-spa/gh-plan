@@ -9,6 +9,11 @@ import type {
   ResourceResolution,
 } from "./types.ts";
 
+/** Adopting unmarked issues by matching titles is disabled unless explicitly requested. */
+export interface IdentityResolutionOptions {
+  adoptByTitle?: boolean;
+}
+
 export interface IdentityResolutionResult {
   resolutions: ResourceResolution[];
   warnings: GithubDiagnostic[];
@@ -79,9 +84,10 @@ function candidateIdentities(
 }
 
 function diagnostic(
-  code: "AMBIGUOUS_IDENTITY" | "UNRESOLVED_IDENTITY" | "UNRESOLVED_REFERENCE" | "INVALID_SCHEMA",
+  code: "AMBIGUOUS_IDENTITY" | "TITLE_MATCH_REQUIRES_ADOPTION" | "UNRESOLVED_IDENTITY" | "UNRESOLVED_REFERENCE" | "INVALID_SCHEMA",
   message: string,
   logicalId?: string,
+  details?: GithubDiagnostic["details"],
 ): GithubDiagnostic {
   return {
     code,
@@ -92,6 +98,7 @@ function diagnostic(
       schemaPath: `resources.${logicalId}.identity`,
     }),
     message,
+    ...(details === undefined ? {} : { details }),
   };
 }
 
@@ -180,6 +187,7 @@ function resolveOne(
   resource: DesiredResource,
   snapshot: GithubStateSnapshot,
   blockers: GithubDiagnostic[],
+  options: IdentityResolutionOptions,
 ): ResourceResolution {
   const observed = observedFor(resource, snapshot);
   const identity = resource.identity;
@@ -287,13 +295,40 @@ function resolveOne(
 
   const title = titleOf(resource);
   if (title !== undefined) {
-    const titleMatches = observed.filter((item) => item.title === title);
+    // Milestones lack issue-body markers; their exact titles remain the established
+    // bootstrap identity. Issue titles are unsafe unless adoption is explicit.
+    const titleMatches = observed.filter((item) => (
+      resource.kind === "issue"
+        ? item.title.trim().toLowerCase() === title.trim().toLowerCase()
+        : item.title === title
+    ));
+    if (resource.kind === "issue" && titleMatches.length > 0 && options.adoptByTitle !== true) {
+      const candidates = candidateIdentities(titleMatches);
+      const numbers = candidates.map((candidate) => candidate.number!);
+      blockers.push(diagnostic(
+        "TITLE_MATCH_REQUIRES_ADOPTION",
+        `Existing issue title matches for ${resource.logicalId}: #${numbers.join(", #")}. Specify identity.number/id/nodeId or a unique marker, or set adoptByTitle: true to authorize title adoption.`,
+        resource.logicalId,
+        {
+          candidateIssueNumbers: numbers,
+          resolution: "Supply explicit identity hints or a unique marker; alternatively set adoptByTitle: true.",
+        },
+      ));
+      return {
+        logicalId: resource.logicalId,
+        kind: resource.kind,
+        status: "unresolved",
+        candidates,
+      };
+    }
     if (titleMatches.length > 1) {
       return ambiguous(
         resource,
         titleMatches,
         blockers,
-        `Exact title for ${resource.logicalId} matches multiple observed ${resource.kind}s.`,
+        resource.kind === "issue"
+          ? `Normalized title for ${resource.logicalId} matches multiple issues: #${titleMatches.map((item) => item.number).sort((a, b) => a - b).join(", #")}.`
+          : `Exact title for ${resource.logicalId} matches multiple observed milestones.`,
       );
     }
     if (titleMatches.length === 1) {
@@ -325,6 +360,7 @@ function resolveOne(
 export function resolveResourceIdentities(
   desired: NormalizedDesiredStateGraph,
   observed: GithubStateSnapshot,
+  options: IdentityResolutionOptions = {},
 ): IdentityResolutionResult {
   const blockers: GithubDiagnostic[] = [];
   const resources = [...desired.resources].sort((a, b) => a.logicalId.localeCompare(b.logicalId));
@@ -345,7 +381,7 @@ export function resolveResourceIdentities(
     };
   }
 
-  const resolutions = resources.map((resource) => resolveOne(resource, observed, blockers));
+  const resolutions = resources.map((resource) => resolveOne(resource, observed, blockers, options));
   return {
     resolutions,
     warnings: [],

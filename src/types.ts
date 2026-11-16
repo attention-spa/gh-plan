@@ -34,6 +34,8 @@ export interface GithubPlannerConfig {
   fetch?: FetchLike;
   octokit?: unknown;
   mode?: GithubPlannerMode;
+  /** Default false; only explicitly opted-in plans may adopt existing issues by title. */
+  adoptByTitle?: boolean;
 }
 
 export type LogicalResourceId = string;
@@ -285,6 +287,7 @@ export type DiagnosticCode =
   | "AUTH_FAILED"
   | "REPOSITORY_NOT_FOUND"
   | "AMBIGUOUS_IDENTITY"
+  | "TITLE_MATCH_REQUIRES_ADOPTION"
   | "UNRESOLVED_IDENTITY"
   | "UNRESOLVED_REFERENCE"
   | "UNKNOWN_ISSUE_TYPE"

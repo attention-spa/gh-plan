@@ -5,6 +5,7 @@ export {
   resolveResourceIdentities,
 } from "./identity.ts";
 export type {
+  IdentityResolutionOptions,
   IdentityResolutionResult,
 } from "./identity.ts";
 
