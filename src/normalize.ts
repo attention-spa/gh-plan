@@ -19,7 +19,7 @@ export interface NormalizationResult {
 
 type RecordLike = Record<string, unknown>;
 
-const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships", "relationshipMode", "labels"]);
+const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships", "relationshipMode", "labels", "$schema"]);
 const ISSUE_KEYS = new Set([
   "logicalId",
   "management",
@@ -531,6 +531,9 @@ export function normalizeSchema(schema: object): NormalizationResult {
   }
 
   reportUnknownKeys(schema, ROOT_KEYS, "$", diagnostics);
+  if ("$schema" in schema && typeof schema.$schema !== "string") {
+    diagnostics.push(diagnostic("INVALID_SCHEMA", "$schema must be a string.", "$.$schema"));
+  }
   const relationshipMode = schema.relationshipMode === undefined ? "reconcile" : schema.relationshipMode;
   if (relationshipMode !== "reconcile" && relationshipMode !== "additive") {
     diagnostics.push(diagnostic("INVALID_SCHEMA", "relationshipMode must be reconcile or additive.", "$.relationshipMode"));

@@ -1,3 +1,9 @@
+export type {
+  GithubPlanSchema, AuthoringIssue, AuthoringManagedIssue, AuthoringReferencedIssue,
+  AuthoringMilestone, AuthoringRepositoryLabel, AuthoringRelationship,
+  AuthoringIssueLabels, AuthoringIssueAssignees, AuthoringIdentity,
+  AuthoringMilestoneRef, AuthoringSet, AuthoringRemove,
+} from "./authoring-schema.ts";
 export { compileIssueLabelSteps } from "./issue-label-compiler.ts";
 export { compileRepositoryLabelSteps } from "./repository-label-compiler.ts";
 export type { RepositoryLabelCompilationResult } from "./repository-label-compiler.ts";

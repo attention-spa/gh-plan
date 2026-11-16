@@ -1,5 +1,5 @@
 import { GITHUB_PLAN_VERSION, planGithub } from "../src/index.ts";
-import type { FetchLike, FetchResponseLike, GithubPlan } from "../src/index.ts";
+import type { FetchLike, FetchResponseLike, GithubPlan, GithubPlanSchema } from "../src/index.ts";
 
 function check(condition: unknown, text: string): asserts condition {
   if (!condition) throw Error(text);
@@ -20,7 +20,7 @@ const schema = {
     { logicalId: "C", title: "Child", milestone: "M", blockedBy: ["P"], relatesTo: ["P"] },
   ],
   relationships: [{ kind: "parent", parent: "P", child: "C" }],
-};
+} satisfies GithubPlanSchema;
 type Mode = "empty" | "applied" | "invalid_type" | "error";
 function response(status: number, data: unknown, headers: Record<string, string> = {}): FetchResponseLike {
   return {
@@ -67,7 +67,7 @@ function mock(mode: Mode, calls: string[], status = 401): FetchLike {
     throw Error("Unexpected fixture URL: " + url);
   };
 }
-const make = async (mode: Mode, calls: string[], otherSchema: object = schema, status?: number) =>
+const make = async (mode: Mode, calls: string[], otherSchema: GithubPlanSchema = schema, status?: number) =>
   planGithub({ schema: otherSchema, auth: "fixture-secret", fetch: mock(mode, calls, status) });
 
 const calls: string[] = [];
@@ -113,7 +113,7 @@ const badSchema = {
     { logicalId: "GOOD", title: "Good" },
     { logicalId: "BAD", title: "Bad", type: "NotKnown" },
   ],
-};
+} satisfies GithubPlanSchema;
 plan = await make("invalid_type", [], badSchema);
 equal(plan.readiness, "blocked", "Invalid issue type must block entire plan.");
 check(plan.blockers.some((b) => b.code === "UNKNOWN_ISSUE_TYPE"),
@@ -122,7 +122,8 @@ check(plan.summary.planned > 0, "Candidate operations may be included for review
 check(plan.blockers.every((b) => b.blocking), "All blockers are strictly blocking.");
 
 const malformed = await planGithub({
-  schema: { repository: repo, issues: [{ logicalId: "X", title: { op: "invalid" } }] },
+  // Deliberately malformed runtime input: normalization must still reject untyped JSON.
+  schema: { repository: repo, issues: [{ logicalId: "X", title: { op: "invalid" } }] } as unknown as GithubPlanSchema,
   auth: "fixture-secret",
   fetch: mock("empty", []),
 });

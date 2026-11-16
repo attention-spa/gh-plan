@@ -1,0 +1,704 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/attention-spa/gh-plan/main/schema/gh-plan.schema.json",
+  "$ref": "#/$defs/GithubPlanSchema",
+  "$defs": {
+    "GithubPlanSchema": {
+      "type": "object",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "Editor schema hint; ignored by the planner when a string."
+        },
+        "repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "fullName": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "number"
+                },
+                "nodeId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "fullName"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringIssue"
+          }
+        },
+        "milestones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringMilestone"
+          }
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringRepositoryLabel"
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringRelationship"
+          }
+        },
+        "relationshipMode": {
+          "type": "string",
+          "enum": [
+            "reconcile",
+            "additive"
+          ]
+        }
+      },
+      "required": [
+        "repository"
+      ],
+      "additionalProperties": false,
+      "description": "Public ergonomic input to planGithub(); omit fields you do not manage."
+    },
+    "AuthoringIssue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AuthoringManagedIssue"
+        },
+        {
+          "$ref": "#/$defs/AuthoringReferencedIssue"
+        }
+      ]
+    },
+    "AuthoringManagedIssue": {
+      "type": "object",
+      "properties": {
+        "logicalId": {
+          "type": "string"
+        },
+        "management": {
+          "type": "string",
+          "const": "managed"
+        },
+        "identity": {
+          "$ref": "#/$defs/AuthoringIdentity"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSet%3Cstring%3E"
+            }
+          ]
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSetOrRemove%3Cstring%3E"
+            }
+          ]
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "open"
+            },
+            {
+              "type": "string",
+              "const": "closed"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSet%3C(%22open%22%7C%22closed%22)%3E"
+            }
+          ]
+        },
+        "milestone": {
+          "$ref": "#/$defs/AuthoringMilestoneRef"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSet%3Cstring%3E"
+            }
+          ]
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AuthoringJson"
+              },
+              {
+                "$ref": "#/$defs/AuthoringSet%3CAuthoringJson%3E"
+              },
+              {
+                "$ref": "#/$defs/AuthoringRemove"
+              }
+            ]
+          }
+        },
+        "labels": {
+          "$ref": "#/$defs/AuthoringIssueLabels"
+        },
+        "assignees": {
+          "$ref": "#/$defs/AuthoringIssueAssignees"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringIssue"
+          }
+        },
+        "blockedBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "relatesTo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "logicalId"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringIdentity": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "number"
+        },
+        "id": {
+          "type": "number"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "marker": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AuthoringSet<string>": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "const": "set"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringSetOrRemove<string>": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AuthoringSet%3Cstring%3E"
+        },
+        {
+          "$ref": "#/$defs/AuthoringRemove"
+        }
+      ]
+    },
+    "AuthoringRemove": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "const": "remove"
+        }
+      },
+      "required": [
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringSet<(\"open\"|\"closed\")>": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "const": "set"
+        },
+        "value": {
+          "type": "string",
+          "enum": [
+            "open",
+            "closed"
+          ]
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringMilestoneRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/AuthoringLogicalRef"
+        },
+        {
+          "$ref": "#/$defs/AuthoringSet%3C(string%7CAuthoringLogicalRef)%3E"
+        },
+        {
+          "$ref": "#/$defs/AuthoringRemove"
+        }
+      ]
+    },
+    "AuthoringLogicalRef": {
+      "type": "object",
+      "properties": {
+        "logicalId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "logicalId"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringSet<(string|AuthoringLogicalRef)>": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "const": "set"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AuthoringLogicalRef"
+            }
+          ]
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringJson": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringJson"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/AuthoringJson"
+          }
+        }
+      ],
+      "description": "Public authoring input; the only source for schema/gh-plan.schema.json. normalizeSchema() performs cross-resource and GitHub-specific validation."
+    },
+    "AuthoringSet<AuthoringJson>": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "const": "set"
+        },
+        "value": {
+          "$ref": "#/$defs/AuthoringJson"
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringIssueLabels": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "$ref": "#/$defs/AuthoringSet%3Cstring%5B%5D%3E"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "add": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "remove": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "add"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "add": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "remove": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "remove"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "AuthoringSet<string[]>": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "const": "set"
+        },
+        "value": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringIssueAssignees": {
+      "$ref": "#/$defs/AuthoringIssueLabels"
+    },
+    "AuthoringReferencedIssue": {
+      "type": "object",
+      "properties": {
+        "logicalId": {
+          "type": "string"
+        },
+        "management": {
+          "type": "string",
+          "const": "reference"
+        },
+        "identity": {
+          "$ref": "#/$defs/AuthoringIdentity"
+        }
+      },
+      "required": [
+        "logicalId",
+        "management"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringMilestone": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AuthoringManagedMilestone"
+        },
+        {
+          "$ref": "#/$defs/AuthoringReferencedMilestone"
+        }
+      ]
+    },
+    "AuthoringManagedMilestone": {
+      "type": "object",
+      "properties": {
+        "logicalId": {
+          "type": "string"
+        },
+        "management": {
+          "type": "string",
+          "const": "managed"
+        },
+        "identity": {
+          "$ref": "#/$defs/AuthoringIdentity"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSet%3Cstring%3E"
+            }
+          ]
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSetOrRemove%3Cstring%3E"
+            }
+          ]
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "open"
+            },
+            {
+              "type": "string",
+              "const": "closed"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSet%3C(%22open%22%7C%22closed%22)%3E"
+            }
+          ]
+        }
+      },
+      "required": [
+        "logicalId"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringReferencedMilestone": {
+      "type": "object",
+      "properties": {
+        "logicalId": {
+          "type": "string"
+        },
+        "management": {
+          "type": "string",
+          "const": "reference"
+        },
+        "identity": {
+          "$ref": "#/$defs/AuthoringIdentity"
+        }
+      },
+      "required": [
+        "logicalId",
+        "management"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringRepositoryLabel": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AuthoringManagedRepositoryLabel"
+        },
+        {
+          "$ref": "#/$defs/AuthoringReferencedRepositoryLabel"
+        }
+      ]
+    },
+    "AuthoringManagedRepositoryLabel": {
+      "type": "object",
+      "properties": {
+        "logicalId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "management": {
+          "type": "string",
+          "const": "managed"
+        },
+        "color": {
+          "type": "string",
+          "description": "Six hexadecimal digits, without #."
+        },
+        "description": {
+          "type": "string",
+          "description": "Maximum 100 characters; empty string clears."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringReferencedRepositoryLabel": {
+      "type": "object",
+      "properties": {
+        "logicalId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "management": {
+          "type": "string",
+          "const": "reference"
+        }
+      },
+      "required": [
+        "name",
+        "management"
+      ],
+      "additionalProperties": false
+    },
+    "AuthoringRelationship": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "parent"
+            },
+            "parent": {
+              "type": "string"
+            },
+            "child": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "parent",
+            "child"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "blocked_by"
+            },
+            "issue": {
+              "type": "string"
+            },
+            "blocker": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "issue",
+            "blocker"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "blocks"
+            },
+            "issue": {
+              "type": "string"
+            },
+            "blocked": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "issue",
+            "blocked"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "relates_to"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
