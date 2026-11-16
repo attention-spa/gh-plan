@@ -1,3 +1,5 @@
+export { compileMilestoneSteps } from "./milestone-compiler.ts";
+export type { MilestoneCompilationResult } from "./milestone-compiler.ts";
 export { bindPlanRequest, requestReferences, validatePlanStepReferences, PlanBindingError } from "./plan-bindings.ts";
 export type { BoundPlanRequest, PlanBindingErrorCode } from "./plan-bindings.ts";
 export { diffGithubState } from "./diff.ts";
