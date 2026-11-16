@@ -84,6 +84,35 @@ for (const name of [
   assert.equal(typeof direct[name], "function", "Missing built export: " + name);
   assert.strictEqual(self[name], direct[name], "Package self-export mismatch: " + name);
 }
+
+// #187: named C2 types/declarations are public; executing applyPlan is NOT.
+const c2Types = readFileSync(new URL("index.d.ts", dist), "utf8");
+for (const name of [
+  "ApplyPlanOptions", "ApplyPlanResult", "ApplyOwnershipAdapter",
+  "ApplyDispatcher", "ApplyPostconditionContext", "ApplyPostconditionRead",
+  "ApplyPostconditionReader", "ApplyIssueCatalogReader",
+  "ApplyMilestoneCatalogReader", "ApplyLogSink", "SafeApplyLogEntry",
+  "ApplyPlanErrorCode", "ApplyPlanPhase", "ApplyOwnerState",
+]) {
+  assert(c2Types.includes(name), "Public type-only C2 entry missing: " + name);
+}
+assert.equal(typeof direct.ApplyPlanError, "function",
+  "Typed sanitized C2 error class must be importable at runtime.");
+assert.strictEqual(self.ApplyPlanError, direct.ApplyPlanError,
+  "Package self export must agree on sanitized C2 error class.");
+assert.equal(typeof direct.applyPlan, "undefined",
+  "Public applyPlan execution must NOT be exported before #190.");
+assert.equal(typeof self.applyPlan, "undefined",
+  "Package self-reference must not expose early write facade.");
+assert.equal(typeof direct.prepareApplyPlan, "undefined",
+  "Internal preflight gate must not be public.");
+const c2Failure = new direct.ApplyPlanError({
+  code: "INVALID_PLAN", phase: "preflight",
+});
+assert.equal(c2Failure.toJSON().code, "INVALID_PLAN");
+assert(!JSON.stringify(c2Failure).includes("cause"),
+  "Public failure JSON may not contain arbitrary error cause.");
+
 assert.equal(typeof direct.GITHUB_PLAN_VERSION, "string", "Version must remain exported.");
 assert.strictEqual(self.GITHUB_PLAN_VERSION, direct.GITHUB_PLAN_VERSION);
 
