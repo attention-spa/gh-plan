@@ -5,7 +5,7 @@ description: "GitHub REST GET catalog, enrichment and assignee-eligibility endpo
 resource: https://docs.github.com/en/rest/issues/issues
 tags: [github, rest, permissions]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:25:57+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T13:20:42.830Z }
 sources:
   - resource: https://docs.github.com/en/rest/issues/issues
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/rest.ts
