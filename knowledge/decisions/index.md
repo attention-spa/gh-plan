@@ -1,6 +1,6 @@
 # Architecture and Safety Decisions
 
-- [Caller-injected public apply contract](/decisions/caller-injected-apply-contract.md) — Select callback-based applyPlan with an explicit caller trust boundary and separately verified GitHub adapters.
+- [Caller-injected public apply contract](/decisions/caller-injected-apply-contract.md) — Expose a callback-based applyPlan in the private package, with explicit caller trust and independently gated GitHub-safe adapters.
 
 - [Progressive apply coverage and authoritative postconditions](/decisions/progressive-apply-postconditions.md) — Start optional apply with four narrowly verified issue and milestone operations; reject unsupported plans before any write.
 
