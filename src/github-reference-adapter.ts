@@ -5,6 +5,7 @@ import { createRestIssuePostconditionReader, IssueReadError } from "./apply-issu
 import { createRestMilestonePostconditionReader } from "./apply-milestone-reader.ts";
 import { createGithubReferenceHttp, GithubReferenceError } from "./github-reference-http.ts";
 import { GITHUB_REST_API_VERSION } from "./rest.ts";
+import { matchesMarker } from "./identity.ts";
 import type { ApplyPlanOptions, ApplyLogSink, ApplyPostconditionRead } from "./apply-contract.ts";
 import type { ApplyPostconditionSpec } from "./apply-preflight.ts";
 import type { GithubCasLockHandle } from "./github-cas-lock.ts";
@@ -171,6 +172,65 @@ export function createGithubReferenceApplyOptions(config: GithubReferenceApplyCo
     },
   };
 
+  /**
+   * #188's narrow create→close replay cannot pass "closed" through the #180
+   * issue.create reader, whose strict canonical spec REQUIRES initial "open".
+   * Preserve #180 unchanged; implement a fresh catalog + independent by-number
+   * GET only for an exactly planned dependent issue.close, checking all create
+   * fields against the FINAL closed state and stable full REST identity.
+   */
+  async function readSupersededClosed(spec: ApplyPostconditionSpec,
+    bindings: Readonly<PlanBindings>): Promise<ApplyPostconditionRead> {
+    if (spec.kind !== "issue.create" ||
+        spec.identity.strategy !== "unique_issue_marker") reject();
+    const marker = spec.identity.marker;
+    const logicalId = spec.stepId.slice("issue.create:".length);
+    const custom = marker !== "<!-- gh-plan:" + logicalId + " -->";
+    const rows = await transport.issuesCatalog();
+    const found = rows.filter((row) =>
+      typeof row.body === "string" && row.body.split(marker).length === 2 &&
+      matchesMarker(row.body, marker, custom));
+    if (found.length > 1) reject();
+    const row = found[0];
+    if (!row) return { status: "unsatisfied" };
+    if (!POSITIVE(row.id) || typeof row.nodeId !== "string" || !row.nodeId ||
+        row.state !== "closed" || row.milestoneNumber === undefined) reject();
+    const url = BASE + "/repos/" + repo + "/issues/" + row.number;
+    const response = await transport.fetch(url, {
+      method: "GET", redirect: "error", headers: {
+        Authorization: "Bearer " + config.auth,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": GITHUB_REST_API_VERSION,
+      },
+    });
+    let raw: unknown;
+    try { raw = await response.json(); } catch { return reject(); }
+    if (!record(raw) || raw.pull_request !== undefined ||
+        raw.id !== row.id || raw.number !== row.number ||
+        raw.node_id !== row.nodeId || raw.title !== row.title ||
+        raw.body !== row.body || raw.state !== row.state ||
+        !Object.hasOwn(raw, "milestone"))
+      reject();
+    const milestone = raw.milestone === null ? null :
+      record(raw.milestone) && POSITIVE(raw.milestone.number)
+        ? raw.milestone.number : reject();
+    if (milestone !== row.milestoneNumber) reject();
+    for (const check of spec.predicates) {
+      const expected = record(check.expected) && typeof check.expected.$ref === "string"
+        ? bindings[check.expected.$ref.slice(0, -".number".length)]?.number
+        : check.expected;
+      if (check.comparison === "null" ? milestone !== null :
+          check.field === "title" && row.title !== expected ||
+          check.field === "body" && row.body !== expected ||
+          check.field === "state" && row.state !== expected ||
+          check.field === "milestone" && milestone !== expected)
+        reject();
+    }
+    return { status: "satisfied", identity: {
+      number: row.number, id: row.id, nodeId: row.nodeId,
+    } };
+  }
+
   const readPostcondition: ApplyPlanOptions["readPostcondition"] =
     async (context) => {
       const step = context.step;
@@ -188,6 +248,7 @@ export function createGithubReferenceApplyOptions(config: GithubReferenceApplyCo
       if (context.phase === "before") {
         const bound = bindPlanRequest(step.request!, context.bindings);
         if (canonical(bound) !== canonical(context.request)) reject();
+        if (isAlternate) return readSupersededClosed(spec, context.bindings);
         let value: ApplyPostconditionRead;
         if (spec.kind.startsWith("issue")) {
           try {
