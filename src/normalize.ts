@@ -18,7 +18,7 @@ export interface NormalizationResult {
 
 type RecordLike = Record<string, unknown>;
 
-const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships"]);
+const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships", "relationshipMode"]);
 const ISSUE_KEYS = new Set([
   "logicalId",
   "management",
@@ -421,6 +421,10 @@ export function normalizeSchema(schema: object): NormalizationResult {
   }
 
   reportUnknownKeys(schema, ROOT_KEYS, "$", diagnostics);
+  const relationshipMode = schema.relationshipMode === undefined ? "reconcile" : schema.relationshipMode;
+  if (relationshipMode !== "reconcile" && relationshipMode !== "additive") {
+    diagnostics.push(diagnostic("INVALID_SCHEMA", "relationshipMode must be reconcile or additive.", "$.relationshipMode"));
+  }
 
   if (!("repository" in schema)) {
     diagnostics.push(diagnostic("INVALID_SCHEMA", "Schema requires a repository selector.", "$.repository"));
@@ -660,6 +664,7 @@ export function normalizeSchema(schema: object): NormalizationResult {
     ok: true,
     graph: {
       repository: repository!,
+      relationshipMode: relationshipMode === "additive" ? "additive" : "reconcile",
       resources,
       relationships: deduped,
     },
