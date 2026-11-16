@@ -10,7 +10,9 @@ permissions:
 
 jobs:
   contracts:
-    runs-on: ubuntu-latest
+    # Untrusted PR code stays on GitHub-hosted VMs; trusted main pushes use OCI.
+    # Self-hosted routing has no automatic GitHub-hosted fallback (separate unit).
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","trusted"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
