@@ -119,6 +119,23 @@ const rerun = await fresh.verify.readBefore(create, M);
 equal(rerun.status, "satisfied", "Repeat creates detect verified zero-write state.");
 equal(fresh.calls.length, 5, "Repeat-run never uses stale initial observation.");
 
+const withoutMilestone: ApplyPostconditionSpec = {
+  ...create, predicates: create.predicates.filter((p) => p.field !== "milestone"),
+};
+const expectedDefault = reader({
+  [LIST]: () => response([issue({ milestone: null })]),
+  [ROOT + "/11"]: () => response(issue({ milestone: null })),
+});
+equal((await expectedDefault.verify.readBefore(withoutMilestone)).status, "satisfied",
+  "Absent milestone on issue.create must verify GitHub's null default.");
+const unexpectedMilestone = reader({
+  [LIST]: () => response([issue()]),
+  [ROOT + "/11"]: () => response(issue()),
+});
+await reject("unexpected milestone on existing marker", () =>
+  unexpectedMilestone.verify.readBefore(withoutMilestone),
+  "POSTCONDITION_MISMATCH");
+
 const lost = reader({
   [LIST]: () => response([issue()]),
   [ROOT + "/11"]: () => response(issue()),
