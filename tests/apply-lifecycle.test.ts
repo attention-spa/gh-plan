@@ -114,6 +114,8 @@ class Fixture {
   incorrectResponse = false;
   afterReadInvalid = false;
   beforeReadInvalid = false;
+  wrongUpdateRead = false;
+  malformedNodeIdReply = false;
   failAudit?: (entry: SafeApplyLogEntry) => boolean;
   failDispatch?: (step: PlanStep) => boolean;
   beforeReadHook?: Hook;
@@ -198,12 +200,14 @@ class Fixture {
       const field = pred.field === "milestone" ? "milestoneNumber" : pred.field;
       const actual = (current as unknown as Record<string, unknown>)[field];
       if (pred.comparison === "null" ? actual !== null && actual !== "" :
-        actual !== expected) return { status: "unsatisfied" as const };
+        !(field === "description" && expected === "" && actual === null) &&
+          actual !== expected) return { status: "unsatisfied" as const };
     }
     return {
       status: "satisfied" as const,
       identity: {
-        number: current.number, id: current.id, nodeId: current.nodeId,
+        number: this.wrongUpdateRead && spec.kind.endsWith(".update")
+          ? 999 : current.number, id: current.id, nodeId: current.nodeId,
       },
     };
   }
@@ -256,6 +260,8 @@ class Fixture {
         : undefined;
       return created
         ? this.incorrectResponse ? { number: 999, id: 999, node_id: "WRONG" } :
+          this.malformedNodeIdReply ? { number: created.number, id: created.id,
+            node_id: "WRONG_NODE_ID" } :
           { number: created.number, id: created.id, node_id: created.nodeId }
         : {};
     } finally {
@@ -338,6 +344,21 @@ await denied("wrong created response identity", alteredResponse.config(),
   "VERIFICATION_FAILED", "retained");
 equal(alteredResponse.dispatches, 1, "No replay after mismatched create response.");
 
+const wrongNode = new Fixture();
+wrongNode.malformedNodeIdReply = true;
+await denied("GitHub raw node_id must match independently read node ID",
+  wrongNode.config(), "VERIFICATION_FAILED", "retained");
+equal(wrongNode.dispatches, 1, "Wrong GitHub node_id does not retry creation.");
+
+const wrongUpdate = new Fixture();
+wrongUpdate.wrongUpdateRead = true;
+// The first create completes, but the first update whose reader claims
+// a different REST issue/milestone number must fail and retain ownership.
+await denied("wrong by-number update identity",
+  wrongUpdate.config(), "VERIFICATION_FAILED", "retained");
+equal(wrongUpdate.dispatches, 2,
+  "Mismatched update identity stops without dispatching later steps.");
+
 const invalidBefore = new Fixture();
 invalidBefore.beforeReadInvalid = true;
 await denied("reader returns malformed status", invalidBefore.config(),
@@ -371,6 +392,10 @@ const auditFirst = await denied("durable dispatch-intent audit failure",
   auditBeforeWrite.config(), "AUDIT_FAILED");
 equal(auditBeforeWrite.dispatches, 0, "Failing audit BEFORE write dispatches zero.");
 equal(auditFirst.log.length, 1, "Only the ownership audit was acknowledged.");
+equal(auditFirst.ownerState, "released",
+  "Audit failure before any write safely releases a verified lock.");
+assert(!auditBeforeWrite.ownerHeld,
+  "No-write audit sink failure must not strand a cooperative lock.");
 
 const auditAfterWrite = new Fixture();
 auditAfterWrite.failAudit = (entry) =>
@@ -464,5 +489,43 @@ lying.beforeReadHook = (ctx) => {
 await denied("existing unique title but conflicting managed fields", lying.config(),
   "UNVERIFIED_STATE", "released");
 equal(lying.dispatches, 0, "Existing mismatched title must not be adopted/created again.");
+
+const noMilestonePlan = clone(good);
+const createIssue = noMilestonePlan.steps.find((step) => step.kind === "issue.create")!;
+const unboundIssue = createIssue.request!;
+if (unboundIssue.protocol !== "rest") throw Error("Fixture must use REST");
+unboundIssue.body = { title: "Ship", body: token("I") };
+createIssue.desired = unboundIssue.body;
+noMilestonePlan.applyIntent!.managed.find((entry) => entry.logicalId === "I")!.fields =
+  ["state", "title"];
+const noMilestone = new Fixture();
+const noMilestoneResult = await executeCallbackApplyPlan(noMilestone.config(noMilestonePlan));
+equal(noMilestoneResult.status, "applied",
+  "Issue create with omitted milestone must start with GitHub's null milestone.");
+equal(noMilestone.issues.find((i) => i.number === 37)?.milestoneNumber, null,
+  "Omitted issue milestone is observed as null.");
+
+const wrongImplicit = new Fixture();
+wrongImplicit.issues.push({
+  kind: "issue", number: 37, id: 3700, nodeId: "I_3700",
+  title: "Ship", body: token("I"), state: "open", milestoneNumber: 2,
+});
+await denied("marker owner with unexpected implicit milestone",
+  wrongImplicit.config(noMilestonePlan), "UNVERIFIED_STATE", "released");
+equal(wrongImplicit.dispatches, 1,
+  "Existing marker with unrelated milestone cannot issue duplicate create.");
+
+const clearedDescription = new Fixture();
+await executeCallbackApplyPlan(clearedDescription.config());
+clearedDescription.dispatches = 0;
+clearedDescription.milestones.find((m) => m.number === 17)!.description =
+  null as unknown as string;
+clearedDescription.milestones.find((m) => m.number === 2)!.description =
+  null as unknown as string;
+const descriptionReplay = await executeCallbackApplyPlan(clearedDescription.config());
+equal(descriptionReplay.status, "already_satisfied",
+  "GitHub null and empty milestone descriptions normalize on reread.");
+equal(clearedDescription.dispatches, 0,
+  "Normalized description no-op requires no writes.");
 
 console.log("C2 #188: guarded four-kind callback graph, late binding, verified replay, serial writes, audit prefix, cancellation and uncertain-owner refusal passed.");
