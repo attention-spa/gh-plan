@@ -1,3 +1,4 @@
+import { fromGithubMilestoneDueOn } from "./milestone-due-date.ts";
 import type {
   DesiredResource, DesiredSetOrRemove, GithubDiagnostic, GithubDiff, GithubDiffResult,
   GithubStateSnapshot, JsonValue, NormalizedDesiredStateGraph, ObservedIssue,
@@ -192,6 +193,13 @@ export function diffGithubState(
         if (d.description) compare("milestone.description:" + id, id, kind, "description",
           current.description ?? null, d.description);
         if (d.state) compare("milestone.state:" + id, id, kind, "state", current.state, d.state);
+        if (d.due_on) {
+          const currentDue = current.due_on;
+          const calendar = currentDue === null ? null : fromGithubMilestoneDueOn(currentDue);
+          if (calendar === undefined) report("UNRESOLVED_REFERENCE", "milestone.due_on:" + id,
+            id, kind, "due_on", "Observed milestone due_on is missing or invalid.");
+          else compare("milestone.due_on:" + id, id, kind, "due_on", calendar, d.due_on);
+        }
       }
       continue;
     }

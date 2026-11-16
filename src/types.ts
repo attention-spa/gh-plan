@@ -173,6 +173,8 @@ export type DesiredMilestoneState = {
   title?: DesiredSet<string>;
   description?: DesiredSetOrRemove<string>;
   state?: DesiredSet<"open" | "closed">;
+  /** Normalized YYYY-MM-DD UTC date, never a timestamp. */
+  due_on?: DesiredSetOrRemove<string>;
 };
 
 interface DesiredResourceBase {
@@ -324,6 +326,8 @@ export interface ObservedMilestone {
   title: string;
   description?: string | null;
   state: "open" | "closed";
+  /** GitHub's ISO timestamp or null; undefined means due_on was not discovered. */
+  due_on?: string | null;
 }
 
 /** Enriched PR. Unlike a /issues listing entry, head/base and reviewer state are authoritative. */

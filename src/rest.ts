@@ -1,3 +1,4 @@
+import { fromGithubMilestoneDueOn } from "./milestone-due-date.ts";
 import type {
   FetchLike,
   DesiredProjectReference,
@@ -454,6 +455,10 @@ function mapMilestone(raw: unknown): ObservedMilestone {
   if (description !== undefined && description !== null && typeof description !== "string") {
     invalidResponse(`/milestones/${number}.description`);
   }
+  const dueOn = raw.due_on;
+  if (dueOn !== undefined && dueOn !== null && fromGithubMilestoneDueOn(dueOn) === undefined) {
+    invalidResponse(`/milestones/${number}.due_on`);
+  }
   const id = raw.id === undefined ? undefined : requiredNumber(raw.id, `/milestones/${number}.id`);
   const nodeId = optionalString(raw.node_id, `/milestones/${number}.node_id`);
   return {
@@ -464,6 +469,7 @@ function mapMilestone(raw: unknown): ObservedMilestone {
     title,
     description: description as string | null | undefined,
     state,
+    ...(dueOn === undefined ? {} : { due_on: dueOn as string | null }),
   };
 }
 
