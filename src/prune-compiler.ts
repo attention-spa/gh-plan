@@ -15,6 +15,13 @@ export interface PruneCompilationResult {
 const MARKER = /^<!-- gh-plan:([A-Za-z0-9][A-Za-z0-9._:/-]*) -->$/gm;
 const markerIds = (body: string | null | undefined): string[] =>
   typeof body === "string" ? [...body.matchAll(MARKER)].map((m) => m[1]!) : [];
+/** Mutating a marked issue needs stronger provenance than reporting a quoted marker. */
+function hasLeadingMarker(issue: ObservedIssue, id: string): boolean {
+  if (typeof issue.body !== "string") return false;
+  const marker = "<!-- gh-plan:" + id + " -->";
+  return issue.body === marker || issue.body.startsWith(marker + "\n") ||
+    issue.body.startsWith(marker + "\r\n");
+}
 
 function diagnostic(
   code: GithubDiagnostic["code"], message: string, logicalId: string,
@@ -107,9 +114,9 @@ export function compilePruneSteps(
         continue;
       }
       const issue = group[0]!;
-      if (protectedNumbers.has(issue.number)) {
+      if (protectedNumbers.has(issue.number) || !hasLeadingMarker(issue, logicalId)) {
         blockers.push(diagnostic("AMBIGUOUS_IDENTITY",
-          "Orphan #" + issue.number + " has an independently authored identity.",
+          "Orphan #" + issue.number + " is independently authored or lacks a leading ownership marker.",
           logicalId, true, { number: issue.number }));
         continue;
       }
@@ -134,7 +141,7 @@ export function compilePruneSteps(
       ? byNumber.get(res.identity.number) : undefined;
     if (r.management !== "managed" || !explicit || !canonical ||
       !group.some((x) => x.number === canonical.number) ||
-      canonical.id === undefined) {
+      canonical.id === undefined || !hasLeadingMarker(canonical, logicalId)) {
       blockers.push(diagnostic("AMBIGUOUS_IDENTITY",
         "A duplicate may be closed only against an explicitly identified managed canonical issue.",
         logicalId, true, { numbers: group.map((x) => x.number) }));
@@ -150,9 +157,9 @@ export function compilePruneSteps(
       continue;
     }
     for (const issue of duplicateIssues) {
-      if (protectedNumbers.has(issue.number)) {
+      if (protectedNumbers.has(issue.number) || !hasLeadingMarker(issue, logicalId)) {
         blockers.push(diagnostic("AMBIGUOUS_IDENTITY",
-          "Duplicate #" + issue.number + " is independently declared; it is protected.",
+          "Duplicate #" + issue.number + " is independently declared or has no leading ownership marker.",
           logicalId, true, { number: issue.number }));
         continue;
       }
