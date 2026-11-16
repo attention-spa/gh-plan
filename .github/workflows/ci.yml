@@ -10,9 +10,11 @@ permissions:
 
 jobs:
   contracts:
-    # Untrusted PR code stays on GitHub-hosted VMs; trusted main pushes use OCI.
-    # Self-hosted routing has no automatic GitHub-hosted fallback (separate unit).
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","trusted"]') }}
+    # PR code never reaches the persistent OCI runner or an Actions-write token.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,3 +26,22 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run test:dist
+
+  main-controller:
+    # Only trusted main pushes can dispatch/cancel a worker workflow.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prefer trusted OCI; fail over only before worker start
+        run: node scripts/ci-fallback-controller.mjs
+        env:
+          CI_FALLBACK_RUN: '1'
+          GITHUB_TOKEN: ${{ github.token }}
