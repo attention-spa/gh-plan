@@ -1,5 +1,6 @@
 import type {
   DesiredIssueState,
+  DesiredPullRequestResource,
   DesiredMilestoneState,
   DesiredRelationship,
   DesiredResource,
@@ -21,7 +22,7 @@ export interface NormalizationResult {
 
 type RecordLike = Record<string, unknown>;
 
-const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships", "relationshipMode", "labels", "$schema"]);
+const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships", "relationshipMode", "labels", "pullRequests", "$schema"]);
 const ISSUE_KEYS = new Set([
   "logicalId",
   "management",
@@ -40,6 +41,10 @@ const ISSUE_KEYS = new Set([
   "relatesTo",
 ]);
 const REPOSITORY_LABEL_KEYS = new Set(["logicalId", "name", "color", "description", "management"]);
+const PULL_REQUEST_KEYS = new Set([
+  "logicalId", "head", "base", "identity", "title", "body", "state", "draft",
+  "labels", "assignees", "reviewers", "closes",
+]);
 const MILESTONE_KEYS = new Set([
   "logicalId",
   "management",
@@ -530,6 +535,8 @@ export function normalizeSchema(schema: object): NormalizationResult {
   const resources: DesiredResource[] = [];
   const repositoryLabels: DesiredRepositoryLabel[] = [];
   const relationships: DesiredRelationship[] = [];
+  const pullRequests: DesiredPullRequestResource[] = [];
+  const seenPullPairs = new Set<string>();
   const seenLogicalIds = new Set<string>();
 
   if (!isPlainObject(schema)) {
@@ -754,6 +761,73 @@ export function normalizeSchema(schema: object): NormalizationResult {
     });
   }
 
+  function parsePullRequest(raw: unknown, path: string): void {
+    if (!isPlainObject(raw)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "Pull request must be an object.", path));
+      return;
+    }
+    reportUnknownKeys(raw, PULL_REQUEST_KEYS, path, diagnostics);
+    const logicalId = normalizeLogicalId(raw.logicalId, path + ".logicalId", diagnostics);
+    if (!logicalId) return;
+    if (seenLogicalIds.has(logicalId)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "Duplicate logicalId: " + logicalId, path + ".logicalId", logicalId));
+      return;
+    }
+    seenLogicalIds.add(logicalId);
+    const branch = (v: unknown, key: string): string | undefined => {
+      if (typeof v !== "string" || v.trim() !== v || !v ||
+          !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(v) || v.includes("..") ||
+          v.includes("//") || v.endsWith("/") || v.endsWith(".") ||
+          v.includes("@{") || v.includes("\\")) {
+        diagnostics.push(diagnostic("INVALID_SCHEMA",
+          "Pull request " + key + " must be a valid same-repository branch ref.", path + "." + key, logicalId));
+        return undefined;
+      }
+      return v;
+    };
+    const head = branch(raw.head, "head"), base = branch(raw.base, "base");
+    if (!head || !base) return;
+    if (head === base) diagnostics.push(diagnostic("PR_BRANCH_INVALID",
+      "Pull request head and base cannot be identical.", path, logicalId));
+    const pair = head + "\u0000" + base;
+    if (seenPullPairs.has(pair)) diagnostics.push(diagnostic("PR_PAIR_CONFLICT",
+      "Duplicate pull request head/base pair.", path, logicalId));
+    seenPullPairs.add(pair);
+    const identity = normalizeIdentity(raw.identity, path + ".identity", diagnostics, logicalId);
+    if (identity?.marker !== undefined) diagnostics.push(diagnostic("INVALID_SCHEMA",
+      "Pull requests use head/base identity, not an issue-body marker.", path + ".identity.marker", logicalId));
+    const desired: DesiredPullRequestResource["desired"] = {};
+    if ("title" in raw) {
+      const v = normalizeStringSet(raw.title, path + ".title", diagnostics, logicalId, false);
+      if (v?.op === "set") desired.title = v;
+    }
+    if ("body" in raw) desired.body = normalizeStringSet(raw.body, path + ".body", diagnostics, logicalId, true);
+    if ("state" in raw) desired.state = normalizeState(raw.state, path + ".state", diagnostics, logicalId);
+    if ("draft" in raw) {
+      const op = operationObject(raw.draft);
+      const value = op?.op === "set" ? op.value : raw.draft;
+      if (typeof value !== "boolean") diagnostics.push(diagnostic("INVALID_SCHEMA",
+        "Pull request draft must be a boolean or set operation.", path + ".draft", logicalId));
+      else desired.draft = { op: "set", value };
+    }
+    if ("labels" in raw) desired.labels = normalizeLabels(raw.labels, path + ".labels", diagnostics, logicalId);
+    if ("assignees" in raw) desired.assignees = normalizeAssignees(raw.assignees, path + ".assignees", diagnostics, logicalId);
+    if ("reviewers" in raw) desired.reviewers = normalizeAssignees(raw.reviewers, path + ".reviewers", diagnostics, logicalId);
+    if ("closes" in raw) desired.closes = normalizeStringRefArray(raw.closes, path + ".closes", diagnostics, logicalId)
+      .map((ref) => ({ logicalId: ref }))
+      .filter((ref, index, values) => values.findIndex((other) => other.logicalId === ref.logicalId) === index)
+      .sort((a, b) => a.logicalId.localeCompare(b.logicalId));
+    pullRequests.push({
+      logicalId, kind: "pull_request", management: "managed", head, base,
+      ...(identity ? { identity } : {}), desired,
+    });
+  }
+
+  if ("pullRequests" in schema) {
+    if (!Array.isArray(schema.pullRequests))
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "pullRequests must be an array.", "$.pullRequests"));
+    else schema.pullRequests.forEach((raw, index) => parsePullRequest(raw, "$.pullRequests[" + index + "]"));
+  }
   if ("labels" in schema) {
     if (!Array.isArray(schema.labels))
       diagnostics.push(diagnostic("INVALID_SCHEMA", "labels must be an array.", "$.labels"));
@@ -776,6 +850,14 @@ export function normalizeSchema(schema: object): NormalizationResult {
   }
 
   const resourceById = new Map(resources.map((resource) => [resource.logicalId, resource] as const));
+  for (const pr of pullRequests) {
+    for (const reference of pr.desired.closes ?? []) {
+      const target = resourceById.get(reference.logicalId);
+      if (!target || target.kind !== "issue") diagnostics.push(diagnostic("INVALID_SCHEMA",
+        "PR closes must reference a declared issue: " + reference.logicalId,
+        "$.pullRequests", pr.logicalId));
+    }
+  }
 
   for (const resource of resources) {
     if (resource.kind === "issue" && resource.management === "managed" && resource.desired.milestone?.op === "set") {
@@ -847,6 +929,7 @@ export function normalizeSchema(schema: object): NormalizationResult {
     return { ok: false, diagnostics };
   }
 
+  pullRequests.sort((a, b) => a.logicalId.localeCompare(b.logicalId));
   resources.sort((a, b) => `${a.kind}:${a.logicalId}`.localeCompare(`${b.kind}:${b.logicalId}`));
   repositoryLabels.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
   deduped.sort((a, b) => relationKey(a).localeCompare(relationKey(b)));
@@ -857,6 +940,7 @@ export function normalizeSchema(schema: object): NormalizationResult {
       repository: repository!,
       ...(relationshipMode === "additive" ? { relationshipMode: "additive" as const } : {}),
       resources,
+      ...(pullRequests.length ? { pullRequests } : {}),
       ...(repositoryLabels.length ? { labels: repositoryLabels } : {}),
       relationships: deduped,
     },
