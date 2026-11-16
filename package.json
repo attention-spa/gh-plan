@@ -8,7 +8,7 @@
     "test:normalization": "node --experimental-strip-types tests/normalize.test.ts",
     "test:rest": "node --experimental-strip-types tests/rest-discovery.test.ts && node --experimental-strip-types tests/rest-global-fetch.test.ts && node --experimental-strip-types tests/rest-token-safety.test.ts && node --experimental-strip-types tests/discovery.test.ts",
     "test:identity": "node --experimental-strip-types tests/identity.test.ts",
-    "test": "npm run typecheck && npm run test:normalization && npm run test:rest && npm run test:identity && npm run test:diff && npm run test:bindings && npm run test:milestones && npm run test:issues && npm run test:issue-fields && npm run test:relationships && npm run test:plan && npm run test:labels && npm run test:assignees",
+    "test": "npm run typecheck && npm run test:normalization && npm run test:rest && npm run test:identity && npm run test:diff && npm run test:bindings && npm run test:milestones && npm run test:issues && npm run test:issue-fields && npm run test:relationships && npm run test:plan && npm run test:labels && npm run test:assignees && npm run test:repository-labels",
     "test:diff": "node --experimental-strip-types tests/diff.test.ts",
     "test:bindings": "node --experimental-strip-types tests/plan-bindings.test.ts",
     "test:milestones": "node --experimental-strip-types tests/milestone-compiler.test.ts",
@@ -17,7 +17,8 @@
     "test:relationships": "node --experimental-strip-types tests/relationship-compiler.test.ts",
     "test:plan": "node --experimental-strip-types tests/plan.test.ts",
     "test:labels": "node --experimental-strip-types tests/labels.test.ts",
-    "test:assignees": "node --experimental-strip-types tests/assignees.test.ts"
+    "test:assignees": "node --experimental-strip-types tests/assignees.test.ts",
+    "test:repository-labels": "node --experimental-strip-types tests/repository-labels.test.ts"
   },
   "devDependencies": {
     "typescript": "5.9.3"

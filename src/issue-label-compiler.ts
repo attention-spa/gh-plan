@@ -71,12 +71,24 @@ export function compileIssueLabelSteps(
       catalog.set(key(label.name), [...(catalog.get(key(label.name)) ?? []), label.name]);
     }
     const requested = operation.op === "set" ? operation.value : [...operation.add, ...operation.remove];
-    const unknown = requested.filter((name) => catalog.get(key(name))?.length !== 1);
+    const managed = new Map((desired.labels ?? [])
+      .filter((label) => label.management === "managed")
+      .map((label) => [key(label.name), label]));
+    const unknown = requested.filter((name) => {
+      const observedCount = catalog.get(key(name))?.length ?? 0;
+      return observedCount !== 1 && !(observedCount === 0 && managed.has(key(name)));
+    });
     if (unknown.length) {
       blockers.push(diagnostic(id, "UNKNOWN_LABEL", "Unknown or ambiguous labels: " + unknown.join(", ") + "."));
       continue;
     }
-    const canonical = (name: string): string => catalog.get(key(name))![0]!;
+    const canonical = (name: string): string =>
+      catalog.get(key(name))?.[0] ?? managed.get(key(name))!.name;
+    const labelCreates = (names: string[]): string[] => [...new Set(names.flatMap((name) => {
+      if ((catalog.get(key(name))?.length ?? 0) !== 0) return [];
+      const producer = managed.get(key(name));
+      return producer ? ["label.create:" + producer.logicalId] : [];
+    }))].sort();
     const resolution = byResolution.get(id);
     if (!resolution || resolution.kind !== "issue" ||
       (resolution.status !== "new" && resolution.status !== "existing")) {
@@ -101,6 +113,8 @@ export function compileIssueLabelSteps(
       [base, { $ref: (id + ".number") as PlanValueRef["$ref"] }, "/labels"] :
       base + current!.number + "/labels";
     const dependency = isNew ? ["issue.create:" + id] : [];
+    const creationDependencies = labelCreates(operation.op === "set"
+      ? operation.value : operation.add);
     const changed = diff.diffs.find((item) => item.id === "issue.labels:" + id);
     if (!isNew && (!changed || !["noop", "update"].includes(changed.status))) {
       blockers.push(diagnostic(id, "UNRESOLVED_REFERENCE", "Missing safe issue label semantic diff."));
@@ -125,7 +139,7 @@ export function compileIssueLabelSteps(
     }
     if (operation.op === "set" && !isNew) {
       steps.push(step(id, "issue.label.set", "planned", oldValues, newValues,
-        "Replace complete issue label set.", [], { protocol: "rest", method: "PUT",
+        "Replace complete issue label set.", creationDependencies, { protocol: "rest", method: "PUT",
           path: labelsPath, body: { labels: newValues } }));
       continue;
     }
@@ -149,7 +163,7 @@ export function compileIssueLabelSteps(
     if (added.length) {
       steps.push(step(id, "issue.label.add", "planned", oldValues, newValues,
         "Add explicitly requested labels while retaining unrelated labels.",
-        [...dependency, ...removeIds], { protocol: "rest", method: "POST",
+        [...dependency, ...removeIds, ...labelCreates(added)], { protocol: "rest", method: "POST",
           path: labelsPath, body: { labels: added } }));
     }
     if (!removed.length && !added.length) {

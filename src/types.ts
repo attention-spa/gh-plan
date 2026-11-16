@@ -78,6 +78,17 @@ export type DesiredIssueLabels =
 /** GitHub logins; absent assignees are left unmanaged. */
 export type DesiredIssueAssignees = DesiredIssueLabels;
 
+/** Repository labels are name-keyed. Logical IDs are optional in input and always normalized. */
+export interface DesiredRepositoryLabel {
+  logicalId: LogicalResourceId;
+  name: string;
+  management: ResourceManagement;
+  /** Six hexadecimal digits, without #. Omission preserves existing color. */
+  color?: string;
+  /** Omission preserves existing description; empty string clears it. */
+  description?: string;
+}
+
 export type DesiredIssueState = {
   title?: DesiredSet<string>;
   body?: DesiredSetOrRemove<string>;
@@ -169,6 +180,8 @@ export interface NormalizedDesiredStateGraph {
   relationshipMode?: RelationshipReconciliationMode;
   repository: RepositoryRef;
   resources: DesiredResource[];
+  /** Optional root repository-label declarations; never imply deletions. */
+  labels?: DesiredRepositoryLabel[];
   relationships: DesiredRelationship[];
 }
 
@@ -244,6 +257,8 @@ export interface ObservedLabel {
   name: string;
   id?: number;
   color?: string;
+  /** Null is GitHub's representation of an empty description. */
+  description?: string | null;
 }
 
 export interface GithubStateSnapshot {
@@ -269,6 +284,8 @@ export interface GithubDiscoveryTransport {
 export type PlanStepStatus = "planned" | "noop" | "blocked" | "unsupported";
 
 export type PlanOperationKind =
+  | "label.create"
+  | "label.update"
   | "milestone.create"
   | "milestone.update"
   | "issue.create"

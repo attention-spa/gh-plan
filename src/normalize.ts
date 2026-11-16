@@ -4,6 +4,7 @@ import type {
   DesiredRelationship,
   DesiredResource,
   DesiredResourceIdentity,
+  DesiredRepositoryLabel,
   GithubDiagnostic,
   JsonValue,
   NormalizedDesiredStateGraph,
@@ -18,7 +19,7 @@ export interface NormalizationResult {
 
 type RecordLike = Record<string, unknown>;
 
-const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships", "relationshipMode"]);
+const ROOT_KEYS = new Set(["repository", "issues", "milestones", "relationships", "relationshipMode", "labels"]);
 const ISSUE_KEYS = new Set([
   "logicalId",
   "management",
@@ -36,6 +37,7 @@ const ISSUE_KEYS = new Set([
   "blocks",
   "relatesTo",
 ]);
+const REPOSITORY_LABEL_KEYS = new Set(["logicalId", "name", "color", "description", "management"]);
 const MILESTONE_KEYS = new Set([
   "logicalId",
   "management",
@@ -517,6 +519,7 @@ function detectDirectedCycle(edges: Array<[string, string]>): boolean {
 export function normalizeSchema(schema: object): NormalizationResult {
   const diagnostics: GithubDiagnostic[] = [];
   const resources: DesiredResource[] = [];
+  const repositoryLabels: DesiredRepositoryLabel[] = [];
   const relationships: DesiredRelationship[] = [];
   const seenLogicalIds = new Set<string>();
 
@@ -684,6 +687,66 @@ export function normalizeSchema(schema: object): NormalizationResult {
     }, path);
   }
 
+
+  const seenLabelNames = new Set<string>();
+  function parseRepositoryLabel(value: unknown, path: string): void {
+    if (!isPlainObject(value)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "Repository labels must be objects.", path));
+      return;
+    }
+    reportUnknownKeys(value, REPOSITORY_LABEL_KEYS, path, diagnostics);
+    if (typeof value.name !== "string" || !value.name.trim() || value.name !== value.name.trim()) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "Repository label name must be a nonempty trimmed string.", path + ".name"));
+      return;
+    }
+    const name = value.name;
+    const folded = name.toLowerCase();
+    if (seenLabelNames.has(folded)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "Duplicate repository label name: " + name + ".", path + ".name"));
+      return;
+    }
+    seenLabelNames.add(folded);
+    const logicalId = value.logicalId === undefined
+      ? "label:" + encodeURIComponent(folded)
+      : normalizeLogicalId(value.logicalId, path + ".logicalId", diagnostics);
+    if (!logicalId) return;
+    if (seenLogicalIds.has(logicalId)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA",
+        "Duplicate logicalId '" + logicalId + "'.", path + ".logicalId", logicalId));
+      return;
+    }
+    seenLogicalIds.add(logicalId);
+    const management = normalizeManagement(value.management, path + ".management", diagnostics, logicalId);
+    let color: string | undefined;
+    if ("color" in value) {
+      if (typeof value.color !== "string" || !/^[0-9a-fA-F]{6}$/.test(value.color)) {
+        diagnostics.push(diagnostic("INVALID_SCHEMA",
+          "Repository label color must be six hexadecimal digits without #.", path + ".color", logicalId));
+      } else color = value.color.toLowerCase();
+    }
+    let description: string | undefined;
+    if ("description" in value) {
+      if (typeof value.description !== "string" || value.description.length > 100) {
+        diagnostics.push(diagnostic("INVALID_SCHEMA",
+          "Repository label description must be a string of at most 100 characters.", path + ".description", logicalId));
+      } else description = value.description;
+    }
+    if (management === "reference" && ("color" in value || "description" in value)) {
+      diagnostics.push(diagnostic("INVALID_SCHEMA",
+        "Reference-only repository labels cannot manage color or description.", path, logicalId));
+    }
+    repositoryLabels.push({
+      logicalId, name, management,
+      ...(color === undefined ? {} : { color }),
+      ...(description === undefined ? {} : { description }),
+    });
+  }
+
+  if ("labels" in schema) {
+    if (!Array.isArray(schema.labels))
+      diagnostics.push(diagnostic("INVALID_SCHEMA", "labels must be an array.", "$.labels"));
+    else schema.labels.forEach((value, index) => parseRepositoryLabel(value, `$.labels[${index}]`));
+  }
   if ("milestones" in schema) {
     if (!Array.isArray(schema.milestones)) diagnostics.push(diagnostic("INVALID_SCHEMA", "milestones must be an array.", "$.milestones"));
     else schema.milestones.forEach((value, index) => parseMilestone(value, `$.milestones[${index}]`));
@@ -773,6 +836,7 @@ export function normalizeSchema(schema: object): NormalizationResult {
   }
 
   resources.sort((a, b) => `${a.kind}:${a.logicalId}`.localeCompare(`${b.kind}:${b.logicalId}`));
+  repositoryLabels.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
   deduped.sort((a, b) => relationKey(a).localeCompare(relationKey(b)));
 
   return {
@@ -781,6 +845,7 @@ export function normalizeSchema(schema: object): NormalizationResult {
       repository: repository!,
       ...(relationshipMode === "additive" ? { relationshipMode: "additive" as const } : {}),
       resources,
+      ...(repositoryLabels.length ? { labels: repositoryLabels } : {}),
       relationships: deduped,
     },
     diagnostics,

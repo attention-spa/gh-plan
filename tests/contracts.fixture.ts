@@ -5,6 +5,7 @@ import type {
   GithubPlannerConfig,
   JsonValue,
   NormalizedDesiredStateGraph,
+  DesiredRepositoryLabel,
   PlanRequest,
   PlanValueRef,
   PlanStep,
@@ -38,6 +39,10 @@ void config;
 
 const graph = {
   repository: { fullName: "attention-spa/example" },
+  labels: [
+    { logicalId: "release-tag", name: "release", management: "managed",
+      color: "1a2b3c", description: "Release tracking" } satisfies DesiredRepositoryLabel,
+  ],
   resources: [
     {
       kind: "milestone",

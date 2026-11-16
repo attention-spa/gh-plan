@@ -5,6 +5,7 @@ import { compileMilestoneSteps } from "./milestone-compiler.ts";
 import { compileIssueSteps } from "./issue-compiler.ts";
 import { compileIssueFieldSteps } from "./issue-field-compiler.ts";
 import { compileIssueLabelSteps } from "./issue-label-compiler.ts";
+import { compileRepositoryLabelSteps } from "./repository-label-compiler.ts";
 import { compileIssueAssigneeSteps } from "./issue-assignee-compiler.ts";
 import { compileRelationshipSteps } from "./relationship-compiler.ts";
 import { validatePlanStepReferences } from "./plan-bindings.ts";
@@ -157,7 +158,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
   const repository = graph?.repository ??
     { fullName: "" };
   const counts = {
-    resourceCount: graph?.resources.length ?? 0,
+    resourceCount: (graph?.resources.length ?? 0) + (graph?.labels?.length ?? 0),
     relationshipCount: graph?.relationships.length ?? 0,
   };
   if (!normalization.ok || !graph) {
@@ -195,6 +196,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
   const milestone = compileMilestoneSteps(graph, semantic, resolution.resolutions);
   const issues = compileIssueSteps(graph, semantic, snapshot, resolution.resolutions);
   const fields = compileIssueFieldSteps(graph, semantic, snapshot, resolution.resolutions);
+  const repositoryLabels = compileRepositoryLabelSteps(graph, semantic, snapshot);
   const labels = compileIssueLabelSteps(graph, semantic, snapshot, resolution.resolutions);
   const assignees = compileIssueAssigneeSteps(graph, semantic, snapshot, resolution.resolutions);
   const relationships = compileRelationshipSteps(graph, semantic, snapshot, resolution.resolutions, mode);
@@ -205,6 +207,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     milestone,
     issues,
     fields,
+    repositoryLabels,
     labels,
     assignees,
     relationships,
