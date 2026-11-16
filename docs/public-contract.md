@@ -22,6 +22,12 @@ The internal GET-only issue reader consumes #178's versioned issue.create/update
 
 This stage does not wire the reader into the public executor, acquire A1 ownership, or dispatch mutations. Both issue and milestone readers are staged internally, but #181 disposable private-repository evidence and the C2 reference adapter remain separate requirements.
 
+## Internal A1 GitHub-native CAS ownership — #175 staging
+
+The internal `src/github-cas-lock.ts` now implements a per-repository, cooperative Git-ref CAS primitive. An off-ref unique owner commit preserves the default-branch tree; GraphQL `updateRefs` conditionally acquires the exact `refs/heads/gh-plan/locks/repository` from a zero OID and releases only with the matching owner OID, with `force:false` and independent ref/commit readbacks. Guarded callbacks run serially under fresh ownership checks; unknown writes prohibit release and require manual recovery. GitHub's zero-OID protocol and competing owner refusals were exercised against a **disposable private test repository**. A protected ref and a least-privilege GitHub App token were not live-tested (private-plan ruleset/protection endpoints returned 403).
+
+This is not an exported public API or a GitHub Issues writer. A1 has **cooperative-only** semantics: an ownership check and subsequent Issues REST mutation cannot be atomically fenced, and unrelated writers need not respect the ref. There is no TTL, automatic stale-lock takeover or global exactly-once guarantee. Operator recovery remains the separate [#176](https://github.com/attention-spa/gh-plan/issues/176).
+
 ## Future apply boundary — C2 approved, NOT IMPLEMENTED
 
 The future `applyPlan()` is opt-in via explicit `acknowledgeCallbackTrust: true`, requires callback dispatch, readback and ownership inputs, and must reject the entire plan before any resource writes if a B1 kind/shape/intent is unsupported. Its result/errors will carry only typed phases, stable codes and safe audit records; cancellation is cooperative, unknown GitHub writes must not be blindly retried, and callback honesty cannot be mechanically established by the package. The public `auth` and `fetch` options previously proposed under C1 are **not** approved for C2. This is a design only; `src/index.ts` has no such export, and `planGithub()` remains read-only.
