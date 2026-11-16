@@ -4,7 +4,7 @@ title: "Progressive apply coverage and authoritative postconditions"
 description: "Start optional apply with four narrowly verified issue and milestone operations; reject unsupported plans before any write."
 tags: ["github", "apply", "verification", "safety"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T11:22:00+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T13:20:42.830Z }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/issues/165
   - resource: https://github.com/attention-spa/gh-plan/issues/163
