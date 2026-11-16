@@ -33,45 +33,51 @@
               ],
               "additionalProperties": false
             }
-          ]
+          ],
+          "description": "owner/name shorthand or repository identity object."
         },
         "issues": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/AuthoringIssue"
-          }
+          },
+          "description": "Optional managed/reference issue trees."
         },
         "milestones": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/AuthoringMilestone"
-          }
+          },
+          "description": "Optional milestones keyed by logical ID."
         },
         "labels": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/AuthoringRepositoryLabel"
-          }
+          },
+          "description": "Optional repository-label declarations; omitted labels never imply deletion."
         },
         "relationships": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/AuthoringRelationship"
-          }
+          },
+          "description": "Native directed and symmetric relationship declarations."
         },
         "relationshipMode": {
           "type": "string",
           "enum": [
             "reconcile",
             "additive"
-          ]
+          ],
+          "description": "Defaults reconcile; additive preserves relationships not named in the schema."
         }
       },
       "required": [
         "repository"
       ],
       "additionalProperties": false,
-      "description": "Public ergonomic input to planGithub(); omit fields you do not manage."
+      "description": "Public ergonomic planGithub() input. Fields omitted from managed resources are not touched. Nested children flatten into parent edges; cross-resource validity is checked at runtime. A string $schema value is an editor hint, not a transport instruction."
     },
     "AuthoringIssue": {
       "anyOf": [
@@ -81,7 +87,8 @@
         {
           "$ref": "#/$defs/AuthoringReferencedIssue"
         }
-      ]
+      ],
+      "description": "Discriminated managed-or-reference issue declaration, optionally nested via children."
     },
     "AuthoringManagedIssue": {
       "type": "object",
@@ -158,43 +165,51 @@
                 "$ref": "#/$defs/AuthoringRemove"
               }
             ]
-          }
+          },
+          "description": "Organization issue fields keyed by field name; value or explicit set/remove."
         },
         "labels": {
-          "$ref": "#/$defs/AuthoringIssueLabels"
+          "$ref": "#/$defs/AuthoringIssueLabels",
+          "description": "Omitted leaves existing issue labels intact; exact set or targeted add/remove."
         },
         "assignees": {
-          "$ref": "#/$defs/AuthoringIssueAssignees"
+          "$ref": "#/$defs/AuthoringIssueAssignees",
+          "description": "GitHub logins; assignment eligibility is checked by GET during discovery."
         },
         "children": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/AuthoringIssue"
-          }
+          },
+          "description": "Nested children create directed parent links; nested reference-only issues are allowed."
         },
         "blockedBy": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Logical IDs of issues that block this issue (incoming dependency edges)."
         },
         "blocks": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Logical IDs of issues blocked by this issue (outgoing dependency edges)."
         },
         "relatesTo": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Undirected associations to other issue logical IDs."
         }
       },
       "required": [
         "logicalId"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Managed issue: requested properties are reconciled; absent properties are not touched. Type and organization fields use display names, not REST IDs."
     },
     "AuthoringIdentity": {
       "type": "object",
@@ -212,7 +227,8 @@
           "type": "string"
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Optional exact identity clues: REST id, node id, issue number and body marker. Explicit IDs precede marker/title lookup and must agree."
     },
     "AuthoringSet<string>": {
       "type": "object",
@@ -229,7 +245,8 @@
         "op",
         "value"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Explicitly assign a value; omitted properties are not managed."
     },
     "AuthoringSetOrRemove<string>": {
       "anyOf": [
@@ -239,7 +256,8 @@
         {
           "$ref": "#/$defs/AuthoringRemove"
         }
-      ]
+      ],
+      "description": "Set or clear form for body, description and other removable properties."
     },
     "AuthoringRemove": {
       "type": "object",
@@ -252,7 +270,8 @@
       "required": [
         "op"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Explicitly clear a supported nullable property."
     },
     "AuthoringSet<(\"open\"|\"closed\")>": {
       "type": "object",
@@ -273,7 +292,8 @@
         "op",
         "value"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Explicitly assign a value; omitted properties are not managed."
     },
     "AuthoringMilestoneRef": {
       "anyOf": [
@@ -289,7 +309,8 @@
         {
           "$ref": "#/$defs/AuthoringRemove"
         }
-      ]
+      ],
+      "description": "Milestone assignment shorthand: logical ID, logical reference, explicit set or remove."
     },
     "AuthoringLogicalRef": {
       "type": "object",
@@ -301,7 +322,8 @@
       "required": [
         "logicalId"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Logical resource pointer used for future and existing milestone assignment."
     },
     "AuthoringSet<(string|AuthoringLogicalRef)>": {
       "type": "object",
@@ -325,7 +347,8 @@
         "op",
         "value"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Explicitly assign a value; omitted properties are not managed."
     },
     "AuthoringJson": {
       "anyOf": [
@@ -354,7 +377,7 @@
           }
         }
       ],
-      "description": "Public authoring input; the only source for schema/gh-plan.schema.json. normalizeSchema() performs cross-resource and GitHub-specific validation."
+      "description": "JSON-serializable field payload; a remove operation is separate from JSON null."
     },
     "AuthoringSet<AuthoringJson>": {
       "type": "object",
@@ -371,7 +394,8 @@
         "op",
         "value"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Explicitly assign a value; omitted properties are not managed."
     },
     "AuthoringIssueLabels": {
       "anyOf": [
@@ -426,7 +450,8 @@
           ],
           "additionalProperties": false
         }
-      ]
+      ],
+      "description": "Exact labels array or set operation; add/remove only change named labels, preserving others. Omission leaves labels untouched."
     },
     "AuthoringSet<string[]>": {
       "type": "object",
@@ -446,10 +471,12 @@
         "op",
         "value"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Explicitly assign a value; omitted properties are not managed."
     },
     "AuthoringIssueAssignees": {
-      "$ref": "#/$defs/AuthoringIssueLabels"
+      "$ref": "#/$defs/AuthoringIssueLabels",
+      "description": "GitHub login assignment using the same exact/incremental forms as labels. Omission never unassigns collaborators."
     },
     "AuthoringReferencedIssue": {
       "type": "object",
@@ -469,7 +496,8 @@
         "logicalId",
         "management"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Existing issue reference for relationships only; authoring a title or other desired state is prohibited."
     },
     "AuthoringMilestone": {
       "anyOf": [
@@ -479,7 +507,8 @@
         {
           "$ref": "#/$defs/AuthoringReferencedMilestone"
         }
-      ]
+      ],
+      "description": "Managed or reference-only milestone declaration."
     },
     "AuthoringManagedMilestone": {
       "type": "object",
@@ -533,7 +562,8 @@
       "required": [
         "logicalId"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Managed milestone: title is fallback discovery identity when no explicit id is supplied; omitted fields remain unchanged."
     },
     "AuthoringReferencedMilestone": {
       "type": "object",
@@ -553,7 +583,8 @@
         "logicalId",
         "management"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Existing milestone resource used as a pointer, not mutated or created."
     },
     "AuthoringRepositoryLabel": {
       "anyOf": [
@@ -563,7 +594,8 @@
         {
           "$ref": "#/$defs/AuthoringReferencedRepositoryLabel"
         }
-      ]
+      ],
+      "description": "Managed or reference-only repository-label declaration, keyed by unique name."
     },
     "AuthoringManagedRepositoryLabel": {
       "type": "object",
@@ -590,7 +622,8 @@
       "required": [
         "name"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Managed repository label: case-insensitive name is identity; metadata is optional and never implies deletion or rename."
     },
     "AuthoringReferencedRepositoryLabel": {
       "type": "object",
@@ -610,7 +643,8 @@
         "name",
         "management"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Existing label referenced by name only; missing labels block and cannot be created from a reference."
     },
     "AuthoringRelationship": {
       "anyOf": [
@@ -698,7 +732,8 @@
           ],
           "additionalProperties": false
         }
-      ]
+      ],
+      "description": "Directed parent/blocked_by/blocks and symmetric relates_to edges. blocks reverses blocked_by; relates_to is deduplicated without direction."
     }
   }
 }
