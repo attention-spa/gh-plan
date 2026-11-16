@@ -4,6 +4,7 @@ import type {
   PlanValueRef, ResourceResolution,
 } from "./types.ts";
 
+/** Pure output: explicit issue-label set/add/remove steps, noops and unknown-label blockers. */
 export interface IssueLabelCompilationResult {
   steps: PlanStep[];
   noops: PlanStep[];
@@ -33,9 +34,12 @@ function step(
 const key = (name: string): string => name.toLowerCase();
 
 /**
- * Compile only explicitly managed issue labels.
- * An exact set uses PUT, while {add,remove} uses targeted POST/DELETE.
- * On new issues both forms use POST after issue.create, never a broad PUT.
+ * Pure compiler for explicitly managed issue labels: exact set uses PUT on
+ * existing issues; add/remove uses targeted POST/DELETE, preserving others.
+ * New issues receive targeted POST after issue.create (never a broad PUT).
+ * Absent repository labels must be declared managed at the schema root; those
+ * requests depend on label.create before assignment. Unknown/ambiguous names
+ * produce blockers. No network I/O.
  */
 export function compileIssueLabelSteps(
   desired: NormalizedDesiredStateGraph,

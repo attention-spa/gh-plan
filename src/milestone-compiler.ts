@@ -4,9 +4,8 @@ import type {
 } from "./types.ts";
 
 /**
- * Compile only milestone semantic deltas into REST plan steps.
- * No discovery, HTTP execution, or mutation occurs here.
- * The later DAG composer combines these steps with other resource compilers.
+ * Milestone compiler result: proposed REST creation/updates, noops and blockers.
+ * Pure: no discovery or mutation; callers compose these steps into the DAG.
  */
 export interface MilestoneCompilationResult {
   steps: PlanStep[];
@@ -57,7 +56,11 @@ function step(
   };
 }
 
-/** Preserve omission semantics: only explicit changed properties enter a PATCH body. */
+/**
+ * Pure milestone compiler: creates missing managed milestones; existing ones
+ * get PATCH only for explicitly changed fields, preserving omitted metadata.
+ * Reference-only milestones never change. Unsafe identities block; no HTTP I/O.
+ */
 export function compileMilestoneSteps(
   desired: NormalizedDesiredStateGraph,
   result: GithubDiffResult,

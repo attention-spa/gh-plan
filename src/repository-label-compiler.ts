@@ -3,6 +3,7 @@ import type {
   NormalizedDesiredStateGraph, PlanStep,
 } from "./types.ts";
 
+/** Pure output: repository-label create/PATCH requests, noops and name-identity blockers. */
 export interface RepositoryLabelCompilationResult {
   steps: PlanStep[];
   noops: PlanStep[];
@@ -27,7 +28,13 @@ function step(id: string, kind: PlanStep["kind"], status: "planned" | "noop",
   };
 }
 
-/** Read-only, deterministic compilation of repository label creation and partial metadata updates. */
+/**
+ * Pure repository-label compiler keyed by case-insensitive names. Missing
+ * managed labels produce POST create, changed declared metadata uses PATCH;
+ * omitted metadata is preserved. Never generates rename or deletion.
+ * References must exist. Unknown/ambiguous catalog identities block safely.
+ * No network I/O or actual repository mutation.
+ */
 export function compileRepositoryLabelSteps(
   desired: NormalizedDesiredStateGraph,
   diff: GithubDiffResult,
