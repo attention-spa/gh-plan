@@ -108,7 +108,7 @@ function createMarker(plan: GithubPlan, step: PlanStep): { marker: string; custo
   if (request?.protocol !== "rest" || request.method !== "POST" ||
       !request.path || typeof request.path !== "string" ||
       !request.path.endsWith("/issues") || !isRecord(request.body) ||
-      !matchesMarker(request.body.body as string | undefined, marker, custom)) {
+      !matchesMarker((request.body as Record<string, unknown>)["body"] as string | undefined, marker, custom)) {
     throw new Error("Issue create lacks a valid identity marker.");
   }
   return { marker, custom };

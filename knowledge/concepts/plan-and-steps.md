@@ -4,7 +4,7 @@ title: "Plans and Steps"
 description: "Deterministic read-only reconciliation proposals with dependency-ordered REST requests."
 tags: ["planning", "dag"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:15:46+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:25:57+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -42,4 +42,6 @@ The package entrypoint remains read-only. The internal (not exported) `executePl
 
 M8.1.2 requires an explicitly injected **fresh, authoritative postcondition reader** before **every** planned mutation. It receives the step, bound request and current identities and must independently read GitHub's latest state (not reuse the planner snapshot), confirming **all** of that step's postconditions. A `satisfied` result skips the write; `unsatisfied` dispatches it. Missing, ambiguous or failed reads stop execution. Skipped create steps must return observed, validated identities or execution fails closed; satisfied steps are retained in `completedStepIds` and listed separately in `skippedStepIds`. The postcondition strings in `PlanStep` are *descriptive*, not machine-executable; this stage **does not implement a GitHub-backed reader**.
 
-This remains staging, **not** a safe public `applyPlan()`: no marker-based interrupted-create recovery, post-write verification, secret-free apply log or completed rerun guarantees exist yet. Do not use it against a live repository until the remaining M8.1 gates are implemented. Deterministic output and [secret-free plans](/decisions/no-secrets-in-plans.md) make review possible before writing.
+M8.1.3 adds a second, authoritative **complete issue-catalog** read before every `issue.create`, using the canonical/custom identity marker embedded in the outgoing issue body. The internal `createRestIssueCatalogReader()` uses the existing GitHub GET client, fetches all open and closed issue pages and excludes PRs. If exactly one marked issue exists **and** the postcondition reader reports satisfied with matching identity, the create is skipped and the observed IDs bind downstream requests. Duplicate markers, marker/postcondition disagreement, invalid identities and failed catalog reads stop execution, never trigger another create. The marker's absence permits the create only after both fresh reads. A lost create response can therefore be recovered on the next invocation without another POST, provided GitHub's listing has converged.
+
+This remains staging, **not** a safe public `applyPlan()`: recovery checks are not a cross-process transaction lock, and post-write verification, secret-free apply logs and the final complete rerun test suite are pending. Do not use it against a live repository until the remaining M8.1 gates are implemented. Deterministic output and [secret-free plans](/decisions/no-secrets-in-plans.md) make review possible before writing.
