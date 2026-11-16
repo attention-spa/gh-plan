@@ -5,7 +5,7 @@ description: "Planned HTTP methods and endpoint paths mapped to the current Plan
 resource: https://docs.github.com/en/rest/issues/issues
 tags: [github, rest, permissions]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:59:33.118+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:11:04.172+01:00 }
 sources:
   - resource: https://docs.github.com/en/rest/issues/issues
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/relationship-compiler.ts
@@ -54,7 +54,7 @@ Planned HTTP methods and endpoint paths mapped to the current PlanOperationKind 
 
 Projects v2 `project.item.add` accepts an `Issue` or `PullRequest` REST content ID (or repo owner/name/number) to add existing content. New issues/PRs are late-bound after their create steps. `project.item.fields.set` PATCH sends `{fields: [{id: numericFieldId, value: scalarOrOptionId}]}` using existing board field metadata and a discovered or newly created project-item REST ID. Only text, number, date, single-select and iteration values are supported; **no project/field create, item delete or membership remove operations are emitted**. Project-field creation REST exists, but it is deliberately outside gh-plan's authority.
 
-The [M7.4 prune policy](/schema/prune-duplicates.md) reports markers/title collisions by default. Explicit `prune:"close"` plans `PATCH /issues/{number}` with `state:"closed",state_reason:"not_planned"` for uniquely marked orphans. Duplicates with an explicitly identified canonical issue receive a prior reason comment, then `state_reason:"duplicate"` and `duplicate_issue_id` (canonical REST ID). Both closures are non-destructive and reversible. `issue.duplicate.delete` is an irreversible GraphQL-only pure proposal, **never a REST mutation**; top-level GraphQL planning remains blocked.
+The [M7.4 prune policy](/schema/prune-duplicates.md) reports markers/title collisions by default. Explicit `prune:"close"` plans `PATCH /issues/{number}` with `state:"closed",state_reason:"not_planned"` for uniquely marked orphans. Duplicates with an explicitly identified canonical issue receive a prior reason comment, then `state_reason:"duplicate"` and `duplicate_issue_id` (canonical REST ID). Both closures are non-destructive and reversible. `issue.duplicate.delete` is an irreversible GraphQL-only pure proposal, **never a REST mutation**; top-level GraphQL planning permits only dual-opt-in duplicate deletion proposals, while all other GraphQL use remains blocked.
 
 Milestone `due_on` is a date-only `YYYY-MM-DD` in authoring. The planner proposes `YYYY-MM-DDT00:00:00Z` for POST/PATCH sets, and `due_on: null` on PATCH when explicitly cleared; omission leaves the existing date untouched. A matching observed timestamp on the same UTC calendar date is a noop. This is based on the documented ISO 8601 REST field; no real clear operation was executed in M7.3.
 

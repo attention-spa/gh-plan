@@ -5,7 +5,7 @@ description: "Required permissions for read-only planning and potential external
 resource: https://docs.github.com/en/rest/overview/permissions-required-for-fine-grained-personal-access-tokens
 tags: [github, rest, permissions]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:59:33.118+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:11:04.172+01:00 }
 sources:
   - resource: https://docs.github.com/en/rest/overview/permissions-required-for-fine-grained-personal-access-tokens
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
@@ -36,7 +36,7 @@ These labels describe **GitHub's documented fine-grained access-token permission
 
 Projects v2 reads require **organization Projects: read** for organization boards; a separate executor needs **organization Projects: write** to add existing content as an item and set its supported fields. GitHub's 2026-03-10 REST documentation supports *creating project fields*, but this planner intentionally does not. User-owned board endpoints have different token-class restrictions; no current token grants or user-owned access were tested.
 
-Orphan and duplicate reporting reuses repository **Issues: read**. A later executor would need **Issues: write** to post a canonical reason comment or close an issue. Irreversible `deleteIssue` is a **GraphQL** mutation with separate authorization requirements and no currently supported top-level planner transport. The active token's deletion grants were not inspected.
+Orphan and duplicate reporting reuses repository **Issues: read**. A later executor would need **Issues: write** to post a canonical reason comment or close an issue. Irreversible `deleteIssue` is a **GraphQL** mutation with separate authorization requirements and a narrowly permitted dual-opt-in GraphQL **proposal** path using REST GET discovery, but no GraphQL executor or network transport. The active token's deletion grants were not inspected.
 
 PR compilation does not require merging permission: the planner never proposes a merge. A future external executor would need **Pull requests: write** to create or patch PRs or request reviews. PR labels/assignees use GitHub issue endpoints and may be authorized by Issues: write (or Pull requests: write where GitHub documents an alternative). No active-token grants were tested.
 
