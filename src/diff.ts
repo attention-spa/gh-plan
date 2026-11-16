@@ -224,14 +224,6 @@ export function diffGithubState(
     }
     if (seen.has(id)) continue;
     seen.add(id);
-    if (edge.kind === "relates_to") {
-      const reason = "Related is conceptual metadata; no native v0.1 mutation exists.";
-      add(id, logicalId, "relationship.related", "unsupported", reason, undefined, undefined,
-        { from: refs[0]!, to: refs[1]! }, refs);
-      unsupported.push({ code: "UNSUPPORTED_SCHEMA_FEATURE", severity: "warning", blocking: false,
-        logicalId, schemaPath: "relationships.related", message: reason });
-      continue;
-    }
     const first = endpoint(refs[0]!), second = endpoint(refs[1]!);
     if (!first || !second || refs.some((ref) => resources.get(ref)?.kind !== "issue")) {
       report("UNRESOLVED_REFERENCE", id, logicalId, "relationship." + edge.kind, "relationship",
@@ -243,16 +235,19 @@ export function diffGithubState(
         ? observed.issues.find((issue) => issue.number === second.identity?.number) : undefined;
       const parentNumber = first.status === "existing" ? first.identity?.number : undefined;
       const oldParent = child?.parentNumber ?? null;
-      if (child && oldParent !== null && oldParent !== parentNumber) {
-        report("PARENT_CONFLICT", id, logicalId, "relationship.parent", "parent",
-          "Unsafe reparenting of " + edge.child + " from #" + oldParent + ".",
-          { existingParentNumber: oldParent });
-      } else {
-        const matches = !!child && parentNumber !== undefined && oldParent === parentNumber;
-        add(id, logicalId, "relationship.parent", matches ? "noop" : "update",
-          matches ? "Parent already matches." : "Parent relationship is missing.",
-          "parent", oldParent, { logicalId: edge.parent }, refs);
-      }
+      const matches = !!child && parentNumber !== undefined && oldParent === parentNumber;
+      add(id, logicalId, "relationship.parent", matches ? "noop" : "update",
+        matches ? "Parent already matches." :
+          oldParent !== null ? "Parent changes from #" + oldParent + "." : "Parent relationship is missing.",
+        "parent", oldParent, { logicalId: edge.parent }, refs);
+    } else if (edge.kind === "relates_to") {
+      const a = first.status === "existing" ? observed.issues.find((issue) => issue.number === first.identity?.number) : undefined;
+      const b = second.status === "existing" ? observed.issues.find((issue) => issue.number === second.identity?.number) : undefined;
+      const matches = !!a && !!b &&
+        ((a.relatesToNumbers ?? []).includes(b.number) || (b.relatesToNumbers ?? []).includes(a.number));
+      add(id, logicalId, "relationship.relates_to", matches ? "noop" : "update",
+        matches ? "Related issue already linked." : "Related issue link is missing.",
+        "relates_to", a?.relatesToNumbers ?? [], { logicalId: refs[1]! }, refs);
     } else {
       const dependent = first.status === "existing"
         ? observed.issues.find((issue) => issue.number === first.identity?.number) : undefined;

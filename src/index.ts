@@ -1,3 +1,5 @@
+export { compileRelationshipSteps } from "./relationship-compiler.ts";
+export type { RelationshipCompilationResult } from "./relationship-compiler.ts";
 export { compileIssueFieldSteps } from "./issue-field-compiler.ts";
 export type { IssueFieldCompilationResult } from "./issue-field-compiler.ts";
 export { compileIssueSteps } from "./issue-compiler.ts";
@@ -88,6 +90,7 @@ export type {
   ReferencedIssueResource,
   ReferencedMilestoneResource,
   RelatesToRelationship,
+  RelationshipReconciliationMode,
   RepositoryRef,
   ResolvedGithubIdentity,
   ResourceKind,
