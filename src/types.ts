@@ -1,3 +1,5 @@
+import type { GithubPlanSchema } from "./authoring-schema.ts";
+
 export type GithubPlannerMode = "rest" | "graphql";
 
 export type JsonPrimitive = string | number | boolean | null;
@@ -29,7 +31,7 @@ export type FetchLike = (
 ) => Promise<FetchResponseLike>;
 
 export interface GithubPlannerConfig {
-  schema: object;
+  schema: GithubPlanSchema;
   auth: string;
   fetch?: FetchLike;
   mode?: GithubPlannerMode;
