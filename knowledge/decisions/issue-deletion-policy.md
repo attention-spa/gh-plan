@@ -4,7 +4,7 @@ title: "Issue deletion policy"
 description: "Default to no issue deletion; permanent duplicate deletion requires an explicit GraphQL-only opt-in and verified identities."
 tags: ["deletion", "safety"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:04:40.638+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:09:43.760+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
@@ -20,7 +20,7 @@ A desired-state document is not an implicit list of issues that should exist to 
 
 The default `prune:"report"` policy **never emits orphan or duplicate mutations**. It scans only exact, standalone canonical gh-plan issue-body markers (never titles alone); mutations additionally require a leading first-line marker, and reports orphaned marker issues as nonblocking informational warnings. `prune:"close"` explicitly permits non-destructive, reversible closure of uniquely marked orphan issues using `state_reason:not_planned`. It may also propose a duplicate's canonical-link comment before a reversible `state_reason:duplicate` close, but only when an explicitly identified managed canonical issue shares the duplicate's marker. Declared identities and ambiguous marker groups remain protected.
 
-Permanent deletion is **not a REST issue operation**. With `deleteDuplicates:true` and `prune:"close"`, the pure [prune compiler](/api/compilePruneSteps.md) can describe an irreversible GraphQL `deleteIssue` only for a demonstrably duplicated issue with a known node ID, after a reason comment on the surviving canonical issue. In REST mode this is a blocking unsupported diagnostic; the top-level planner's GraphQL mode still blocks because transport is not implemented. No executor exists, so these are inert proposals only.
+Permanent deletion is **not a REST issue operation**. With `deleteDuplicates:true` and `prune:"close"`, the pure [prune compiler](/api/compilePruneSteps.md) can describe an irreversible GraphQL `deleteIssue` only for a demonstrably duplicated issue with a known node ID, after a reason comment on the surviving canonical issue. In REST mode this is a blocking unsupported diagnostic; the top-level planner permits this narrowly scoped, dual-opt-in GraphQL **proposal** while continuing to discover solely via REST GET. All other GraphQL-mode plans block, and no executor exists, so no mutation is performed.
 
 ## Rationale and consequences
 

@@ -5,7 +5,7 @@ description: "Report orphaned gh-plan issue markers and duplicate clashes by def
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/authoring-schema.ts
 tags: [schema, prune, safety, issues]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:04:40.638+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:09:43.760+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/authoring-schema.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/normalize.ts
@@ -28,7 +28,7 @@ A gh-plan owned orphan is an ordinary issue whose **entire standalone marker com
 
 Duplicate marker collisions and issue-title collisions are reported. A **duplicate close** requires the same exact gh-plan marker on both observed issues, plus an explicitly identified and safely resolved **managed** canonical issue. Before a reversible duplicate close (`state_reason:"duplicate"`, `duplicate_issue_id` canonical REST ID), a comment on the duplicate must record the canonical URL and reason. Titles alone never authorize closing or deletion; unmarked issues, PRs, multiple-marker bodies and independently declared resources remain protected.
 
-`deleteDuplicates:true` requests the **irreversible** GraphQL `deleteIssue` mutation for a verified duplicate, with an observed GraphQL node ID. The pure compiler can describe this only in `graphql` mode after an audit comment is proposed on the surviving canonical issue. In ordinary REST mode this request is **blocked as unsupported**; current top-level `planGithub({mode:"graphql"})` remains blocked because there is no GraphQL transport. The opt-in therefore does not silently enable an executable deletion workflow.
+`deleteDuplicates:true` requests the **irreversible** GraphQL `deleteIssue` mutation for a verified duplicate, with an observed GraphQL node ID. The pure compiler can describe this only in `graphql` mode after an audit comment is proposed on the surviving canonical issue. In ordinary REST mode this request is **blocked as unsupported**. The top-level `planGithub({mode:"graphql"})` permits a **narrow, explicit exception** only when both `prune:"close"` and `deleteDuplicates:true` are set: it still performs REST GET discovery and emits an inert mixed REST-comment/GraphQL-deletion plan. All other GraphQL-mode requests block, and **no executor or GraphQL network transport is implemented**.
 
 # Examples
 

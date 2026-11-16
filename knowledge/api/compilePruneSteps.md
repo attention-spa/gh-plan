@@ -5,7 +5,7 @@ description: "Purely reports orphaned issue markers and duplicate clashes, and c
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/prune-compiler.ts
 tags: [api, safety, prune, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:04:40.638+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:09:43.760+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/prune-compiler.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -34,4 +34,4 @@ compilePruneSteps(
 
 `prune:"close"` permits only a safely recognized canonical marker orphan close (`state_reason:not_planned`) or exact shared-marker duplicate close against an explicitly selected canonical issue. The duplicate comment step precedes the close PATCH, which carries `state_reason:duplicate` and the canonical REST ID. No step uses an issue title as authorization. Both closes are marked non-destructive and reversible.
 
-`deleteDuplicates:true` with `mode:"rest"` blocks with `DUPLICATE_DELETION_UNSUPPORTED`; a pure GraphQL compilation request can describe `deleteIssue` only for observed duplicate node IDs after a canonical retained-audit comment. That deletion is `destructive:true` and `reversible:false`. **The public `planGithub()` entrypoint continues to block GraphQL mode** until an independently authorized transport exists; no executor is implemented.
+`deleteDuplicates:true` with `mode:"rest"` blocks with `DUPLICATE_DELETION_UNSUPPORTED`; a pure GraphQL compilation request can describe `deleteIssue` only for observed duplicate node IDs after a canonical retained-audit comment. That deletion is `destructive:true` and `reversible:false`. **The public `planGithub()` entrypoint permits only the explicit dual-opt-in GraphQL deletion proposal** using read-only REST discovery; all other GraphQL modes remain blocked. It emits a mixed-protocol request DAG but performs no GraphQL network I/O and provides no executor.

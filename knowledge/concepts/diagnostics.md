@@ -4,7 +4,7 @@ title: "Diagnostics"
 description: "Typed warnings and blockers that prevent unsafe reconciliation before execution."
 tags: ["safety", "diagnostics"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:00:14.448+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:09:43.760+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
@@ -19,7 +19,7 @@ A `GithubDiagnostic` contains a machine-readable `code`, a severity, a `blocking
 - Invalid schemas, unresolved or ambiguous identities, dangling relationship references, unknown labels/assignees, and unknown issue field/type choices yield blocking diagnostics.
 - Unknown **additional** authoring properties warn without blocking, preserving forward compatibility while ignoring unsupported constructs.
 - REST authorization, permission, rate-limit, missing repository and malformed transport results are mapped into sanitized error diagnostics.
-- Unsupported modes and operations are explicit; requesting the GraphQL planner mode currently blocks with `NO_GRAPHQL_TRANSPORT`.
+- Unsupported modes and operations are explicit: GraphQL mode blocks with `NO_GRAPHQL_TRANSPORT` except for the narrow explicit `prune:"close", deleteDuplicates:true` deletion-proposal path. That path uses only REST GET discovery and never executes a GraphQL request.
 
 Orphans and duplicate marker/title collisions are **informational** in report mode. An unsafe duplicate canonical selection, ambiguous orphan ownership, or an attempted REST permanent deletion blocks only when a mutation is opted in. See [prune schema](/schema/prune-duplicates.md) and [deletion policy](/decisions/issue-deletion-policy.md).
 
