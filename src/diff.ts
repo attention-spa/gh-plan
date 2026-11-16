@@ -197,6 +197,35 @@ export function diffGithubState(
         }
       }
     }
+
+    if (d.assignees) {
+      const diffId = "issue.assignees:" + id;
+      const requested = d.assignees.op === "set" ? d.assignees.value : d.assignees.add;
+      const unknown = requested.filter((login) =>
+        observed.assigneeEligibility?.[login.toLowerCase()] !== true);
+      if (unknown.length) {
+        report("UNKNOWN_ASSIGNEE", diffId, id, kind, "assignees",
+          "Unknown or ineligible assignees: " + unknown.join(", ") + ".", { logins: unknown });
+      } else if (issue) {
+        if (!issue.assignees) {
+          report("UNRESOLVED_REFERENCE", diffId, id, kind, "assignees",
+            "Issue assignees were not discovered for " + id + ".");
+        } else {
+          const oldKeys = new Set(issue.assignees.map((login) => login.toLowerCase()));
+          const nextKeys = d.assignees.op === "set"
+            ? new Set(d.assignees.value.map((login) => login.toLowerCase()))
+            : new Set([...oldKeys, ...d.assignees.add.map((login) => login.toLowerCase())]);
+          if (d.assignees.op === "modify") {
+            for (const login of d.assignees.remove) nextKeys.delete(login.toLowerCase());
+          }
+          const matches = oldKeys.size === nextKeys.size &&
+            [...oldKeys].every((login) => nextKeys.has(login));
+          add(diffId, id, kind, matches ? "noop" : "update",
+            matches ? "Issue assignees already match." : "Issue assignee set differs.",
+            "assignees", [...issue.assignees].sort(), [...nextKeys].sort());
+        }
+      }
+    }
     if (d.issueType) {
       const value = d.issueType.value;
       if (observed.issueTypes.filter((type) => type.name === value).length !== 1) {

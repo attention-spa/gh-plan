@@ -81,6 +81,7 @@ interface GithubRestClient {
   getJson<T>(pathOrUrl: string): Promise<T>;
   getJsonOptional404<T>(pathOrUrl: string): Promise<T | undefined>;
   getPaginated<T>(pathOrUrl: string): Promise<T[]>;
+  isAssigneeEligible(path: string): Promise<boolean>;
 }
 
 interface JsonResponse<T> {
@@ -188,6 +189,32 @@ function createRestClient(auth: string, fetch: FetchLike): GithubRestClient {
   }
 
   return {
+    async isAssigneeEligible(path: string): Promise<boolean> {
+      const url = apiUrl(path);
+      let response: FetchResponseLike;
+      try {
+        response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${auth}`,
+            "X-GitHub-Api-Version": API_VERSION,
+          },
+        });
+      } catch {
+        throw new GithubRestTransportError("REST_FAILURE", safePath(url));
+      }
+      // GitHub returns 204 without a JSON body on success, 404 if ineligible.
+      if (response.status === 204) return true;
+      if (response.status === 404) return false;
+      if (!response.ok) throw new GithubRestTransportError(
+        classifyHttpFailure(response), safePath(url),
+        { status: response.status, statusText: response.statusText },
+      );
+      throw new GithubRestTransportError("INVALID_RESPONSE", safePath(url),
+        { status: response.status, statusText: response.statusText });
+    },
+
     async getJson<T>(pathOrUrl: string): Promise<T> {
       const result = await requestJson<T>(pathOrUrl);
       if (!result) throw new GithubRestTransportError("NOT_FOUND", safePath(pathOrUrl), { status: 404 });
@@ -312,6 +339,17 @@ function mapIssue(raw: unknown): ObservedIssue | undefined {
       return requiredString(label.name, "/issues/" + number + ".labels[" + index + "].name");
     }).sort((a, b) => a.localeCompare(b));
   }
+  let assignees: string[] | undefined;
+  if (raw.assignees !== undefined) {
+    if (!Array.isArray(raw.assignees)) invalidResponse("/issues/" + number + ".assignees");
+    const logins = raw.assignees.map((assignee, index) => {
+      if (!isRecord(assignee)) invalidResponse("/issues/" + number + ".assignees[" + index + "]");
+      return requiredString(assignee.login, "/issues/" + number + ".assignees[" + index + "].login");
+    });
+    if (new Set(logins.map((login) => login.toLowerCase())).size !== logins.length)
+      invalidResponse("/issues/" + number + ".assignees");
+    assignees = logins.sort((a, b) => a.localeCompare(b));
+  }
   const nodeId = optionalString(raw.node_id, `/issues/${number}.node_id`);
   return {
     kind: "issue",
@@ -324,6 +362,7 @@ function mapIssue(raw: unknown): ObservedIssue | undefined {
     milestoneNumber,
     issueType,
     ...(labels === undefined ? {} : { labels }),
+    ...(assignees === undefined ? {} : { assignees }),
   };
 }
 
@@ -553,7 +592,8 @@ export function createRestDiscoveryTransport(
       };
     },
 
-    async enrich(snapshot: GithubStateSnapshot, issueNumbers: number[]): Promise<GithubStateSnapshot> {
+    async enrich(snapshot: GithubStateSnapshot, issueNumbers: number[],
+      assigneeLogins: string[] = []): Promise<GithubStateSnapshot> {
       const [owner, repo] = splitRepository(snapshot.repository.fullName);
       const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
       const selected = [...new Set(issueNumbers)].sort((a, b) => a - b);
@@ -569,9 +609,18 @@ export function createRestDiscoveryTransport(
       const enriched = await mapBounded(selected, limit, (number) =>
         enrichIssue(byNumber.get(number)!, client, repoPath, includeFields)
       );
+      const assigneeEligibility = assigneeLogins.length ? { ...snapshot.assigneeEligibility } : undefined;
+      if (assigneeEligibility) {
+        const unique = new Map(assigneeLogins.map((login) => [login.toLowerCase(), login]));
+        const checked = await mapBounded([...unique].sort(([a], [b]) => a.localeCompare(b)),
+          limit, async ([key, login]) => [key, await client.isAssigneeEligible(
+            `${repoPath}/assignees/${encodeURIComponent(login)}`)] as const);
+        for (const [key, eligible] of checked) assigneeEligibility[key] = eligible;
+      }
       const updated = new Map(enriched.map((issue) => [issue.number, issue] as const));
       return {
         ...snapshot,
+        ...(assigneeEligibility === undefined ? {} : { assigneeEligibility }),
         issues: snapshot.issues
           .map((issue) => updated.get(issue.number) ?? issue)
           .sort((a, b) => a.number - b.number),

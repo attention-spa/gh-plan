@@ -75,6 +75,9 @@ export type DesiredIssueLabels =
   | { op: "set"; value: string[] }
   | { op: "modify"; add: string[]; remove: string[] };
 
+/** GitHub logins; absent assignees are left unmanaged. */
+export type DesiredIssueAssignees = DesiredIssueLabels;
+
 export type DesiredIssueState = {
   title?: DesiredSet<string>;
   body?: DesiredSetOrRemove<string>;
@@ -82,6 +85,7 @@ export type DesiredIssueState = {
   milestone?: DesiredSetOrRemove<LogicalResourceRef>;
   issueType?: DesiredSet<string>;
   labels?: DesiredIssueLabels;
+  assignees?: DesiredIssueAssignees;
   fields?: Record<string, DesiredSetOrRemove<JsonValue>>;
 };
 
@@ -199,6 +203,8 @@ export interface ObservedIssue {
   issueType?: string | null;
   /** Undefined means not discovered; empty array is authoritative. */
   labels?: string[];
+  /** Undefined means not discovered; empty array is authoritative. */
+  assignees?: string[];
   fields?: Record<string, JsonValue>;
   parentNumber?: number | null;
   blockedByNumbers?: number[];
@@ -247,6 +253,8 @@ export interface GithubStateSnapshot {
   issueTypes: ObservedIssueType[];
   /** Undefined until catalog discovery is requested. */
   labels?: ObservedLabel[];
+  /** Case-folded login to repository assignment eligibility (204=true, 404=false). */
+  assigneeEligibility?: Record<string, boolean>;
   issueFields: ObservedIssueField[];
 }
 
@@ -255,7 +263,7 @@ export interface GithubDiscoveryTransport {
   /** Broad repository data and issue summaries; no per-issue requests. */
   discover(desired: NormalizedDesiredStateGraph): Promise<GithubStateSnapshot>;
   /** Targeted per-issue detail requests; preserves untargeted summaries. */
-  enrich(snapshot: GithubStateSnapshot, issueNumbers: number[]): Promise<GithubStateSnapshot>;
+  enrich(snapshot: GithubStateSnapshot, issueNumbers: number[], assigneeLogins?: string[]): Promise<GithubStateSnapshot>;
 }
 
 export type PlanStepStatus = "planned" | "noop" | "blocked" | "unsupported";
@@ -270,6 +278,9 @@ export type PlanOperationKind =
   | "issue.label.set"
   | "issue.label.add"
   | "issue.label.remove"
+  | "issue.assignee.set"
+  | "issue.assignee.add"
+  | "issue.assignee.remove"
   | "issue.field.set"
   | "issue.field.remove"
   | "issue.parent.set"
@@ -345,6 +356,7 @@ export type DiagnosticCode =
   | "UNKNOWN_ISSUE_TYPE"
   | "UNKNOWN_ISSUE_FIELD"
   | "UNKNOWN_LABEL"
+  | "UNKNOWN_ASSIGNEE"
   | "UNKNOWN_FIELD_OPTION"
   | "RELATIONSHIP_CYCLE"
   | "INSUFFICIENT_PERMISSION"
