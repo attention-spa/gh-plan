@@ -49,6 +49,10 @@ if (mode === "--write") {
   try { actual = readFileSync(output, "utf8"); } catch { actual = ""; }
   if (actual !== expected) {
     console.error("Generated schema differs from committed schema; run npm run schema:generate.");
+    if (process.env.GH_PLAN_SCHEMA_BOOTSTRAP === "1") {
+      for (const chunk of expected.match(/[\s\S]{1,400}/g) ?? [])
+        console.log("GH_PLAN_SCHEMA_CHUNK=" + encodeURIComponent(chunk));
+    }
     process.exitCode = 1;
   } else {
     console.log("Generated JSON Schema matches the checked-in artifact.");

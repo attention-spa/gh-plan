@@ -23,6 +23,8 @@ export function fromGithubMilestoneDueOn(value: unknown): string | undefined {
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
     return undefined;
   }
+  // Date.parse may silently roll an impossible day into the following month.
+  if (!isIsoCalendarDate(value.slice(0, 10))) return undefined;
   const parsed = new Date(value);
   if (!Number.isFinite(parsed.getTime())) return undefined;
   const day = parsed.toISOString().slice(0, 10);
