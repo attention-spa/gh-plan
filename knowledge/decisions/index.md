@@ -1,6 +1,6 @@
 # Architecture and Safety Decisions
 
-- [Progressive apply coverage and authoritative postconditions](/decisions/progressive-apply-postconditions.md) — Permit only four verified issue/milestone mutation kinds with exhaustive whole-plan preflight and fail-closed state checks.
+- [Progressive apply coverage and authoritative postconditions](/decisions/progressive-apply-postconditions.md) — Start optional apply with four narrowly verified issue and milestone operations; reject unsupported plans before any write.
 
 - [GitHub-native cooperative apply ownership](/decisions/github-native-apply-ownership.md) — Serialize participating apply workers per target repository using a compare-and-swap Git ref; require manual abandoned-lock recovery.
 - [Canonical issue body markers](/decisions/markers-in-body.md) — Use unique issue-body markers as durable discovery identity, with exact matching and injection-resistant logical IDs.
