@@ -272,6 +272,10 @@ export interface NormalizedDesiredStateGraph {
   /** Existing board references and declared issue/PR project item memberships. */
   projects?: DesiredProjectReference[];
   projectItems?: DesiredProjectItemAssignment[];
+  /** Default report-only; close is opt-in and never deletes an issue. */
+  prune?: "report" | "close";
+  /** Opt-in for irreversible GraphQL-only deletion of confirmed duplicates. */
+  deleteDuplicates?: boolean;
 }
 
 /** Only existing/new are actionable; ambiguous/unresolved identities must block. */
@@ -464,6 +468,10 @@ export type PlanOperationKind =
   | "pull_request.update"
   | "pull_request.reviewer.add"
   | "pull_request.reviewer.remove"
+  | "issue.orphan.close"
+  | "issue.duplicate.comment"
+  | "issue.duplicate.close"
+  | "issue.duplicate.delete"
   | "issue.create"
   | "issue.update"
   | "issue.type.set"
@@ -585,7 +593,11 @@ export type DiagnosticCode =
   | "UNKNOWN_PROJECT"
   | "UNKNOWN_PROJECT_FIELD"
   | "UNKNOWN_PROJECT_FIELD_OPTION"
-  | "UNSUPPORTED_PROJECT_FIELD";
+  | "UNSUPPORTED_PROJECT_FIELD"
+  | "ORPHAN_ISSUE"
+  | "DUPLICATE_ISSUE_MARKER"
+  | "DUPLICATE_ISSUE_TITLE"
+  | "DUPLICATE_DELETION_UNSUPPORTED";
 
 /** Severity label; blocking separately controls whether the plan is safe to execute. */
 export type DiagnosticSeverity = "info" | "warning" | "error";

@@ -195,6 +195,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     });
     ({ snapshot, resolution } = await discoverAndResolve(graph, rest, {
       adoptByTitle: config.adoptByTitle,
+      allowDuplicateMarkerWithExplicitIdentity: graph.prune === "close",
     }));
   } catch (error) {
     return assemble(repository, mode, counts, [], [

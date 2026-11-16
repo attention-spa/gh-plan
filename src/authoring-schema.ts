@@ -159,6 +159,10 @@ export interface GithubPlanSchema {
   $schema?: string;
   /** owner/name shorthand or repository identity object. */
   repository: string | { fullName: string; id?: number; nodeId?: string };
+  /** Default report-only orphan/duplicate diagnostics; close is an explicit opt-in. */
+  prune?: "report" | "close";
+  /** Permanent deletion is a separate explicit, GraphQL-only duplicate opt-in. */
+  deleteDuplicates?: boolean;
   /** Optional managed/reference issue trees. */
   issues?: AuthoringIssue[];
   /** Managed pull requests, identified by open head/base pairs. Merging is not supported. */
