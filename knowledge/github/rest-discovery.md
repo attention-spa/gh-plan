@@ -26,6 +26,12 @@ The [#179](https://github.com/attention-spa/gh-plan/issues/179) readback compone
 
 The reader is internal and does not expand public package exports, the read-only planner, or the authorized four-kind capability set. See the [B1 decision](/decisions/progressive-apply-postconditions.md).
 
+## M8.1.6b.3 issue create/update verification reader (internal)
+
+The [#180](https://github.com/attention-spa/gh-plan/issues/180) GET-only reader evaluates B1 issue.create/update via a fresh complete GET /repos/{owner}/{repo}/issues?state=all&per_page=100 catalog, excluding pull requests and following all Link pages, plus independent GET /repos/{owner}/{repo}/issues/{number}. It compares unique exact body marker, stable REST number/id/node ID, title/body/state and numeric milestone number/null. Both issue.number and milestone.number references require independently verified producer bindings. Updates check preservation of omitted fields; an interrupted create requires a fresh unique full-state match rather than a speculative POST retry.
+
+The reader rejects partial catalogs, duplicate marker owners, missing identity fields, inconsistent response IDs, permissions failures including hidden 404, and unsafe redirects/pagination. It is internal staging; no writer or A1 lock is exposed, and third-party callbacks remain caller-trusted under C2.
+
 ## Verified endpoints and access
 
 | Method | Endpoint | Purpose | Permission |
