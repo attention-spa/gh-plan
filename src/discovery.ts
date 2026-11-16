@@ -50,8 +50,20 @@ export async function discoverAndResolve(
       resource.kind === "issue" && resource.status === "existing"
       && resource.identity?.number !== undefined && required.has(resource.logicalId))
     .map((resource) => resource.identity!.number!);
+  // Check only logins that may be assigned. Removals must remain possible
+  // even after a collaborator loses repository assignment eligibility.
+  const logins = new Map<string, string>();
+  for (const resource of desired.resources) {
+    if (resource.kind !== "issue" || resource.management !== "managed") continue;
+    const operation = resource.desired.assignees;
+    if (!operation) continue;
+    for (const login of operation.op === "set" ? operation.value : operation.add) {
+      logins.set(login.toLowerCase(), logins.get(login.toLowerCase()) ?? login);
+    }
+  }
   return {
     resolution,
-    snapshot: await transport.enrich(broad, issueNumbers),
+    snapshot: await transport.enrich(broad, issueNumbers,
+      [...logins.values()].sort((a, b) => a.localeCompare(b))),
   };
 }

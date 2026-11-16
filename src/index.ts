@@ -1,4 +1,6 @@
 export { compileIssueLabelSteps } from "./issue-label-compiler.ts";
+export { compileIssueAssigneeSteps } from "./issue-assignee-compiler.ts";
+export type { IssueAssigneeCompilationResult } from "./issue-assignee-compiler.ts";
 export type { IssueLabelCompilationResult } from "./issue-label-compiler.ts";
 export { planGithub, GITHUB_PLAN_VERSION } from "./plan.ts";
 export { compileRelationshipSteps } from "./relationship-compiler.ts";
@@ -40,6 +42,7 @@ export type {
   BlocksRelationship,
   DesiredIssueState,
   DesiredIssueLabels,
+  DesiredIssueAssignees,
   DesiredMilestoneState,
   DesiredRelationship,
   DesiredRemove,
