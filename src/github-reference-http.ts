@@ -64,6 +64,30 @@ function params(page: URL, path: string): void {
   if (number !== null && (!NUM.test(number) || Number(number) < 2))
     fail("UNSAFE_REQUEST");
 }
+function resourceBody(kind: "issues" | "milestones", create: boolean,
+  payload: unknown): boolean {
+  if (!record(payload) || !Object.keys(payload).length) return false;
+  const fields = kind === "issues"
+    ? create ? ["title", "body", "milestone"] : ["title", "body", "state", "milestone"]
+    : ["title", "description", "state", "due_on"];
+  if (Object.keys(payload).some((key) => !fields.includes(key))) return false;
+  if (create && (typeof payload.title !== "string" || !payload.title.trim()))
+    return false;
+  if (create && kind === "issues" && typeof payload.body !== "string")
+    return false;
+  return Object.entries(payload).every(([field, value]) => {
+    if (field === "title") return typeof value === "string" && !!value.trim();
+    if (field === "body" || field === "description")
+      return typeof value === "string";
+    if (field === "state") return value === "open" || value === "closed";
+    if (field === "milestone") return kind === "issues" &&
+      (positive(value) || !create && value === null);
+    if (field === "due_on") return typeof value === "string" &&
+      /^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/.test(value) ||
+      !create && value === null;
+    return false;
+  });
+}
 function requestAllowed(repository: string, url: URL, method: string,
   payload: unknown): void {
   const base = "/repos/" + repository, path = url.pathname;
@@ -118,15 +142,18 @@ function requestAllowed(repository: string, url: URL, method: string,
         typeof payload.tree === "string" && OID.test(payload.tree) &&
         Array.isArray(payload.parents) && payload.parents.length === 1 &&
         typeof payload.parents[0] === "string" && OID.test(payload.parents[0])) return;
-    if ([base + "/issues", base + "/milestones"].includes(path) &&
-        record(payload)) return;
+    if (path === base + "/issues" && resourceBody("issues", true, payload) ||
+        path === base + "/milestones" && resourceBody("milestones", true, payload))
+      return;
     fail("UNSAFE_REQUEST");
   }
   if (method === "PATCH" &&
-      ["/issues/", "/milestones/"].some((prefix) => {
-        const head = base + prefix;
-        return path.startsWith(head) && NUM.test(path.slice(head.length));
-      }) && record(payload)) return;
+      (path.startsWith(base + "/issues/") &&
+        NUM.test(path.slice((base + "/issues/").length)) &&
+        resourceBody("issues", false, payload) ||
+       path.startsWith(base + "/milestones/") &&
+        NUM.test(path.slice((base + "/milestones/").length)) &&
+        resourceBody("milestones", false, payload))) return;
   fail("UNSAFE_REQUEST");
 }
 function parseNext(link: string | null, path: string, page: number): string | undefined {
