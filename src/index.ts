@@ -16,6 +16,8 @@ export type { IssueLabelCompilationResult } from "./issue-label-compiler.ts";
 export { planGithub, GITHUB_PLAN_VERSION } from "./plan.ts";
 export { compileRelationshipSteps } from "./relationship-compiler.ts";
 export { compilePullRequestSteps } from "./pull-request-compiler.ts";
+export { compileProjectItemSteps } from "./project-item-compiler.ts";
+export type { ProjectItemCompilationResult } from "./project-item-compiler.ts";
 export type { PullRequestCompilationResult } from "./pull-request-compiler.ts";
 export type { RelationshipCompilationResult } from "./relationship-compiler.ts";
 export { compileIssueFieldSteps } from "./issue-field-compiler.ts";

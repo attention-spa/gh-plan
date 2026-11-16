@@ -162,7 +162,7 @@ export function compileProjectItemSteps(
           : id !== undefined ? { id } : { owner: repoOwner, repo: repoName, number: number! }),
       };
       steps.push(step(createId, key, "project.item.add", null,
-        data as JsonValue, "Add existing/planned content to an existing Projects v2 board.",
+        data as unknown as JsonValue, "Add existing/planned content to an existing Projects v2 board.",
         { protocol: "rest", method: "POST", path: root, body: data }, deps));
     } else {
       noops.push(step(createId, key, "project.item.add", current.id, current.id,

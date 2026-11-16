@@ -83,5 +83,9 @@ export async function discoverAndResolve(
     ? await transport.enrichPullRequests?.(enriched, desired.pullRequests)
     : enriched;
   if (!snapshot) throw new Error("PR-aware discovery transport is required for pullRequests.");
-  return { resolution, snapshot };
+  const withProjects = desired.projects?.length
+    ? await transport.enrichProjects?.(snapshot, desired)
+    : snapshot;
+  if (!withProjects) throw new Error("Projects v2 discovery transport required for projects.");
+  return { resolution, snapshot: withProjects };
 }
