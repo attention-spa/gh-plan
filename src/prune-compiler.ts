@@ -200,9 +200,9 @@ export function compilePruneSteps(
     }
   }
 
-  const wantedTitles = new Set(desiredIssues
-    .filter((r) => r.management === "managed" && r.desired.title?.op === "set")
-    .map((r) => normalizeTitle(r.desired.title!.value)));
+  const wantedTitles = new Set(desiredIssues.flatMap((r) =>
+    r.kind === "issue" && r.management === "managed" && r.desired.title?.op === "set"
+      ? [normalizeTitle(r.desired.title.value)] : []));
   for (const title of [...wantedTitles].sort()) {
     const matches = issues.filter((issue) => normalizeTitle(issue.title) === title);
     if (matches.length > 1) warnings.push(diagnostic("DUPLICATE_ISSUE_TITLE",
