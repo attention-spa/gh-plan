@@ -25,7 +25,7 @@
     "test:normalization": "node --experimental-strip-types tests/normalize.test.ts",
     "test:rest": "node --experimental-strip-types tests/rest-discovery.test.ts && node --experimental-strip-types tests/rest-global-fetch.test.ts && node --experimental-strip-types tests/rest-token-safety.test.ts && node --experimental-strip-types tests/discovery.test.ts",
     "test:identity": "node --experimental-strip-types tests/identity.test.ts",
-    "test": "npm run typecheck && npm run test:normalization && npm run test:rest && npm run test:identity && npm run test:diff && npm run test:bindings && npm run test:milestones && npm run test:issues && npm run test:issue-fields && npm run test:relationships && npm run test:plan && npm run test:labels && npm run test:assignees && npm run test:repository-labels && npm run test:schema",
+    "test": "npm run typecheck && npm run test:normalization && npm run test:rest && npm run test:identity && npm run test:diff && npm run test:bindings && npm run test:milestones && npm run test:issues && npm run test:issue-fields && npm run test:relationships && npm run test:plan && npm run test:labels && npm run test:assignees && npm run test:repository-labels && npm run test:schema && npm run test:knowledge",
     "test:diff": "node --experimental-strip-types tests/diff.test.ts",
     "test:bindings": "node --experimental-strip-types tests/plan-bindings.test.ts",
     "test:milestones": "node --experimental-strip-types tests/milestone-compiler.test.ts",
@@ -39,11 +39,13 @@
     "test:dist": "node tests/dist-import.test.mjs",
     "schema:generate": "node scripts/generate-schema.mjs --write",
     "schema:check": "node scripts/generate-schema.mjs --check",
-    "test:schema": "node tests/schema.test.mjs"
+    "test:schema": "node tests/schema.test.mjs",
+    "test:knowledge": "node tests/knowledge.test.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3",
     "ts-json-schema-generator": "2.9.0",
-    "ajv": "8.17.1"
+    "ajv": "8.17.1",
+    "yaml": "2.8.1"
   }
 }
