@@ -1,0 +1,23 @@
+# Public API Reference
+
+- [bindPlanRequest](/api/bindPlanRequest.md) — Substitutes externally obtained post-create identities in inert requests.
+- [compileIssueAssigneeSteps](/api/compileIssueAssigneeSteps.md) — Compiles exact and incremental GitHub issue assignee changes.
+- [compileIssueFieldSteps](/api/compileIssueFieldSteps.md) — Compiles explicit organization issue-field changes by field/option name.
+- [compileIssueLabelSteps](/api/compileIssueLabelSteps.md) — Compiles issue-label exact sets and targeted add/remove operations.
+- [compileIssueSteps](/api/compileIssueSteps.md) — Compiles managed issue create, core updates and issue-type requests.
+- [compileMilestoneSteps](/api/compileMilestoneSteps.md) — Compiles managed milestone create and minimal-update requests.
+- [compileRelationshipSteps](/api/compileRelationshipSteps.md) — Compiles parent, dependency and related-to native GitHub relations.
+- [compileRepositoryLabelSteps](/api/compileRepositoryLabelSteps.md) — Compiles repository-label creation and partial metadata updates.
+- [createRestDiscoveryTransport](/api/createRestDiscoveryTransport.md) — Builds an authenticated read-only GitHub REST discovery adapter.
+- [diffGithubState](/api/diffGithubState.md) — Builds deterministic semantic deltas independent of request encoding.
+- [discoverAndResolve](/api/discoverAndResolve.md) — Discovers broad repository state and enriches only relevant existing issues.
+- [normalizeSchema](/api/normalizeSchema.md) — Canonicalizes authored shorthands, nested resources and relationship edges.
+- [planGithub](/api/planGithub.md) — Plans a repository from a typed schema without executing mutations.
+- [requestReferences](/api/requestReferences.md) — Finds distinct future-resource logical IDs referenced in a request.
+- [resolveResourceIdentities](/api/resolveResourceIdentities.md) — Resolves logical issues and milestones to existing or new GitHub identities.
+- [Authoring type contracts](/api/types-authoring.md) — Typed GithubPlanSchema and its exported shorthand issue, milestone, label and relationship types.
+- [Diagnostics and error types](/api/types-errors.md) — GithubDiagnostic and related typed error outcomes for planning and request binding.
+- [Plan and request types](/api/types-plan.md) — GithubPlan and PlanStep request DAG, readiness, identity refs and execution boundary.
+- [Desired and observed state types](/api/types-state.md) — NormalizedDesiredStateGraph, desired-resource unions, observed snapshots and resolution statuses.
+- [Discovery and transport contracts](/api/types-transport.md) — FetchLike abstraction and read-only REST discovery response contracts.
+- [validatePlanStepReferences](/api/validatePlanStepReferences.md) — Validates that late-bound references depend on a unique planned create producer.
