@@ -1,0 +1,64 @@
+name: CI worker
+run-name: CI worker ${{ inputs.correlation } ${{ inputs.backend } ${{ inputs.sha }
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend:
+        type: choice
+        required: true
+        options: [oci, hosted]
+      sha:
+        type: string
+        required: true
+      correlation:
+        type: string
+        required: true
+      parent_run_id:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  contracts-worker:
+    runs-on: ${{ inputs.backend == 'oci' && fromJSON('["self-hosted","Linux","trusted"]') || 'ubuntu-latest' }
+    permissions:
+      contents: read
+    timeout-minutes: 35
+    steps:
+      # Checkout only trusted main prior to validating the dispatch SHA.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable trusted main commit and workflow identity
+        env:
+          TARGET_SHA: ${{ inputs.sha }
+          BACKEND: ${{ inputs.backend }
+          CORRELATION: ${{ inputs.correlation }
+          PARENT_RUN: ${{ inputs.parent_run_id }
+          REPOSITORY: ${{ github.repository }
+          GIT_REF: ${{ github.ref }
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$REPOSITORY" == "attention-spa/gh-plan" ]]
+          [[ "$GIT_REF" == "refs/heads/main" ]]
+          [[ "$BACKEND" == "oci" || "$BACKEND" == "hosted" ]]
+          [[ "$TARGET_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$PARENT_RUN" =~ ^[1-9][0-9]*$ ]]
+          [[ "$CORRELATION" =~ ^[1-9][0-9]*-[a-f0-9]{16}$ ]]
+          [[ "$CORRELATION" == "$PARENT_RUN"-* ]]
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$TARGET_SHA" refs/remotes/origin/main
+          git checkout --detach "$TARGET_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run schema:check
+      - run: npm run docs:check
+      - run: npm test
+      - run: npm run build
+      - run: npm run test:dist
