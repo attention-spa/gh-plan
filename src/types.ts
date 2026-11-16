@@ -255,18 +255,38 @@ export type PlanOperationKind =
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
+/** A reference to a GitHub identity that will be available after a create step. */
+export type PlanIdentityProperty = "number" | "id" | "nodeId";
+export type PlanValueRef = {
+  $ref: `${LogicalResourceId}.${PlanIdentityProperty}`;
+};
+
+/** Serializable request data; references can occur at any nesting depth. */
+export type PlanJsonValue =
+  | JsonPrimitive
+  | PlanValueRef
+  | PlanJsonValue[]
+  | { [key: string]: PlanJsonValue };
+
+/** Literal path fragments and late-bound identity references in order. */
+export type PlanPath = string | Array<string | PlanValueRef>;
+
+/** Identity values supplied by an external executor after creating a resource. */
+export type PlanBindings = Record<LogicalResourceId, Partial<Record<PlanIdentityProperty, number | string>>>;
+
+
 export interface RestPlanRequest {
   protocol: "rest";
   method: HttpMethod;
-  path: string;
-  body?: JsonValue;
+  path: PlanPath;
+  body?: PlanJsonValue;
 }
 
 export interface GraphqlPlanRequest {
   protocol: "graphql";
   document: string;
   operationName?: string;
-  variables?: Record<string, JsonValue>;
+  variables?: Record<string, PlanJsonValue>;
 }
 
 export type PlanRequest = RestPlanRequest | GraphqlPlanRequest;
