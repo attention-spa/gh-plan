@@ -263,3 +263,39 @@ const punctuatedIds = valid({
 });
 equal(punctuatedIds.relationships.length, 2,
   "relates_to dedup keys must not collide when logical IDs contain delimiters");
+
+
+// M1.2: logical IDs must not contain HTML delimiters or untrusted whitespace.
+for (const [invalidId, label] of [
+  ["", "empty"],
+  ["-A", "leading hyphen"],
+  [":A", "leading colon"],
+  [" A", "leading whitespace"],
+  ["A B", "embedded whitespace"],
+  ["A\nB", "newline"],
+  ["A-->", "HTML comment terminator"],
+  ["-->B", "HTML comment terminator prefix"],
+  ["<script>", "HTML markup"],
+  ["éclair", "non-ASCII leading character"],
+] as const) {
+  const result = normalizeSchema({
+    repository: "attention-spa/example",
+    issues: [{ logicalId: invalidId, title: "Example" }],
+  });
+  assert(!result.ok, label + ": unsafe logicalId must fail");
+  const diagnostic = result.diagnostics.find((item) =>
+    item.code === "INVALID_SCHEMA" && item.schemaPath === "$.issues[0].logicalId");
+  assert(diagnostic?.blocking, label + ": expected a blocking logicalId diagnostic");
+  assert(diagnostic.message.includes("^[A-Za-z0-9]"), label + ": diagnostic must explain required ID format");
+}
+for (const safeId of ["A", "9", "A.B_C:D/E-9", "x-y", "1.2/3:4"]) {
+  const graph = valid({
+    repository: "attention-spa/example",
+    issues: [{ logicalId: safeId, title: "Example" }],
+  });
+  equal(graph.resources[0]?.logicalId, safeId, "safe logicalId " + safeId + " should be preserved");
+}
+blocked({
+  repository: "attention-spa/example",
+  issues: [{ logicalId: "A", title: "Example", blockedBy: ["B-->"] }],
+}, "INVALID_SCHEMA");
