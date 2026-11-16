@@ -302,7 +302,8 @@ export type DiagnosticCode =
   | "INSUFFICIENT_PERMISSION"
   | "NO_REST_TRANSPORT"
   | "NO_GRAPHQL_TRANSPORT"
-  | "UNSUPPORTED_SCHEMA_FEATURE";
+  | "UNSUPPORTED_SCHEMA_FEATURE"
+  | "PARENT_CONFLICT";
 
 export type DiagnosticSeverity = "info" | "warning" | "error";
 
@@ -352,3 +353,23 @@ export interface GithubPlan {
 }
 
 export type PlanGithub = (config: GithubPlannerConfig) => Promise<GithubPlan>;
+
+/** Pure, transport-independent reconciliation intent. */
+export type GithubDiffStatus = "create" | "update" | "noop" | "conflict" | "unsupported";
+export interface GithubDiff {
+  id: string;
+  logicalId: LogicalResourceId;
+  kind: string;
+  status: GithubDiffStatus;
+  reason: string;
+  property?: string;
+  current?: JsonValue;
+  desired?: JsonValue;
+  references?: LogicalResourceRef[];
+}
+export interface GithubDiffResult {
+  diffs: GithubDiff[];
+  blockers: GithubDiagnostic[];
+  warnings: GithubDiagnostic[];
+  unsupported: GithubDiagnostic[];
+}
