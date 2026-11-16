@@ -177,10 +177,10 @@ export function diffGithubState(
         continue;
       }
       const definition = fields[0]!;
+      const multi = (definition.dataType ?? "").toLowerCase().replace(/[-_\s]/g, "") === "multiselect";
       if (operation.op === "set" && definition.options) {
         const options = definition.options;
         const exists = (value: JsonValue): boolean => options.some((option) => same(value, option.value ?? option.name));
-        const multi = (definition.dataType ?? "").toLowerCase().replace(/[-_\s]/g, "").includes("multi");
         const valid = multi ? Array.isArray(operation.value) && operation.value.every(exists)
           : exists(operation.value);
         if (!valid) {
@@ -189,7 +189,21 @@ export function diffGithubState(
           continue;
         }
       }
-      if (issue) compare(diffId, id, kind, "fields." + name, issue.fields?.[name] ?? null, operation);
+      if (issue) {
+        const oldValue = issue.fields?.[name] ?? null;
+        // Multi-select values are semantic sets, not ordered lists. Preserve
+        // original payload values; normalize only for comparison.
+        if (multi && operation.op === "set" && Array.isArray(oldValue) && Array.isArray(operation.value)) {
+          const normalized = (values: JsonValue[]): string[] =>
+            [...new Set(values.map(stable))].sort();
+          const equalSet = same(normalized(oldValue), normalized(operation.value));
+          add(diffId, id, kind, equalSet ? "noop" : "update",
+            equalSet ? "fields." + name + " already matches." : "fields." + name + " differs.",
+            "fields." + name, oldValue, operation.value);
+        } else {
+          compare(diffId, id, kind, "fields." + name, oldValue, operation);
+        }
+      }
     }
   }
 
