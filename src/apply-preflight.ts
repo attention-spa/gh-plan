@@ -178,7 +178,7 @@ function stepSpec(step: PlanStep, steps: Map<string, PlanStep>, repository: stri
     kind === "issue.update" ? ["title", "body", "state", "milestone"] :
     kind === "milestone.create" ? ["title", "description", "state", "due_on"] :
     ["title", "description", "state", "due_on"];
-  const body = request.body;
+  const body = request.body as Record<string, unknown>;
   if (!keysOnly(body, allowed) || !Object.entries(body).every(([field, value]) =>
     validField(kind, field, value, step, steps))) return undefined;
   if (create && (typeof body.title !== "string" ||
