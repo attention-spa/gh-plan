@@ -30,6 +30,10 @@ Required permissions for read-only planning and potential external execution of 
 | Contents: read | Validate head/base refs and compare commits ahead of base | New PR discovery |
 | Pull requests: write | PR create/close/update and add/remove reviewer requests | External executor only |
 
+## #175 live permission check for the A1 CAS Git-ref owner
+
+The internal CAS reference backend reads the canonical repository/default branch and owner Git commit, creates an **off-ref** owner commit, and atomically creates/removes `refs/heads/gh-plan/locks/repository` using GraphQL `updateRefs` and exact conditional OIDs. Documented minimum is **Metadata: read** and **Contents: read/write** on the target repository. It does **not** require Issues:write to acquire the lock; an issue/milestone executor needs Issues:write separately. An agent-hachi **admin** token performed live acquire/release/contender tests in a disposable private repo, proving effective permission rather than least-privilege scope. Private-repository branch-protection/rulesets GETs returned 403 with GitHub's upgrade/private-plan message, so protected ruleset behavior was **not** live-tested. The reference adapter fails closed on denied CAS writes; no production token grants were changed.
+
 ## C2 callback ownership of permissions (future, not implemented)
 
 The approved [C2 caller-injected API](/decisions/caller-injected-apply-contract.md) has **no public `auth` parameter or built-in GitHub writer**: it accepts caller-provided dispatch, postcondition, catalog and ownership callbacks. The package cannot attest the actual permission scopes or GitHub interactions of those callbacks. A separately selectable GitHub-backed reference adapter is required to apply the A1/B1 documented permission policy and prove it in a disposable private repository. The package remains private/read-only in its current exports.
