@@ -109,7 +109,7 @@ equal(creates, 1, "Restart must not create an issue with an existing marker.");
 equal(patches, 1, "Downstream operation resumes from recovered identity.");
 equal(second.skippedStepIds, ["issue.create:I"],
   "Recovered issue create is skipped and downstream step runs.");
-equal(second.bindings.I, { number: 41, id: 410, nodeId: "I_41" },
+equal(second.bindings.I, { id: 410, number: 41, nodeId: "I_41" },
   "Recovered IDs are derived from the authoritative catalog.");
 const third = await executePlanSteps(plan(), dispatch, read, lookup);
 equal(creates, 1, "Third invocation never duplicates existing issue.");
