@@ -1,3 +1,4 @@
+export { diffGithubState } from "./diff.ts";
 export { normalizeSchema } from "./normalize.ts";
 export { discoverAndResolve } from "./discovery.ts";
 export type { DiscoveryResolutionResult } from "./discovery.ts";
@@ -39,6 +40,9 @@ export type {
   FetchRequestInitLike,
   FetchResponseLike,
   GithubDiagnostic,
+  GithubDiff,
+  GithubDiffResult,
+  GithubDiffStatus,
   GithubDiscoveryTransport,
   GithubPlan,
   GithubPlannerConfig,
