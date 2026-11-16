@@ -5,7 +5,7 @@ description: "Canonicalizes authored shorthands, nested resources and relationsh
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/normalize.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:39:10.683+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:59:33.118+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/normalize.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -22,6 +22,8 @@ normalizeSchema(schema: object) => NormalizationResult
 ```
 
 Milestone `due_on` supports a date-only `YYYY-MM-DD` shorthand, explicit set or explicit remove. Normalization checks Gregorian calendar validity, including leap years, and blocks timestamp strings, invalid dates, `null` and due-date mutations on reference-only milestones.
+
+Root `prune` accepts `"report"` (default) or `"close"`; `deleteDuplicates` must be boolean, and true requires explicit `prune:"close"`. Invalid forms block rather than silently enabling an unsafe operation. See the [prune schema](/schema/prune-duplicates.md).
 
 The normalized graph is the authoritative input to discovery, identity resolution and diff.
 

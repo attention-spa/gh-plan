@@ -5,7 +5,7 @@ description: "Resolves logical issues and milestones to existing or new GitHub i
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/identity.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:23:20.409+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:59:33.118+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/identity.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -22,6 +22,8 @@ resolveResourceIdentities(desired: NormalizedDesiredStateGraph, observed: Github
 ```
 
 Explicit REST/node/number hints must agree; a unique issue marker outranks title fallback.
+
+When `prune:"close"` is explicit, one canonical issue can resolve within a duplicated-marker group **only when all supplied explicit identity hints select that marked issue**. Otherwise marker multiplicity remains an ambiguity blocker. Issue-title collisions alone never authorize duplicate closure.
 
 ## I/O and failure behavior
 

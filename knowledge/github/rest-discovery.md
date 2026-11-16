@@ -5,7 +5,7 @@ description: "GitHub REST GET catalog, enrichment and assignee-eligibility endpo
 resource: https://docs.github.com/en/rest/issues/issues
 tags: [github, rest, permissions]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:39:10.683+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:59:33.118+01:00 }
 sources:
   - resource: https://docs.github.com/en/rest/issues/issues
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/rest.ts
@@ -45,6 +45,8 @@ GitHub REST GET catalog, enrichment and assignee-eligibility endpoints used by t
 ## Runtime behavior
 
 Milestone `due_on` is included in the existing paginated milestone GET and requires no additional request. Non-null values are validated as ISO timestamps and normalized to UTC calendar dates for semantic comparison; `null` denotes no deadline.
+
+Pruning uses only the existing paginated `GET /issues?state=all` list. The REST adapter already excludes PRs. Canonical issue-body markers and title collisions require **no additional request**, and no mutation is executed by the planner.
 
 For declared Projects v2, the transport performs only read-only GETs on the referenced project by owner/number, field metadata, and a repository-filtered item listing with explicit numeric field selectors. It never lists unrelated boards or requests project/field creation. Project list pagination is followed safely as with existing REST catalogs. User-owned board GETs are supported in the adapter but GitHub documents that they do **not** support fine-grained token classes; authentication failures are blockers.
 
