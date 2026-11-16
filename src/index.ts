@@ -135,3 +135,14 @@ export type {
   ResourceResolutionStatus,
   RestPlanRequest,
 } from "./types.ts";
+
+// C2 named public TYPES and sanitized error class only (#187).
+// No public applyPlan() function or preflight/dispatch entrypoint until #188–#190.
+export { ApplyPlanError } from "./apply-contract.ts";
+export type {
+  ApplyPlanPhase, ApplyOwnerState, ApplyPlanErrorCode, ApplyPlanErrorDetails,
+  ApplyPlanOptions, ApplyPlanResult, ApplyOwnershipAdapter, ApplyDispatcher,
+  ApplyPostconditionContext, ApplyPostconditionRead, ApplyPostconditionReader,
+  ApplyIssueCatalogReader, ApplyMilestoneCatalogReader, ApplyLogSink,
+  SafeApplyLogEntry,
+} from "./apply-contract.ts";
