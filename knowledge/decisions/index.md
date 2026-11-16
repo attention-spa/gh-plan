@@ -1,5 +1,6 @@
 # Architecture and Safety Decisions
 
+- [GitHub-native cooperative apply ownership](/decisions/github-native-apply-ownership.md) — Serialize participating direct/Actions apply calls with a single CAS Git ref; manual crash recovery, no lease stealing.
 - [Canonical issue body markers](/decisions/markers-in-body.md) — Use unique issue-body markers as durable discovery identity, with exact matching and injection-resistant logical IDs.
 - [Deterministic plan output](/decisions/deterministic-output.md) — Emit sorted semantic diffs and topologically ordered steps so identical inputs produce equivalent plans.
 - [No secrets in plans](/decisions/no-secrets-in-plans.md) — Keep bearer credentials runtime-only, with sanitized diagnostics and serializable request proposals.
