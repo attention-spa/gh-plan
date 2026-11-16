@@ -10,6 +10,7 @@ import { compileIssueAssigneeSteps } from "./issue-assignee-compiler.ts";
 import { compileRelationshipSteps } from "./relationship-compiler.ts";
 import { compilePullRequestSteps } from "./pull-request-compiler.ts";
 import { compileProjectItemSteps } from "./project-item-compiler.ts";
+import { compilePruneSteps } from "./prune-compiler.ts";
 import { validatePlanStepReferences } from "./plan-bindings.ts";
 import { createRestDiscoveryTransport, GithubRestTransportError } from "./rest.ts";
 import type {
@@ -215,6 +216,7 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
   const pullRequests = compilePullRequestSteps(graph, snapshot, resolution.resolutions);
   const projectItems = compileProjectItemSteps(graph, snapshot,
     [...resolution.resolutions, ...pullRequests.resolutions]);
+  const pruning = compilePruneSteps(graph, snapshot, resolution.resolutions, mode);
   return assemble(snapshot.repository, mode, counts,
     [...resolution.resolutions, ...pullRequests.resolutions], [
     { warnings: normalizationWarnings },
@@ -229,5 +231,6 @@ export async function planGithub(config: GithubPlannerConfig): Promise<GithubPla
     relationships,
     pullRequests,
     projectItems,
+    pruning,
   ]);
 }
