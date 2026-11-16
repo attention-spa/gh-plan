@@ -1,4 +1,10 @@
 import type {
+  ApplyPlanOptions, ApplyPlanResult, ApplyPlanErrorCode,
+  ApplyOwnershipAdapter, ApplyPostconditionContext, ApplyPostconditionRead,
+  ApplyDispatcher, ApplyLogSink, ApplyIssueCatalogReader, ApplyMilestoneCatalogReader,
+} from "../src/index.ts";
+
+import type {
   FetchLike,
   GithubDiagnostic,
   GithubPlan,
@@ -230,3 +236,38 @@ const serializableCurrentState: JsonValue = {
 };
 
 void serializableCurrentState;
+
+
+// #187 C2 public declaration compile fixture; no runtime applyPlan export exists.
+const applyOwnership: ApplyOwnershipAdapter = {
+  async acquire(_repoName) { return { ownerId: "opaque-owner" }; },
+  async assertOwned(_repoName, _ownerId) { return true; },
+  async release(_repoName, _ownerId) {},
+};
+const applyDispatcher: ApplyDispatcher = async (_request, _step) => ({ number: 1 });
+const issueCatalog: ApplyIssueCatalogReader = async (_repoName) => [];
+const milestoneCatalog: ApplyMilestoneCatalogReader = async (_repoName) => [];
+const sink: ApplyLogSink = async (_entry) => {};
+const publicC2Options = {
+  plan, acknowledgeCallbackTrust: true,
+  dispatch: applyDispatcher,
+  readPostcondition: async (context: Readonly<ApplyPostconditionContext>) => {
+    void context.spec.version;
+    return { status: "unsatisfied" } as ApplyPostconditionRead;
+  },
+  readIssueCatalog: issueCatalog,
+  readMilestoneCatalog: milestoneCatalog,
+  ownership: applyOwnership, onLog: sink,
+} satisfies ApplyPlanOptions;
+const publicC2Result: ApplyPlanResult = {
+  status: "already_satisfied", runId: "opaque-run",
+  completedStepIds: [], skippedStepIds: [], bindings: {}, log: [],
+};
+const publicC2Failure: ApplyPlanErrorCode = "UNSUPPORTED_PLAN";
+const optionsCannotCarryCredentials: HasKey<ApplyPlanOptions, "auth"> = false;
+const optionsCannotBypassOwner: HasKey<ApplyPlanOptions, "skipOwnership"> = false;
+void publicC2Options;
+void publicC2Result;
+void publicC2Failure;
+void optionsCannotCarryCredentials;
+void optionsCannotBypassOwner;
