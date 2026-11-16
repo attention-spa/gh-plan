@@ -245,3 +245,21 @@ blocked({
     { logicalId: "B", title: "Beta" },
   ],
 }, "UNSUPPORTED_SCHEMA_FEATURE");
+
+// JSON-encoded pairs avoid collisions for valid logical IDs containing colons.
+
+const punctuatedIds = valid({
+  repository: "attention-spa/example",
+  issues: [
+    { logicalId: "A:B", title: "A:B" },
+    { logicalId: "C", title: "C" },
+    { logicalId: "A", title: "A" },
+    { logicalId: "B:C", title: "B:C" },
+  ],
+  relationships: [
+    { kind: "relates_to", from: "A:B", to: "C" },
+    { kind: "relates_to", from: "A", to: "B:C" },
+  ],
+});
+equal(punctuatedIds.relationships.length, 2,
+  "relates_to dedup keys must not collide when logical IDs contain delimiters");

@@ -312,7 +312,7 @@ function relationKey(relation: DesiredRelationship): string {
     case "blocks": return `blocked_by:${relation.blocked}:${relation.issue}`;
     case "relates_to": {
       const [from, to] = [relation.from, relation.to].sort();
-      return `relates_to:${from}:${to}`;
+      return JSON.stringify(["relates_to", from, to]);
     }
   }
 }
