@@ -49,7 +49,7 @@ function build(schema: object, snapshot: GithubStateSnapshot = current,
 
 // Input supports optional logicalId, name, optional metadata, and management.
 let r = build({ labels: [
-  { name: "work needed", color: "AA0011", description: "" },
+  { name: "work needed", color: "AA0011", description: "Needs triage" },
   { name: "bug", management: "reference" },
 ] });
 equal(r.graph.labels?.map((x) => x.logicalId), ["label:bug", "label:work%20needed"],
@@ -58,14 +58,22 @@ equal(r.graph.labels?.[1]?.color, "aa0011", "Colors are normalized to lowercase.
 equal(r.repositoryLabels.steps[0]?.request, {
   protocol: "rest", method: "PATCH",
   path: "/repos/sample/widgets/labels/work%20needed",
-  body: { description: "" },
+  body: { description: "Needs triage" },
 }, "Existing label update touches only changed metadata, preserving name and color.");
 equal(r.diff.diffs.find((d) => d.id === "label.color:label:work%20needed")?.status,
   "noop", "Color comparison is case insensitive.");
 equal(r.diff.diffs.find((d) => d.id === "label.description:label:work%20needed")?.status,
-  "update", "Explicit empty string clears a null description.");
+  "update", "Explicit description replaces an empty observed description.");
 assert(!r.repositoryLabels.steps.some((s) => s.kind === "label.create"),
   "Reference-only labels and existing managed labels never create labels.");
+
+r = build({ labels: [{ name: "work needed", description: "" }] });
+equal(r.repositoryLabels.steps, [], "Null and explicit empty description are equivalent; no churn.");
+r = build({ labels: [{ name: "bug", description: "" }] });
+equal(r.repositoryLabels.steps[0]?.request, {
+  protocol: "rest", method: "PATCH", path: "/repos/sample/widgets/labels/bug",
+  body: { description: "" },
+}, "Explicit empty description clears a nonempty observed description.");
 
 r = build({ labels: [{ name: "bug" }] });
 equal(r.repositoryLabels.steps, [], "Omitted metadata on existing labels is untouched.");
