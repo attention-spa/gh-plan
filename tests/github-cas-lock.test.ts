@@ -266,7 +266,8 @@ await winner.value.assertOwned();
 await winner.value.release();
 
 class Headers {
-  constructor(private readonly headers: Record<string, string> = {}) {}
+  readonly headers: Record<string, string>;
+  constructor(headers: Record<string, string> = {}) { this.headers = headers; }
   get(name: string): string | null { return this.headers[name.toLowerCase()] ?? null; }
 }
 function response(status: number, body: unknown, url?: string): FetchResponseLike {
