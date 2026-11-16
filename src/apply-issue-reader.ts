@@ -187,7 +187,8 @@ function resolve(spec: IssueDescriptor, context: IssueReadContext | undefined,
     fail("INVALID_SPEC", phase);
   const binding = (value: PlanValueRef): number => {
     const [logicalId] = value.$ref.split(".number");
-    const actual = context?.bindings?.[logicalId!]?.number;
+    const bindings: Readonly<PlanBindings> | undefined = context?.bindings;
+    const actual = bindings ? bindings[logicalId!]?.number : undefined;
     if (!positive(actual)) return fail("INVALID_SPEC", phase);
     return actual;
   };
