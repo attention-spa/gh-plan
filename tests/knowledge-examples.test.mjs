@@ -9,7 +9,7 @@ import { normalizeSchema } from "../src/normalize.ts";
 
 const repo = fileURLToPath(new URL("../", import.meta.url));
 const schemaNames = ["repository", "issue", "milestone", "label", "relationship", "set-remove-operations","pull-request","projects-v2"];
-const validate = new Ajv2020({ allErrors: true, strict: true }).compile(JSON.parse(
+const validate = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true }).compile(JSON.parse(
   readFileSync(join(repo, "schema/gh-plan.schema.json"), "utf8")
 ));
 const examples = [];
