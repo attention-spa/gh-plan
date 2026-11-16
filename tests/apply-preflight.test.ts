@@ -170,6 +170,6 @@ denied("malformed request path injection", (p) => {
   if (r.protocol === "rest") r.path = "/repos/a/b/milestones/2?force=true";
 }, "UNSAFE_REQUEST");
 denied("partial managed intent ignored by compiler", (p) => {
-  p.applyIntent!.managed.push({ logicalId: "J", kind: "issue", fields: ["title"] });
+  p.applyIntent!.managed.push({ logicalId: "J", kind: "issue", fields: ["title"], removes: [] });
 }, "UNSUPPORTED_INTENT");
 console.log("B1 typed preflight: mixed DAG, zero-write rejection and strict intent/identity fixtures passed.");
