@@ -4,7 +4,7 @@ title: "Plans and Steps"
 description: "Deterministic read-only reconciliation proposals with dependency-ordered REST requests."
 tags: ["planning", "dag"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:21:42.849+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -27,6 +27,10 @@ Each `PlanStep` has a full operation `id`, a `kind`, a logical resource ID, a st
 ## PR plans
 
 [Pull requests](/schema/pull-request.md) are separate managed resources with `pull_request.create`, `pull_request.update` and reviewer-request steps. Existing M4 issue-label and assignee steps can operate on a PR number but depend on `pull_request.create` when necessary. The normal REST update cannot toggle an existing PR's draft flag; no merge step is ever proposed. `Closes #` references to new issues use a string template with explicit producing `issue.create` dependencies.
+
+## Projects v2 item plans
+
+References to [existing Projects v2 boards](/schema/projects-v2.md) can add issue/PR membership and set supplied custom fields. Missing boards, fields, selections or unsupported field types block. A new item produces a `project.item.add` request, then `project.item.fields.set` depends on its new numeric item ID; newly created issues and PRs are prerequisite producers. No board/field creation or membership removal is planned.
 
 ## Execution boundary
 

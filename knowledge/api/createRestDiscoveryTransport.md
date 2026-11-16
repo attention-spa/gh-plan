@@ -5,7 +5,7 @@ description: "Builds an authenticated read-only GitHub REST discovery adapter."
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/rest.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:21:42.849+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/rest.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -22,6 +22,8 @@ createRestDiscoveryTransport(config: RestDiscoveryTransportConfig) => GithubDisc
 ```
 
 Optional `enrichPullRequests()` performs scoped `/pulls` filtering, detailed PR reads, reviewer snapshots and branch/compare GETs when PRs are requested. It never creates, updates, closes or merges a PR.
+
+The optional `enrichProjects()` method reads only declared existing Projects v2 boards via `GET /projectsV2/{number}`, their fields and repository-scoped items. It never creates projects or fields and never changes membership. Read permission differs between organization and user projects.
 
 Default enrichment concurrency is four. The returned transport never mutates repository state.
 

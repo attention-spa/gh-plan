@@ -5,7 +5,7 @@ description: "Discovers broad repository state and enriches only relevant existi
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/discovery.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T05:59:23.581+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:21:42.849+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/discovery.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -22,6 +22,8 @@ discoverAndResolve(desired: NormalizedDesiredStateGraph, transport: GithubDiscov
 ```
 
 PR candidates come from the existing `/issues` listing, with relevant head/base filtering and only matching `/pulls/{number}` enrichment. New PRs receive read-only Git reference and commit-comparison checks. Unrelated PRs are not fetched individually.
+
+When root Projects v2 references are declared, discovery also reads each existing board and its field catalog and lists only items matching the target repository. Board/field creation is unsupported. Plans without project declarations add no Projects v2 GETs.
 
 Relationship-only endpoints may be enriched; each distinct addition login triggers eligibility GET.
 
