@@ -250,6 +250,7 @@ export type PlanOperationKind =
   | "issue.type.set"
   | "issue.marker.adopt"
   | "issue.field.set"
+  | "issue.field.remove"
   | "issue.parent.set"
   | "issue.dependency.add"
   | "verification.read";
