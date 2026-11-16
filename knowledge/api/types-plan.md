@@ -5,7 +5,7 @@ description: "GithubPlan and PlanStep request DAG, readiness, identity refs and 
 resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
 tags: [api, public-contract, typescript]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:21:42.849+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:00:14.448+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/index.ts
@@ -32,6 +32,8 @@ GithubPlan and PlanStep request DAG, readiness, identity refs and execution boun
 - `GithubPlannerMode`
 - `PlanGithub`
 - `PlanStepStatus`
+
+The `issue.orphan.close` and `issue.duplicate.close` steps are reversible, non-destructive REST proposals. `issue.duplicate.comment` records a canonical link and justification before a close. The pure compiler can describe irreversible `issue.duplicate.delete` only as an opt-in **GraphQL** proposal; REST returns an unsupported blocker.
 
 ## Contract boundary
 

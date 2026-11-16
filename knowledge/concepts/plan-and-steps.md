@@ -4,7 +4,7 @@ title: "Plans and Steps"
 description: "Deterministic read-only reconciliation proposals with dependency-ordered REST requests."
 tags: ["planning", "dag"]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T06:21:42.849+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T07:00:14.448+01:00 }
 sources:
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/plan.ts
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/types.ts
@@ -31,6 +31,10 @@ Each `PlanStep` has a full operation `id`, a `kind`, a logical resource ID, a st
 ## Projects v2 item plans
 
 References to [existing Projects v2 boards](/schema/projects-v2.md) can add issue/PR membership and set supplied custom fields. Missing boards, fields, selections or unsupported field types block. A new item produces a `project.item.add` request, then `project.item.fields.set` depends on its new numeric item ID; newly created issues and PRs are prerequisite producers. No board/field creation or membership removal is planned.
+
+## Orphan and duplicate steps
+
+The default [prune policy](/schema/prune-duplicates.md) reports orphaned canonical issue-body markers and duplicate marker/title collisions as information. Explicit `prune:"close"` permits non-destructive, reversible `issue.orphan.close`, or `issue.duplicate.comment` followed by `issue.duplicate.close` against an explicitly identified canonical issue. REST-mode deletion requests block. The pure GraphQL-only `issue.duplicate.delete` is irreversible but unavailable through current `planGithub()` GraphQL mode.
 
 ## Execution boundary
 
