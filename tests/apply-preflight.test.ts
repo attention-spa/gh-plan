@@ -226,4 +226,11 @@ denied("duplicate milestone title across creates", (p) => {
   p.applyIntent!.resourceCount++;
   p.desired.resourceCount++;
 }, "UNSAFE_IDENTITY");
+denied("malformed manifest record", (p) => {
+  p.applyIntent!.managed[0] = null as unknown as ApplyIntentManifest["managed"][number];
+}, "INVALID_PLAN");
+const invalidRuntime = preflightApplyPlan(undefined as unknown as GithubPlan);
+assert(!invalidRuntime.ok && invalidRuntime.errors[0]?.code === "INVALID_PLAN",
+  "Malformed runtime input must yield an allowlisted error, not throw.");
+
 console.log("B1 typed preflight: mixed DAG, zero-write rejection and strict intent/identity fixtures passed.");
