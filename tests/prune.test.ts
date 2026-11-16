@@ -98,6 +98,19 @@ const ambiguous = compilePruneSteps(explicitGraph, snapshot,
 check(ambiguous.blockers.some((x) => x.code === "AMBIGUOUS_IDENTITY") &&
   !ambiguous.steps.some((x) => x.kind.startsWith("issue.duplicate")),
   "Without an explicitly resolved canonical, duplicate closure must block.");
+const quotedMarker = compilePruneSteps(explicitGraph, {
+  ...snapshot, issues: [
+    ...snapshot.issues, issue(8, "Documentation example",
+      "Documentation:\\n\\n" + marked("QUOTED") + "is just a sample."),
+  ],
+}, selected.resolutions);
+check(quotedMarker.warnings.some((x) => x.code === "ORPHAN_ISSUE" &&
+  x.logicalId === "QUOTED"), "A quoted marker can still be reported.");
+check(quotedMarker.blockers.some((x) => x.code === "AMBIGUOUS_IDENTITY" &&
+  x.logicalId === "QUOTED") &&
+  !quotedMarker.steps.some((x) => x.logicalId === "QUOTED"),
+  "Quoted markers later in a body never authorize a close proposal.");
+
 const orphanDupSnapshot: GithubStateSnapshot = { ...snapshot,
   issues: [...snapshot.issues, issue(7, "Another old", marked("OLD"))] };
 const orphanDup = compilePruneSteps(explicitGraph, orphanDupSnapshot, selected.resolutions);
