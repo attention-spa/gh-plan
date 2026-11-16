@@ -199,7 +199,8 @@ function stepSpec(step: PlanStep, steps: Map<string, PlanStep>, repository: stri
   let identity: ApplyPostconditionIdentity;
   let reads: ApplyPostconditionSpec["reads"];
   if (kind === "milestone.create") {
-    if (request.path !== base || resolution.identity?.number !== undefined) return undefined;
+    if (request.path !== base || resolution.identity?.number !== undefined ||
+      resolution.identity?.id !== undefined || resolution.identity?.nodeId !== undefined) return undefined;
     identity = { strategy: "unique_milestone_title", title: body.title as string };
     reads = ["milestones.catalog", "milestones.byNumber"];
   } else if (kind === "milestone.update") {
@@ -213,7 +214,8 @@ function stepSpec(step: PlanStep, steps: Map<string, PlanStep>, repository: stri
     if (request.path !== base || !string(token) ||
       text.split(token).length !== 2 ||
       !matchesMarker(text, token, token !== "<!-- gh-plan:" + step.logicalId + " -->") ||
-      resolution.identity?.number !== undefined) return undefined;
+      resolution.identity?.number !== undefined ||
+      resolution.identity?.id !== undefined || resolution.identity?.nodeId !== undefined) return undefined;
     identity = { strategy: "unique_issue_marker", marker: token };
     reads = ["issues.catalog", "issues.byNumber"];
   } else {
@@ -286,8 +288,9 @@ export function preflightApplyPlan(plan: GithubPlan): ApplyCapabilityPreflight {
   if (manifest && (manifest.managed.some((m) =>
     !LOGICAL_ID.test(m.logicalId) || !["issue", "milestone"].includes(m.kind) ||
     !Array.isArray(m.fields) || !m.fields.every((f) => typeof f === "string") ||
+    new Set(m.fields).size !== m.fields.length ||
     !Array.isArray(m.removes) || !m.removes.every((f) => typeof f === "string" &&
-      m.fields.includes(f)) ||
+      m.fields.includes(f)) || new Set(m.removes).size !== m.removes.length ||
     (m.desiredState !== undefined && m.desiredState !== "open" && m.desiredState !== "closed")) ||
     new Set(manifest.managed.map((m) => m.logicalId)).size !== manifest.managed.length))
       fail("INVALID_PLAN");
@@ -355,6 +358,18 @@ export function preflightApplyPlan(plan: GithubPlan): ApplyCapabilityPreflight {
       if (!visit(id, seen, new Set())) { fail("INVALID_REFERENCE"); break; }
     }
     if (validatePlanStepReferences(input.steps).length) fail("INVALID_REFERENCE");
+  }
+  const createdMarkers = new Set<string>();
+  const createdTitles = new Set<string>();
+  for (const spec of specs) {
+    if (spec.identity.strategy === "unique_issue_marker") {
+      if (createdMarkers.has(spec.identity.marker)) fail("UNSAFE_IDENTITY");
+      createdMarkers.add(spec.identity.marker);
+    }
+    if (spec.identity.strategy === "unique_milestone_title") {
+      if (createdTitles.has(spec.identity.title)) fail("UNSAFE_IDENTITY");
+      createdTitles.add(spec.identity.title);
+    }
   }
   if (manifest) {
     for (const m of manifest.managed) {
