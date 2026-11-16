@@ -88,6 +88,14 @@ The list below is mechanically cross-checked against `src/types.ts` as of decisi
 
 `issue.assignee.set` is normally a semantic no-op decomposed into add/remove steps; it is **not** a permission to bypass preflight when a managed assignee operation is requested. `verification.read` is reserved and is **not** a license for an arbitrary user-supplied postcondition. The irreversible GraphQL-only `issue.duplicate.delete` is never executable in B1.
 
+## #178 first implementation checkpoint — static preflight only
+
+[#178](https://github.com/attention-spa/gh-plan/issues/178) implements the internal-only versioned B1 `ApplyPostconditionSpec` descriptor and pure `preflightApplyPlan()` capability gate. The planner now retains an `applyIntent` manifest containing normalized resource property names, explicit removal intent, default state intent, and unsupported root intents, because its existing `desired` summary only contains counts. This prevents silently omitted unsupported fields, relationships, Projects, labels and prune requests from bypassing step-only checks.
+
+The pure function validates the complete request DAG, plan metadata/version, target repository, four exact method/path/body shapes, title/marker uniqueness selectors, versioned field predicates, nullable clears, numeric milestone references, dependency ordering, and managed property coverage. It rejects unsupported operations including a last-step one **before any callback or lock could be invoked**. Unverified existing noops are currently rejected in full: they cannot safely be accepted without a fresh authoritative reader after ownership acquisition. This intentionally narrows eligibility; [#187](https://github.com/attention-spa/gh-plan/issues/187) may add strictly proven under-lock noop revalidation, not assume the planning snapshot is fresh.
+
+These descriptors describe **what readers must verify**, not proof the read occurred. No live GitHub reader, lock, production mutation dispatcher, public apply export or package publication was added. The C2 callback boundary remains explicitly untrusted without the separately tested reference adapter. Preserve the still-open [#179](https://github.com/attention-spa/gh-plan/issues/179), [#180](https://github.com/attention-spa/gh-plan/issues/180), and [#181](https://github.com/attention-spa/gh-plan/issues/181) readback and disposable-repo proofs.
+
 ## Independent implementation and disposable-test evidence
 
 - [#178](https://github.com/attention-spa/gh-plan/issues/178): typed capability predicate compiler, safe whole-plan preflight, exhaustive enum/shape tests, no-write rejection.
