@@ -101,7 +101,7 @@ check(ambiguous.blockers.some((x) => x.code === "AMBIGUOUS_IDENTITY") &&
 const quotedMarker = compilePruneSteps(explicitGraph, {
   ...snapshot, issues: [
     ...snapshot.issues, issue(8, "Documentation example",
-      "Documentation:\\n\\n" + marked("QUOTED") + "is just a sample."),
+      "Documentation:\n\n" + marked("QUOTED") + "is just a sample."),
   ],
 }, selected.resolutions);
 check(quotedMarker.warnings.some((x) => x.code === "ORPHAN_ISSUE" &&
