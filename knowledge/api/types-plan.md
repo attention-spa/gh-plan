@@ -41,4 +41,6 @@ Projects v2 membership and fields use `project.item.add` and `project.item.field
 
 The planner produces only inert requests. An executor must reject `blocked` readiness, honor full step dependencies and provide values for PlanValueRef.
 
+The approved but **not exported** [C2 callback apply contract](/decisions/caller-injected-apply-contract.md) will add a public opt-in executor requiring caller-supplied dispatch, verification, catalogs and ownership. Type correctness cannot establish that a callback read GitHub. The B1 four-kind fail-closed preflight and A1 reference GitHub adapter remain independent implementation requirements; no current public apply export or GitHub write transport exists.
+
 For the runtime entrypoint, see [planGithub()](/api/planGithub.md) and [normalization](/api/normalizeSchema.md).
