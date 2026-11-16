@@ -162,10 +162,12 @@ async function catalog(
       !isRecord(row) || row.kind !== "milestone" ||
       !positive(row.number) || !positive(row.id) ||
       typeof row.nodeId !== "string" || !row.nodeId ||
-      typeof row.title !== "string" || !["open", "closed"].includes(row.state)))
+      typeof row.title !== "string" ||
+      (row.state !== "open" && row.state !== "closed")))
       throw new Error("invalid-milestone-catalog");
+    const title = spec.identity.title;
     matches = (rows as ObservedMilestone[]).filter((row) =>
-      row.title === spec.identity.title);
+      row.title === title);
   } else return undefined;
   if (matches.length > 1) throw new Error("ambiguous-catalog");
   const row = matches[0];
