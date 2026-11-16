@@ -2,16 +2,20 @@
 import { randomBytes } from "node:crypto";
 
 const REPO = "attention-spa/gh-plan";
-const WORKFLOW = "ci-worker.yml";
+const WORKER_PROFILES = Object.freeze({
+  ci: { workflow: "ci-worker.yml", title: "CI worker", event: "push" },
+  bootstrap: { workflow: "bootstrap-worker.yml", title: "Bootstrap worker", event: "workflow_dispatch" },
+});
 export const QUEUE_MS = 180_000;
 const POLL_MS = 10_000, TOTAL_MS = 2_400_000;
 const fail = (code) => new Error("CI_FALLBACK_" + code);
 const int = (n) => Number.isSafeInteger(n) && n > 0;
 const validSha = (s) => typeof s === "string" && /^[a-f0-9]{40}$/.test(s);
-const title = (c, b, sha) => "CI worker " + c + " " + b + " " + sha;
+const title = (c, b, sha, prefix) => prefix + " " + c + " " + b + " " + sha;
 
-export function checkContext(env) {
-  if (env.GITHUB_EVENT_NAME !== "push" ||
+export function checkContext(env, profile = "ci") {
+  const selected = Object.hasOwn(WORKER_PROFILES, profile) ? WORKER_PROFILES[profile] : null;
+  if (!selected || env.GITHUB_EVENT_NAME !== selected.event ||
       env.GITHUB_REF !== "refs/heads/main" ||
       env.GITHUB_REPOSITORY !== REPO || !validSha(env.GITHUB_SHA) ||
       !int(Number(env.GITHUB_RUN_ID)) || !env.GITHUB_TOKEN) {
@@ -21,9 +25,11 @@ export function checkContext(env) {
 }
 
 /** Injected fetch is intended only for deterministic mock tests. */
-export function actionsApi({ token, fetchImpl = globalThis.fetch,
+export function actionsApi({ token, profile = "ci", fetchImpl = globalThis.fetch,
   now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
-  if (!token || typeof fetchImpl !== "function") throw fail("INVALID_TRANSPORT");
+  const selected = Object.hasOwn(WORKER_PROFILES, profile) ? WORKER_PROFILES[profile] : null;
+  if (!selected || !token || typeof fetchImpl !== "function") throw fail("INVALID_TRANSPORT");
+  const WORKFLOW = selected.workflow;
   const base = "https://api.github.com/repos/" + REPO + "/actions";
   const headers = {
     Accept: "application/vnd.github+json", Authorization: "Bearer " + token,
@@ -66,7 +72,7 @@ export function actionsApi({ token, fetchImpl = globalThis.fetch,
       const found = data.workflow_runs.filter((run) =>
         run.workflow_id === workflowId && run.event === "workflow_dispatch" &&
         run.head_branch === "main" && run.repository?.full_name === REPO &&
-        run.display_title === title(expected.correlation, expected.backend, expected.sha) &&
+        run.display_title === title(expected.correlation, expected.backend, expected.sha, selected.title) &&
         Number.isFinite(Date.parse(run.created_at)) &&
         Date.parse(run.created_at) >= since - 60_000);
       if (found.length > 1) throw fail("AMBIGUOUS_DISPATCH");
@@ -109,7 +115,7 @@ export function actionsApi({ token, fetchImpl = globalThis.fetch,
           run.event !== "workflow_dispatch" ? "EVENT" :
           run.head_branch !== "main" ? "BRANCH" :
           run.repository?.full_name !== REPO ? "REPOSITORY" :
-          run.display_title !== title(expected.correlation, expected.backend, expected.sha) ? "TITLE" :
+          run.display_title !== title(expected.correlation, expected.backend, expected.sha, selected.title) ? "TITLE" :
           run.run_attempt !== 1 ? "ATTEMPT" : null;
         if (mismatch === null) break;
         if (attempt < 6) await sleep(2_000);
@@ -218,28 +224,30 @@ export async function orchestrate({ api, sha, parentRunId,
   }
 }
 
-async function main() {
-  const context = checkContext(process.env);
+async function main(profile = "ci") {
+  const context = checkContext(process.env, profile);
+  const label = profile === "bootstrap" ? "Bootstrap" : "CI";
   const report = ({ backend, id, state }) =>
-    console.log("CI worker " + backend + " " + state + ": https://github.com/" +
+    console.log(label + " worker " + backend + " " + state + ": https://github.com/" +
       REPO + "/actions/runs/" + id);
   const controller = new AbortController();
   process.once("SIGTERM", () => controller.abort());
   process.once("SIGINT", () => controller.abort());
   const result = await orchestrate({
-    api: actionsApi({ token: context.token }),
+    api: actionsApi({ token: context.token, profile }),
     sha: context.sha, parentRunId: context.runId, report,
     signal: controller.signal,
   });
-  console.log("Verified CI contracts on " + result.backend + ".");
+  console.log("Verified " + label + " on " + result.backend + ".");
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFileSync } = await import("node:fs");
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, "\nCI backend: **" + result.backend +
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, "\n" + label + " backend: **" + result.backend +
       "** ([worker run](https://github.com/" + REPO + "/actions/runs/" + result.runId + ")).\n");
   }
 }
-if (process.env.CI_FALLBACK_RUN === "1") {
-  main().catch((e) => {
+if (process.env.CI_FALLBACK_RUN === "1" || process.env.BOOTSTRAP_FALLBACK_RUN === "1") {
+  const profile = process.env.BOOTSTRAP_FALLBACK_RUN === "1" ? "bootstrap" : "ci";
+  main(profile).catch((e) => {
     console.error(/^CI_FALLBACK_[A-Z0-9_]+$/.test(e?.message ?? "")
       ? e.message : "CI_FALLBACK_UNEXPECTED");
     process.exitCode = 1;
