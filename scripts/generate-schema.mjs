@@ -15,7 +15,7 @@ function to202012(value) {
       if (key === "definitions") result.$defs = to202012(entry);
       else if (key === "$ref" && typeof entry === "string")
         result.$ref = entry.replace(/^#\/definitions\//, "#/$defs/");
-      else if (key !== "$schema") result[key] = to202012(entry);
+      else result[key] = to202012(entry);
     }
     return result;
   }
@@ -30,10 +30,11 @@ const generated = createGenerator({
   expose: "export",
   jsDoc: "extended",
 }).createSchema("GithubPlanSchema");
+const { $schema: _generatorDialect, ...body } = generated;
 const schema = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
   $id: "https://raw.githubusercontent.com/attention-spa/gh-plan/main/schema/gh-plan.schema.json",
-  ...to202012(generated),
+  ...to202012(body),
 };
 const expected = JSON.stringify(schema, null, 2) + "\n";
 const mode = process.argv[2] ?? "--check";
