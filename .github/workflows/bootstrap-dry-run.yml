@@ -1,0 +1,26 @@
+name: Verify gh-plan Phase A bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  bootstrap-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm no GitHub writes are needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_PROMPT_DISABLED: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/plan/bootstrap.mjs | tee bootstrap-dry-run.log
+          grep -Fx 'Mutations required: 0' bootstrap-dry-run.log
