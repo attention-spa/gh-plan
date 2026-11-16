@@ -128,6 +128,7 @@ class FakeGithub {
   deniedRepo = false;
   absentHidden = false;
   wrongRepo = false;
+  driftDueDate = false;
   unknownWrite?: string;
   rateLimit?: (url: string, method: string, count: number) =>
     { status: number; headers: Record<string,string> } | undefined;
@@ -213,7 +214,8 @@ class FakeGithub {
     if (url === ROOT + "/milestones" && method === "POST" && body) {
       const row = milestone("M", 17, {
         title: body.title, description: body.description ?? "",
-        due_on: body.due_on ?? null,
+        due_on: this.driftDueDate ? "2027-01-02T00:00:00Z" :
+          body.due_on ?? null,
       });
       this.milestones.push(row);
       return response(url, row, 201);
@@ -349,6 +351,17 @@ hidden.absentHidden=true;
 await denied("private repository 404 cannot mean empty", () =>
   executeCallbackApplyPlan(hidden.options()), "OWNER_UNCERTAIN");
 equal(hidden.mutations().length,0,"Hidden private repo cannot cause writes.");
+
+const dueDrift = new FakeGithub();
+dueDrift.driftDueDate = true;
+const rejectedDue = await denied("GitHub milestone due_on one-day drift is not verified",
+  () => executeCallbackApplyPlan(dueDrift.options()), "VERIFICATION_FAILED");
+assert(rejectedDue instanceof ApplyPlanError && rejectedDue.ownerState === "retained",
+  "Mismatched UTC due date fails closed with owner held for review.");
+equal(dueDrift.resourceWrites().length, 1,
+  "No downstream issue is created after due-date drift.");
+assert(dueDrift.ownerOid !== null,
+  "Failed due-date verification prohibits CAS release and retries.");
 
 const uncertain = new FakeGithub();
 uncertain.unknownWrite="/milestones";
