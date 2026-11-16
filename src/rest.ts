@@ -23,7 +23,9 @@ import type {
 } from "./types.ts";
 
 const API_BASE = "https://api.github.com";
-const API_VERSION = "2026-03-10";
+/** Shared pinned REST version for read-only planning and internal apply readers. */
+export const GITHUB_REST_API_VERSION = "2026-03-10";
+const API_VERSION = GITHUB_REST_API_VERSION;
 
 /** Stable GET discovery failure codes. Authentication, permission, rate limit,
  * unsafe pagination and malformed HTTP responses are differentiated. */
