@@ -165,7 +165,7 @@ export class ApplyPlanError extends Error {
 }
 
 /**
- * Internal handoff to #188's callback lifecycle; not an executable function.
+ * Internal handoff to #188's implemented callback lifecycle; no public executor.
  * The plan AND typed descriptors are deep-frozen cloned snapshots, preventing
  * caller mutation after preflight from changing what the next unit will use.
  */
