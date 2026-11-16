@@ -252,7 +252,7 @@ await refuse("owner parent missing", (r) => {
 await refuse("GitHub read permission denied", (r) => { r.backend.denied = true; },
   "READ_FAILED");
 await refuse("invalid proposed repository", (r) => {
-  (r.inspection as unknown as { repository: string }).repository = "a/b/other";
+  r.inspection = { ...r.inspection, repository: "a/b/other" };
 }, "INVALID_TARGET");
 await refuse("cancelled before validation", (r) => {
   const controller = new AbortController();
