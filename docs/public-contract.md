@@ -14,7 +14,13 @@ The internal `src/apply-preflight.ts` builds a versioned normalized-intent manif
 
 An internal, GET-only reader in src/apply-milestone-reader.ts now evaluates #178's version-1 milestone.create/update postconditions. It freshly reads the complete open/closed catalog and by-number resource for creates, or an existing milestone by number before/after update, checking identity stability, managed fields and omitted-field preservation. It rejects ambiguous exact titles, incomplete/unsafe pagination, missing REST id/node_id, unmatched response identities, invalid/missing GitHub fields, and unknown write outcomes without attempting a mutation retry. It normalizes due_on by UTC calendar day, honors explicit null clearing, and treats cleared description as an empty value.
 
-This stage does **not** automatically wire the reader into executePlanSteps(), issue verification, a C2 facade, lock acquisition or a production writer. A safe public execution path requires the remaining separately authorized #175, #180, #181 and #187–#190 tasks, including a tested GitHub reference adapter.
+This stage does **not** automatically wire the reader into executePlanSteps(), a C2 facade, lock acquisition or a production writer. Issue verification is independently staged in #180. A safe public execution path requires the remaining separately authorized #175, #181 and #187–#190 tasks, including a tested GitHub reference adapter.
+
+## Internal issue postcondition verification — #180 staging
+
+The internal GET-only issue reader consumes #178's versioned issue.create/update descriptors. It verifies unique exact marker ownership across every open/closed catalog page (excluding pull requests) and independent GET-by-number before and after a possible write. It checks REST number/id/node ID, title/body/state, milestone number or explicit null, late-bound producer numbers, and preservation of omitted update fields. A marker owner with different properties is a conflict, not permission to issue another POST. Unknown write outcomes never authorize blind retries.
+
+This stage does not wire the reader into the public executor, acquire A1 ownership, or dispatch mutations. Both issue and milestone readers are staged internally, but #181 disposable private-repository evidence and the C2 reference adapter remain separate requirements.
 
 ## Future apply boundary — C2 approved, NOT IMPLEMENTED
 
