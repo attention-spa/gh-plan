@@ -5,8 +5,10 @@ import type {
 
 const REF_PATTERN = /^([A-Za-z0-9][A-Za-z0-9._:/-]*)\.(number|id|nodeId)$/;
 
+/** Invalid reference syntax or a missing/unusable post-create identity. */
 export type PlanBindingErrorCode = "INVALID_PLAN_REFERENCE" | "UNRESOLVED_PLAN_REFERENCE";
 
+/** Typed pure binding error. No network operation is attempted when thrown. */
 export class PlanBindingError extends Error {
   readonly code: PlanBindingErrorCode;
   readonly reference: string;
@@ -49,7 +51,11 @@ function traverse(value: PlanJsonValue, visit: (reference: PlanValueRef) => void
   }
 }
 
-/** Scan a request without transport or mutation dependencies. */
+/**
+ * Pure scan of nested request paths, bodies and variables. Returns sorted unique
+ * resource logical IDs referenced by PlanValueRef placeholders. Invalid $ref
+ * shapes throw PlanBindingError; no network I/O or mutation occurs.
+ */
 export function requestReferences(request: PlanRequest): string[] {
   const references = new Set<string>();
   const collect = (ref: PlanValueRef): void => { references.add(parseRef(ref).logicalId); };
@@ -68,9 +74,11 @@ export function requestReferences(request: PlanRequest): string[] {
 }
 
 /**
- * Each late-bound ref must name a planned create step that is an explicit
- * predecessor of the consuming step. Existing resources should be inlined
- * by the compiler; only future identities belong in $ref expressions.
+ * Pure DAG validation. Each late-bound $ref must point to exactly one planned
+ * create step, with that producer's full step ID listed in consumer.dependsOn.
+ * Existing resource numbers are compiled inline, never bound later. Invalid
+ * syntax or missing producer dependencies become sorted blocking diagnostics,
+ * not thrown transport errors. No I/O.
  */
 export function validatePlanStepReferences(steps: readonly PlanStep[]): GithubDiagnostic[] {
   const producers = new Map<string, string[]>();
@@ -139,13 +147,16 @@ function bindValue(value: PlanJsonValue, bindings: PlanBindings): JsonValue {
   return value;
 }
 
+/** Request after substituting every future identity placeholder; safe for an executor to send. */
 export type BoundPlanRequest =
   | { protocol: "rest"; method: import("./types.ts").HttpMethod; path: string; body?: JsonValue }
   | { protocol: "graphql"; document: string; operationName?: string; variables?: Record<string, JsonValue> };
 
 /**
- * Resolve request references using externally supplied post-create identities.
- * Returns a new JSON-serializable request, leaving the input and bindings intact.
+ * Pure late binding of PlanValueRef tokens into post-create REST IDs/node IDs.
+ * Returns a new serializable request without changing input or bindings. Throws
+ * PlanBindingError for malformed, absent or invalid identity values. It never
+ * sends the resulting request or performs any other network I/O.
  */
 export function bindPlanRequest(request: PlanRequest, bindings: PlanBindings): BoundPlanRequest {
   if (request.protocol === "rest") {
