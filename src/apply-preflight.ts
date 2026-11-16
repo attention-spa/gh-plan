@@ -16,6 +16,8 @@ export interface ApplyIntentManifest {
     logicalId: string;
     kind: "issue" | "milestone";
     fields: string[];
+    removes: string[];
+    desiredState?: "open" | "closed";
   }>;
   unsupported: string[];
 }
@@ -106,7 +108,11 @@ export function buildApplyIntent(graph: NormalizedDesiredStateGraph): ApplyInten
   for (const resource of graph.resources) {
     if (resource.management !== "managed") continue;
     const fields = Object.keys(resource.desired).sort();
-    managed.push({ logicalId: resource.logicalId, kind: resource.kind, fields });
+    const removes = Object.entries(resource.desired)
+      .filter(([, intent]) => intent?.op === "remove").map(([field]) => field).sort();
+    const desiredState = resource.desired.state?.value;
+    managed.push({ logicalId: resource.logicalId, kind: resource.kind, fields, removes,
+      ...(desiredState ? { desiredState } : {}) });
     const allow = resource.kind === "issue"
       ? ["title", "body", "state", "milestone"]
       : ["title", "description", "state", "due_on"];
@@ -234,10 +240,15 @@ function stepSpec(step: PlanStep, steps: Map<string, PlanStep>, repository: stri
     identity = { strategy: "issue_number", number: target, marker: token };
     reads = ["issues.byNumber", "issues.catalog"];
   }
+  const checks = predicates(body);
+  // GitHub's issue-create endpoint starts in open state, even when state is
+  // omitted from the outgoing POST; make this independently checkable.
+  if (kind === "issue.create" && !Object.hasOwn(body, "state"))
+    checks.push({ field: "state", comparison: "exact", expected: "open" });
   return {
     version: 1, stepId: step.id, kind, repository,
     method: request.method as "POST" | "PATCH", path: request.path,
-    identity, predicates: predicates(body), reads,
+    identity, predicates: checks, reads,
   };
 }
 
@@ -274,7 +285,10 @@ export function preflightApplyPlan(plan: GithubPlan): ApplyCapabilityPreflight {
   if (manifest?.unsupported.length) fail("UNSUPPORTED_INTENT");
   if (manifest && (manifest.managed.some((m) =>
     !LOGICAL_ID.test(m.logicalId) || !["issue", "milestone"].includes(m.kind) ||
-    !Array.isArray(m.fields) || !m.fields.every((f) => typeof f === "string")) ||
+    !Array.isArray(m.fields) || !m.fields.every((f) => typeof f === "string") ||
+    !Array.isArray(m.removes) || !m.removes.every((f) => typeof f === "string" &&
+      m.fields.includes(f)) ||
+    (m.desiredState !== undefined && m.desiredState !== "open" && m.desiredState !== "closed")) ||
     new Set(manifest.managed.map((m) => m.logicalId)).size !== manifest.managed.length))
       fail("INVALID_PLAN");
 
@@ -304,7 +318,10 @@ export function preflightApplyPlan(plan: GithubPlan): ApplyCapabilityPreflight {
       new Set(step.dependsOn).size !== step.dependsOn.length ||
       step.dependsOn.includes(step.id) || step.status !== "planned" ||
       step.destructive !== false || !step.request) {
-      fail("INVALID_PLAN", i); return;
+      fail("INVALID_PLAN", i);
+      if (record(step) && typeof step.kind === "string" && !ALLOWED.has(step.kind as PlanOperationKind))
+        fail("UNSUPPORTED_OPERATION", i);
+      return;
     }
     steps.set(step.id, step);
   });
@@ -350,9 +367,13 @@ export function preflightApplyPlan(plan: GithubPlan): ApplyCapabilityPreflight {
         input.steps.some((step) => step.id === spec.stepId && step.logicalId === m.logicalId));
       if (m.fields.length && !matching.length) fail("UNSUPPORTED_INTENT");
       for (const field of m.fields) {
-        if (!matching.some((spec) => spec.predicates.some((predicate) => predicate.field === field))) {
-          fail("STALE_NOOP"); break;
-        }
+        const covered = matching.some((spec) => spec.predicates.some((predicate) =>
+          predicate.field === field && (field !== "state" ||
+            m.desiredState === undefined || predicate.expected === m.desiredState)));
+        const createClear = m.kind === "milestone" && m.removes.includes(field) &&
+          (field === "description" || field === "due_on") &&
+          matching.some((spec) => spec.kind === "milestone.create");
+        if (!covered && !createClear) { fail("STALE_NOOP"); break; }
       }
     }
     for (const spec of specs) {
@@ -362,6 +383,13 @@ export function preflightApplyPlan(plan: GithubPlan): ApplyCapabilityPreflight {
       if (!m) { fail("UNSUPPORTED_INTENT"); continue; }
       if (spec.kind.endsWith(".update") && spec.predicates.some((predicate) =>
         !m.fields.includes(predicate.field))) fail("UNSUPPORTED_INTENT");
+      for (const field of m.removes) {
+        const check = spec.predicates.find((p) => p.field === field);
+        if (check && ((field === "description" && check.expected !== "") ||
+          (field === "due_on" && check.expected !== null) ||
+          (field === "milestone" && check.expected !== null)))
+          fail("UNSAFE_REQUEST");
+      }
     }
   }
   if (errors.length) return { ok: false, errors };
