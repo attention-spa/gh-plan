@@ -149,7 +149,8 @@ function bindValue(value: PlanJsonValue, bindings: PlanBindings): JsonValue {
   if (Array.isArray(value)) return value.map((entry) => bindValue(entry, bindings));
   if (isObject(value)) {
     const output: Record<string, JsonValue> = Object.create(null) as Record<string, JsonValue>;
-    for (const key of Object.keys(value)) output[key] = bindValue(value[key] as PlanJsonValue, bindings);
+    for (const key of Object.keys(value)) output[key] = bindValue(
+      (value as Record<string, PlanJsonValue>)[key]!, bindings);
     return output;
   }
   return value;
