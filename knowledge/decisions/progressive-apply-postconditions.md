@@ -96,6 +96,17 @@ The pure function validates the complete request DAG, plan metadata/version, tar
 
 These descriptors describe **what readers must verify**, not proof the read occurred. No live GitHub reader, lock, production mutation dispatcher, public apply export or package publication was added. The C2 callback boundary remains explicitly untrusted without the separately tested reference adapter. Preserve the still-open [#179](https://github.com/attention-spa/gh-plan/issues/179), [#180](https://github.com/attention-spa/gh-plan/issues/180), and [#181](https://github.com/attention-spa/gh-plan/issues/181) readback and disposable-repo proofs.
 
+## #179 implementation checkpoint — milestone authoritative GET reader
+
+[#179](https://github.com/attention-spa/gh-plan/issues/179) adds internal GET-only milestone readback in [src/apply-milestone-reader.ts](https://github.com/attention-spa/gh-plan/blob/main/src/apply-milestone-reader.ts), consuming the version-1 milestone create/update descriptors from #178. It is **not** a public C2 apply executor, a lock or a GitHub write transport.
+
+- **Create:** fresh open+closed fully paginated milestone catalog, exact unique title, then independent GET by milestone **number**. REST number, numeric id and node_id must all exist and agree between catalog/detail; managed title, state, description and due date are independently checked. A duplicate or mismatched title blocks create rather than issuing another POST. A lost POST response is recoverable only when catalog + by-number GET uniquely verify the full predicate; a missing post-write match is **indeterminate**, not permission to retry.
+- **Update:** fresh GET by number before and after; compare mandatory stable identity and every changed predicate, additionally preserving the original title/state/description/due date wherever not managed. An already-satisfied before-read indicates a candidate zero-write skip; no cached planning snapshot counts. The reader's before-result is tied to the particular reader instance/spec to reject forged, cross-reader or stale after contexts.
+- **Normalization:** due dates compare the UTC calendar day of valid offset-aware ISO timestamps; explicit due_on removal requires a returned null, while description clearing accepts empty string or GitHub's normalized null. An omitted field means preserve, never clear. Missing fields, missing id/node ID, malformed pagination, off-repository or cross-origin Link targets, duplicate resource IDs and 401/403/404/429 errors are fatal.
+- **Auth and trust:** all operations are GET to api.github.com with the same pinned GitHub REST version as planning. Credentials are runtime-only, transport/validation errors contain only closed codes and before/after phases. An injected fetch is for deterministic tests and is caller-trusted; a future reference adapter must use trustworthy GitHub reads and A1 cooperative ownership.
+
+[#180](https://github.com/attention-spa/gh-plan/issues/180) issue verification, [#181](https://github.com/attention-spa/gh-plan/issues/181) disposable private-repository proof, and [#189](https://github.com/attention-spa/gh-plan/issues/189) the C2 GitHub adapter remain separate prerequisites. An HTTP 2xx or a matching preflight descriptor alone never proves a mutation succeeded.
+
 ## Independent implementation and disposable-test evidence
 
 - [#178](https://github.com/attention-spa/gh-plan/issues/178): typed capability predicate compiler, safe whole-plan preflight, exhaustive enum/shape tests, no-write rejection.
