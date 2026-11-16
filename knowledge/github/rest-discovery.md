@@ -5,7 +5,7 @@ description: "GitHub REST GET catalog, enrichment and assignee-eligibility endpo
 resource: https://docs.github.com/en/rest/issues/issues
 tags: [github, rest, permissions]
 status: draft
-generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T08:25:57+01:00 }
+generated: { by: gh-plan-docs/gpt-6, at: 2026-11-16T13:20:42.830Z }
 sources:
   - resource: https://docs.github.com/en/rest/issues/issues
   - resource: https://github.com/attention-spa/gh-plan/blob/main/src/rest.ts
@@ -19,6 +19,12 @@ GitHub REST GET catalog, enrichment and assignee-eligibility endpoints used by t
 ## Recovery-specific read contract
 
 M8.1.3's internal `createRestIssueCatalogReader()` uses `GET /repos/{owner}/{repo}/issues?state=all&per_page=100` with **every** Link pagination page, without relying on the original planning snapshot. It uses the existing sanitized transport errors, validates issue response shapes, excludes pull-request entries and never performs a mutation. The complete list allows an exact-marker uniqueness check immediately before each `issue.create`; failed pages prohibit dispatch. This read requires repository Issues: read. It does not provide a cross-process uniqueness lock.
+
+## M8.1.6b.2 milestone verification reader (internal)
+
+The [#179](https://github.com/attention-spa/gh-plan/issues/179) readback component implements two **fresh read phases** for only the milestone.create/update typed B1 predicates. Creation requires a fully paginated GET /repos/{owner}/{repo}/milestones?state=all&per_page=100, and whenever a title is found, GET /repos/{owner}/{repo}/milestones/{number}. Updates require GET by number before and after, matching immutable REST number/id/node ID and preserving omitted managed fields. GitHub description empty/null is interpreted as cleared; due_on null is distinguished from omission and set dates compare UTC calendar days. Partial or redirected responses, duplicate titles/IDs, title/property conflicts and status 401/403/404/429 fail closed; 404 cannot be presumed to mean a resource is absent. The reader never performs a mutation, never retries a POST or silently recovers an uncertain write.
+
+The reader is internal and does not expand public package exports, the read-only planner, or the authorized four-kind capability set. See the [B1 decision](/decisions/progressive-apply-postconditions.md).
 
 ## Verified endpoints and access
 

@@ -18,6 +18,8 @@ export interface FetchRequestInitLike {
   method?: string;
   headers?: Record<string, string>;
   body?: string;
+  /** The milestone postcondition reader forbids transparent cross-origin redirects. */
+  redirect?: "error" | "follow" | "manual";
 }
 
 /** Minimal HTTP response contract; no DOM Response instance is required. */
