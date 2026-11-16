@@ -69,9 +69,19 @@ export async function discoverAndResolve(
       logins.set(login.toLowerCase(), logins.get(login.toLowerCase()) ?? login);
     }
   }
-  return {
-    resolution,
-    snapshot: await transport.enrich(broad, issueNumbers,
-      [...logins.values()].sort((a, b) => a.localeCompare(b))),
-  };
+  for (const pr of desired.pullRequests ?? []) {
+    for (const operation of [pr.desired.assignees]) {
+      if (!operation) continue;
+      for (const login of operation.op === "set" ? operation.value : operation.add) {
+        logins.set(login.toLowerCase(), logins.get(login.toLowerCase()) ?? login);
+      }
+    }
+  }
+  const enriched = await transport.enrich(broad, issueNumbers,
+    [...logins.values()].sort((a, b) => a.localeCompare(b)));
+  const snapshot = desired.pullRequests?.length
+    ? await transport.enrichPullRequests?.(enriched, desired.pullRequests)
+    : enriched;
+  if (!snapshot) throw new Error("PR-aware discovery transport is required for pullRequests.");
+  return { resolution, snapshot };
 }

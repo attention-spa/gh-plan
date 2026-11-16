@@ -1,11 +1,14 @@
 import type {
   FetchLike,
   FetchResponseLike,
+  DesiredPullRequestResource,
   GithubDiscoveryTransport,
   GithubStateSnapshot,
   JsonValue,
   NormalizedDesiredStateGraph,
   ObservedIssue,
+  ObservedPullRequest,
+  PullRequestBranchCheck,
   ObservedIssueField,
   ObservedLabel,
   ObservedIssueFieldOption,
@@ -320,6 +323,52 @@ function mapRepository(raw: unknown): { repository: RepositoryRef; ownerType: st
   };
 }
 
+/** A PR is an issue entry in the broad list but not an ordinary issue mutation target. */
+function mapPullRequestIssueNumber(raw: unknown): number | undefined {
+  if (!isRecord(raw)) invalidResponse("/issues");
+  if (raw.pull_request === undefined) return undefined;
+  if (!isRecord(raw.pull_request)) invalidResponse("/issues.pull_request");
+  return requiredNumber(raw.number, "/issues.pull_request.number");
+}
+
+/** Convert targeted GET /pulls/{number} response to a complete PR snapshot. */
+function mapPullRequest(raw: unknown): ObservedPullRequest {
+  if (!isRecord(raw)) invalidResponse("/pulls");
+  const number = requiredNumber(raw.number, "/pulls.number");
+  const id = requiredNumber(raw.id, "/pulls.id");
+  const state = raw.state;
+  if (state !== "open" && state !== "closed") invalidResponse("/pulls.state");
+  if (typeof raw.draft !== "boolean") invalidResponse("/pulls.draft");
+  if (!isRecord(raw.head) || !isRecord(raw.base)) invalidResponse("/pulls.head-base");
+  const head = requiredString(raw.head.ref, "/pulls.head.ref");
+  const base = requiredString(raw.base.ref, "/pulls.base.ref");
+  const parseLogins = (list: unknown, key: string): string[] => {
+    if (!Array.isArray(list)) invalidResponse("/pulls." + key);
+    return list.map((entry, i) => {
+      if (!isRecord(entry)) invalidResponse("/pulls." + key + "." + i);
+      return requiredString(entry.login, "/pulls." + key + ".login");
+    }).sort((a, b) => a.localeCompare(b));
+  };
+  if (!Array.isArray(raw.labels)) invalidResponse("/pulls.labels");
+  const labels = raw.labels.map((x, i) => {
+    if (!isRecord(x)) invalidResponse("/pulls.labels." + i);
+    return requiredString(x.name, "/pulls.labels.name");
+  }).sort((a, b) => a.localeCompare(b));
+  const body = raw.body;
+  if (body !== undefined && body !== null && typeof body !== "string") invalidResponse("/pulls.body");
+  const nodeId = optionalString(raw.node_id, "/pulls.node_id");
+  return {
+    kind: "pull_request", number, id,
+    ...(nodeId === undefined ? {} : { nodeId }),
+    title: requiredString(raw.title, "/pulls.title"),
+    ...(body === undefined ? {} : { body: body as string | null }),
+    state, head, base, draft: raw.draft,
+    merged: raw.merged === true || raw.merged_at != null,
+    labels, assignees: parseLogins(raw.assignees, "assignees"),
+    requestedReviewers: parseLogins(raw.requested_reviewers ?? [], "requested_reviewers"),
+  };
+}
+
 function mapIssue(raw: unknown): ObservedIssue | undefined {
   if (!isRecord(raw)) invalidResponse("/issues");
   if (raw.pull_request !== undefined) return undefined;
@@ -578,6 +627,10 @@ export function createRestDiscoveryTransport(
       const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
 
       const rawIssues = await client.getPaginated<unknown>(`${repoPath}/issues?state=all&per_page=100`);
+      const pullRequestIssueNumbers = rawIssues
+        .map(mapPullRequestIssueNumber)
+        .filter((n): n is number => n !== undefined)
+        .sort((a, b) => a - b);
       const issues = rawIssues
         .map(mapIssue)
         .filter((issue): issue is ObservedIssue => issue !== undefined)
@@ -595,7 +648,8 @@ export function createRestDiscoveryTransport(
       const issueTypes = sortByNameThenId((rawIssueTypes ?? []).map(mapIssueType));
       // Catalog reads are needed only when the plan explicitly manages labels.
       // This keeps unchanged discovery request counts stable for other plans.
-      const needsLabels = !!desired.labels?.length || desired.resources.some((resource) =>
+      const needsLabels = !!desired.labels?.length ||
+        !!desired.pullRequests?.some((pr) => pr.desired.labels !== undefined) || desired.resources.some((resource) =>
         resource.kind === "issue" && resource.management === "managed" &&
         resource.desired.labels !== undefined);
       const labels = needsLabels
@@ -613,10 +667,91 @@ export function createRestDiscoveryTransport(
       return {
         repository,
         issues,
+        ...(desired.pullRequests?.length ? { pullRequestIssueNumbers } : {}),
         milestones,
         issueTypes,
         ...(labels === undefined ? {} : { labels }),
         issueFields,
+      };
+    },
+
+    /** Target only desired PR head/base pairs; never enrich unrelated PRs. */
+    async enrichPullRequests(
+      snapshot: GithubStateSnapshot,
+      desired: DesiredPullRequestResource[],
+    ): Promise<GithubStateSnapshot> {
+      if (!desired.length) return snapshot;
+      const [owner, repo] = splitRepository(snapshot.repository.fullName);
+      const basePath = "/repos/" + encodeURIComponent(owner) + "/" + encodeURIComponent(repo);
+      const seen = new Map<number, ObservedPullRequest>();
+      const checks: Record<string, PullRequestBranchCheck> = {};
+      const candidateIssues = new Set(snapshot.pullRequestIssueNumbers ?? []);
+      const candidates = await mapBounded([...desired].sort((a, b) =>
+        a.logicalId.localeCompare(b.logicalId)), limit, async (pr) => {
+        const number = pr.identity?.number;
+        if (number !== undefined) return candidateIssues.has(number) ? [number] : [];
+        // A filtered open pair query is bounded by the requested head and base;
+        // this avoids GET /pulls/{number} calls for unrelated PR issue entries.
+        const query = basePath + "/pulls?state=open&head=" +
+          encodeURIComponent(owner + ":" + pr.head) + "&base=" +
+          encodeURIComponent(pr.base) + "&per_page=100";
+        const list = await client.getPaginated<unknown>(query);
+        return list.map((item) => {
+          if (!isRecord(item)) invalidResponse(query);
+          const id = requiredNumber(item.number, query + ".number");
+          return id;
+        }).filter((id) => candidateIssues.has(id));
+      });
+      const numbers = [...new Set(candidates.flat())].sort((a, b) => a - b);
+      const detailed = await mapBounded(numbers, limit, async (number) => {
+        const raw = await client.getJson<unknown>(basePath + "/pulls/" + number);
+        const pull = mapPullRequest(raw);
+        if (pull.number !== number) invalidResponse(basePath + "/pulls/" + number);
+        const requested = await client.getJson<unknown>(
+          basePath + "/pulls/" + number + "/requested_reviewers");
+        if (!isRecord(requested) || !Array.isArray(requested.users))
+          invalidResponse(basePath + "/pulls/" + number + "/requested_reviewers");
+        const people = requested.users.map((u, index) => {
+          if (!isRecord(u)) invalidResponse("/pulls/requested_reviewers/" + index);
+          return requiredString(u.login, "/pulls/requested_reviewers.login");
+        }).sort((a, b) => a.localeCompare(b));
+        return { ...pull, requestedReviewers: people };
+      });
+      for (const p of detailed) seen.set(p.number, p);
+      for (let i = 0; i < desired.length; i++) {
+        // Request checks for new head/base pairs only. Existing explicit PRs may
+        // change base; GitHub validates any new base through PATCH on execution.
+        const pr = desired[i]!;
+        const matches = [...seen.values()].filter((item) =>
+          pr.identity?.number !== undefined ? item.number === pr.identity.number :
+          item.state === "open" && item.head === pr.head && item.base === pr.base);
+        if (matches.length) continue;
+        const prefix = basePath + "/git/ref/heads/";
+        const [headRef, baseRef] = await Promise.all([
+          client.getJsonOptional404<unknown>(prefix + encodeURIComponent(pr.head)),
+          client.getJsonOptional404<unknown>(prefix + encodeURIComponent(pr.base)),
+        ]);
+        let differs = false;
+        if (headRef !== undefined && baseRef !== undefined && pr.head !== pr.base) {
+          const raw = await client.getJsonOptional404<unknown>(
+            basePath + "/compare/" + encodeURIComponent(pr.base) + "..." +
+              encodeURIComponent(pr.head));
+          if (raw !== undefined) {
+            if (!isRecord(raw) || typeof raw.ahead_by !== "number")
+              invalidResponse("/compare/branch");
+            differs = raw.ahead_by > 0;
+          }
+        }
+        checks[pr.logicalId] = {
+          headExists: headRef !== undefined,
+          baseExists: baseRef !== undefined,
+          differs,
+        };
+      }
+      return {
+        ...snapshot,
+        pullRequests: [...seen.values()].sort((a, b) => a.number - b.number),
+        pullRequestBranchChecks: checks,
       };
     },
 

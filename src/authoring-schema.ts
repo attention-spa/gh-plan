@@ -110,6 +110,26 @@ export type AuthoringRelationship =
   | { kind: "blocks"; issue: string; blocked: string }
   | { kind: "relates_to"; from: string; to: string };
 
+/** Managed PR declaration, identified by a unique open head/base pair (or explicit PR number).
+ * head and base must be same-repository branch refs, not cross-fork selectors.
+ * Existing PRs can change base only when identity.number identifies the original PR. */
+export interface AuthoringPullRequest {
+  logicalId: string;
+  head: string;
+  base: string;
+  identity?: AuthoringIdentity;
+  title?: string | AuthoringSet<string>;
+  body?: string | AuthoringSetOrRemove<string>;
+  state?: "open" | "closed" | AuthoringSet<"open" | "closed">;
+  draft?: boolean | AuthoringSet<boolean>;
+  labels?: AuthoringIssueLabels;
+  assignees?: AuthoringIssueAssignees;
+  /** GitHub user logins only; a requested reviewer is not an approving review. */
+  reviewers?: AuthoringIssueAssignees;
+  /** Logical IDs of declared issues referenced by a managed Closes #number block. */
+  closes?: string[];
+}
+
 /** Public ergonomic planGithub() input. Fields omitted from managed resources are not touched.
  * Nested children flatten into parent edges; cross-resource validity is checked at runtime.
  * A string $schema value is an editor hint, not a transport instruction. */
@@ -120,6 +140,8 @@ export interface GithubPlanSchema {
   repository: string | { fullName: string; id?: number; nodeId?: string };
   /** Optional managed/reference issue trees. */
   issues?: AuthoringIssue[];
+  /** Managed pull requests, identified by open head/base pairs. Merging is not supported. */
+  pullRequests?: AuthoringPullRequest[];
   /** Optional milestones keyed by logical ID. */
   milestones?: AuthoringMilestone[];
   /** Optional repository-label declarations; omitted labels never imply deletion. */

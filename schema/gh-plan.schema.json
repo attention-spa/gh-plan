@@ -43,6 +43,13 @@
           },
           "description": "Optional managed/reference issue trees."
         },
+        "pullRequests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringPullRequest"
+          },
+          "description": "Managed pull requests, identified by open head/base pairs. Merging is not supported."
+        },
         "milestones": {
           "type": "array",
           "items": {
@@ -498,6 +505,110 @@
       ],
       "additionalProperties": false,
       "description": "Existing issue reference for relationships only; authoring a title or other desired state is prohibited."
+    },
+    "AuthoringPullRequest": {
+      "type": "object",
+      "properties": {
+        "logicalId": {
+          "type": "string"
+        },
+        "head": {
+          "type": "string"
+        },
+        "base": {
+          "type": "string"
+        },
+        "identity": {
+          "$ref": "#/$defs/AuthoringIdentity"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSet%3Cstring%3E"
+            }
+          ]
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSetOrRemove%3Cstring%3E"
+            }
+          ]
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "open"
+            },
+            {
+              "type": "string",
+              "const": "closed"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSet%3C(%22open%22%7C%22closed%22)%3E"
+            }
+          ]
+        },
+        "draft": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/AuthoringSet%3Cboolean%3E"
+            }
+          ]
+        },
+        "labels": {
+          "$ref": "#/$defs/AuthoringIssueLabels"
+        },
+        "assignees": {
+          "$ref": "#/$defs/AuthoringIssueAssignees"
+        },
+        "reviewers": {
+          "$ref": "#/$defs/AuthoringIssueAssignees",
+          "description": "GitHub user logins only; a requested reviewer is not an approving review."
+        },
+        "closes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Logical IDs of declared issues referenced by a managed Closes #number block."
+        }
+      },
+      "required": [
+        "logicalId",
+        "head",
+        "base"
+      ],
+      "additionalProperties": false,
+      "description": "Managed PR declaration, identified by a unique open head/base pair (or explicit PR number). head and base must be same-repository branch refs, not cross-fork selectors. Existing PRs can change base only when identity.number identifies the original PR."
+    },
+    "AuthoringSet<boolean>": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "const": "set"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false,
+      "description": "Explicitly assign a value; omitted properties are not managed."
     },
     "AuthoringMilestone": {
       "anyOf": [
