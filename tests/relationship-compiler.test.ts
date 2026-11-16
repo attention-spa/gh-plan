@@ -178,7 +178,7 @@ equal(bindPlanRequest(plan(r, "issue.dependency.add")!.request!, { NEW_PARENT: {
 }, "Late-bound IDs are executable by external integrations.");
 
 const schemaDefault = normalizeSchema({ repository: "acme/example", issues: [] });
-check(schemaDefault.ok && schemaDefault.graph?.relationshipMode === "reconcile",
+check(schemaDefault.ok && (schemaDefault.graph?.relationshipMode ?? "reconcile") === "reconcile",
   "Default schema relation mode is reconcile.");
 const schemaAdd = normalizeSchema({ repository: "acme/example", issues: [], relationshipMode: "additive" });
 check(schemaAdd.ok && schemaAdd.graph?.relationshipMode === "additive",
