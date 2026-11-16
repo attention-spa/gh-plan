@@ -177,6 +177,30 @@ equal(bindPlanRequest(plan(r, "issue.dependency.add")!.request!, { NEW_PARENT: {
   body: { issue_id: 777 },
 }, "Late-bound IDs are executable by external integrations.");
 
+
+r = run([{ kind: "parent", parent: "OLD", child: "CHILD" }],
+  observed(null, [], []), "reconcile",
+  [issue("OLD", "reference"), issue("CHILD")],
+  [existing("OLD", 1), fresh("CHILD")]);
+equal(plan(r, "issue.parent.set")?.request, {
+  protocol: "rest", method: "POST", path: "/repos/acme/example/issues/1/sub_issues",
+  body: { sub_issue_id: { $ref: "CHILD.id" } },
+}, "New child parent assignment requires its REST id, not issue number.");
+check(plan(r, "issue.parent.set")!.dependsOn.includes("issue.create:CHILD"),
+  "New child must be created before parent assignment.");
+const childProducer: PlanStep = {
+  id: "issue.create:CHILD", kind: "issue.create", logicalId: "CHILD",
+  status: "planned", current: null, desired: null, reason: "create",
+  dependsOn: [], preconditions: [], expectedPostconditions: [],
+  destructive: false, reversible: "partial",
+};
+equal(validatePlanStepReferences([childProducer, ...r.steps]), [],
+  "New child parent binding has a valid producer DAG.");
+equal(bindPlanRequest(plan(r, "issue.parent.set")!.request!, { CHILD: { id: 222 } }), {
+  protocol: "rest", method: "POST", path: "/repos/acme/example/issues/1/sub_issues",
+  body: { sub_issue_id: 222 },
+}, "New child REST id binds exactly in POST.");
+
 const schemaDefault = normalizeSchema({ repository: "acme/example", issues: [] });
 check(schemaDefault.ok && (schemaDefault.graph?.relationshipMode ?? "reconcile") === "reconcile",
   "Default schema relation mode is reconcile.");
