@@ -1,5 +1,6 @@
 import type {
   FetchLike,
+  DesiredProjectReference,
   FetchResponseLike,
   DesiredPullRequestResource,
   GithubDiscoveryTransport,
@@ -7,6 +8,9 @@ import type {
   JsonValue,
   NormalizedDesiredStateGraph,
   ObservedIssue,
+  ObservedProject,
+  ObservedProjectField,
+  ObservedProjectItem,
   ObservedPullRequest,
   PullRequestBranchCheck,
   ObservedIssueField,
@@ -575,6 +579,70 @@ async function enrichIssue(
 }
 
 
+
+/** Parse only fields and values actually returned by GitHub's Projects v2 REST list. */
+function mapProjectField(raw: unknown): ObservedProjectField {
+  if (!isRecord(raw)) invalidResponse("/projectsV2/fields");
+  const id = requiredNumber(raw.id, "/projectsV2/fields.id");
+  if (!Number.isSafeInteger(id) || id < 1) invalidResponse("/projectsV2/fields.id");
+  const name = requiredString(raw.name, "/projectsV2/fields.name");
+  const dataType = requiredString(raw.data_type, "/projectsV2/fields.data_type").toLowerCase();
+  const parseName = (value: unknown, path: string): string => {
+    if (typeof value === "string") return value;
+    if (!isRecord(value)) invalidResponse(path);
+    return requiredString(value.raw, path + ".raw");
+  };
+  const options = raw.options === undefined ? undefined :
+    Array.isArray(raw.options) ? raw.options.map((v) => {
+      if (!isRecord(v)) invalidResponse("/projectsV2/fields.options");
+      return { id: requiredString(v.id, "/projectsV2/fields.options.id"),
+        name: parseName(v.name, "/projectsV2/fields.options.name") };
+    }) : invalidResponse("/projectsV2/fields.options");
+  let iterations: ObservedProjectField["iterations"];
+  if (raw.configuration !== undefined) {
+    if (!isRecord(raw.configuration) ||
+        !Array.isArray(raw.configuration.iterations)) invalidResponse("/projectsV2/fields.configuration");
+    iterations = raw.configuration.iterations.map((v) => {
+      if (!isRecord(v)) invalidResponse("/projectsV2/fields.iterations");
+      return { id: requiredString(v.id, "/projectsV2/fields.iterations.id"),
+        title: parseName(v.title, "/projectsV2/fields.iterations.title") };
+    });
+  }
+  return { id, name, dataType, ...(options ? { options } : {}),
+    ...(iterations ? { iterations } : {}) };
+}
+
+/** Project item values are requested by numeric field IDs to avoid conflating names. */
+function mapProjectItem(raw: unknown, repoFullName: string): ObservedProjectItem | undefined {
+  if (!isRecord(raw)) invalidResponse("/projectsV2/items");
+  if (raw.content_type !== "Issue" && raw.content_type !== "PullRequest") return undefined;
+  if (!isRecord(raw.content)) invalidResponse("/projectsV2/items.content");
+  const repositoryUrl = raw.content.repository_url;
+  if (typeof repositoryUrl !== "string") invalidResponse("/projectsV2/items.content.repository_url");
+  const expectedRepo = "https://api.github.com/repos/" + repoFullName;
+  if (repositoryUrl.toLowerCase() !== expectedRepo.toLowerCase()) return undefined;
+  const id = requiredNumber(raw.id, "/projectsV2/items.id");
+  const contentId = requiredNumber(raw.content.id, "/projectsV2/items.content.id");
+  const contentNumber = requiredNumber(raw.content.number, "/projectsV2/items.content.number");
+  if (![id, contentId, contentNumber].every((v) => Number.isSafeInteger(v) && v > 0))
+    invalidResponse("/projectsV2/items.identity");
+  if (!Array.isArray(raw.fields)) invalidResponse("/projectsV2/items.fields");
+  const fields: ObservedProjectItem["fields"] = {};
+  for (const entry of raw.fields) {
+    if (!isRecord(entry)) invalidResponse("/projectsV2/items.fields");
+    const id = isRecord(entry.field) ? entry.field.id : entry.id;
+    if (typeof id !== "number" || !Number.isSafeInteger(id) || id < 1)
+      invalidResponse("/projectsV2/items.fields.id");
+    if (Object.hasOwn(fields, String(id))) invalidResponse("/projectsV2/items.fields.duplicate");
+    const value = entry.value;
+    if (value !== null && typeof value !== "string" &&
+        !(typeof value === "number" && Number.isFinite(value)))
+      invalidResponse("/projectsV2/items.fields.value");
+    fields[id] = value;
+  }
+  return { id, contentType: raw.content_type, contentId, contentNumber, fields };
+}
+
 /** Bounded worker pool. Results retain input order, regardless of completion order. */
 async function mapBounded<T, R>(
   items: T[],
@@ -753,6 +821,46 @@ export function createRestDiscoveryTransport(
         pullRequests: [...seen.values()].sort((a, b) => a.number - b.number),
         pullRequestBranchChecks: checks,
       };
+    },
+
+
+    /** Read existing Projects v2 only; no project, field or item mutation. */
+    async enrichProjects(
+      snapshot: GithubStateSnapshot,
+      desired: NormalizedDesiredStateGraph,
+    ): Promise<GithubStateSnapshot> {
+      const references = [...(desired.projects ?? [])].sort((a, b) =>
+        a.logicalId.localeCompare(b.logicalId));
+      if (!references.length) return snapshot;
+      const boards = await mapBounded(references, limit, async (ref: DesiredProjectReference) => {
+        const root = "/" + (ref.ownerType === "user" ? "users" : "orgs") + "/" +
+          encodeURIComponent(ref.owner) + "/projectsV2/" + ref.number;
+        const project = await client.getJsonOptional404<unknown>(root);
+        if (project === undefined) return {
+          logicalId: ref.logicalId, owner: ref.owner, number: ref.number,
+          ownerType: ref.ownerType, missing: true, fields: [], items: [],
+        } satisfies ObservedProject;
+        if (!isRecord(project) || project.number !== ref.number) invalidResponse(root);
+        const rawFields = await client.getPaginated<unknown>(root + "/fields?per_page=100");
+        const fields = rawFields.map(mapProjectField).sort((a, b) =>
+          a.name.localeCompare(b.name) || a.id - b.id);
+        if (new Set(fields.map((field) => field.id)).size !== fields.length)
+          invalidResponse(root + "/fields");
+        const fieldIds = fields.map((field) => field.id).sort((a,b) => a-b);
+        const q = "repo:" + snapshot.repository.fullName;
+        const query = root + "/items?q=" + encodeURIComponent(q) +
+          (fieldIds.length ? "&fields=" + encodeURIComponent(fieldIds.join(",")) : "") +
+          "&per_page=100";
+        const rawItems = await client.getPaginated<unknown>(query);
+        const items = rawItems.map((raw) => mapProjectItem(raw, snapshot.repository.fullName))
+          .filter((item): item is ObservedProjectItem => item !== undefined)
+          .sort((a, b) => a.id - b.id);
+        return {
+          logicalId: ref.logicalId, owner: ref.owner, number: ref.number,
+          ownerType: ref.ownerType, fields, items,
+        } satisfies ObservedProject;
+      });
+      return { ...snapshot, projects: boards };
     },
 
     async enrich(snapshot: GithubStateSnapshot, issueNumbers: number[],
