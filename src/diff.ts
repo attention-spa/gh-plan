@@ -100,6 +100,60 @@ export function diffGithubState(
     return { diffs, blockers, warnings, unsupported };
   }
 
+
+  if (desired.labels?.length) {
+    if (!observed.labels) {
+      for (const label of desired.labels) {
+        report("UNRESOLVED_REFERENCE", "label.identity:" + label.logicalId,
+          label.logicalId, "label", "name", "Repository label catalog was not discovered.");
+      }
+    } else {
+      for (const label of desired.labels) {
+        const id = label.logicalId;
+        const matches = observed.labels.filter((candidate) =>
+          candidate.name.toLowerCase() === label.name.toLowerCase());
+        if (matches.length > 1) {
+          report("AMBIGUOUS_IDENTITY", "label.identity:" + id, id, "label", "name",
+            "Ambiguous repository label identity for " + label.name + ".");
+          continue;
+        }
+        const current = matches[0];
+        if (!current) {
+          if (label.management === "reference") {
+            report("UNKNOWN_LABEL", "label.identity:" + id, id, "label", "name",
+              "Referenced repository label " + label.name + " does not exist.");
+          } else {
+            add("label.create:" + id, id, "label", "create",
+              "Repository label " + label.name + " is missing.", "label", null,
+              { name: label.name,
+                color: label.color ?? "ededed",
+                ...(label.description === undefined ? {} : { description: label.description }) });
+          }
+          continue;
+        }
+        if (label.management === "reference") continue;
+        if (label.color !== undefined) {
+          if (current.color === undefined) {
+            report("UNRESOLVED_REFERENCE", "label.color:" + id, id, "label", "color",
+              "Observed repository label color is missing for " + label.name + ".");
+          } else {
+            compare("label.color:" + id, id, "label", "color",
+              current.color.toLowerCase(), { op: "set", value: label.color });
+          }
+        }
+        if (label.description !== undefined) {
+          if (current.description === undefined) {
+            report("UNRESOLVED_REFERENCE", "label.description:" + id, id, "label",
+              "description", "Observed repository label description is missing for " + label.name + ".");
+          } else {
+            compare("label.description:" + id, id, "label", "description",
+              current.description ?? "", { op: "set", value: label.description });
+          }
+        }
+      }
+    }
+  }
+
   for (const resource of [...desired.resources].sort((a, b) => a.logicalId.localeCompare(b.logicalId))) {
     const id = resource.logicalId, kind = resource.kind, resolution = resolved.get(id);
     if (!resolution || resolution.kind !== kind || resolution.status === "unresolved" || resolution.status === "ambiguous") {
@@ -171,7 +225,14 @@ export function diffGithubState(
         const key = label.name.toLowerCase();
         keys.set(key, [...(keys.get(key) ?? []), label.name]);
       }
-      const unknown = requested.filter((name) => keys.get(name.toLowerCase())?.length !== 1);
+      const managed = new Set((desired.labels ?? [])
+        .filter((label) => label.management === "managed")
+        .map((label) => label.name.toLowerCase()));
+      const unknown = requested.filter((name) => {
+        const found = keys.get(name.toLowerCase())?.length ?? 0;
+        return found !== 1 && !(found === 0 && available !== undefined &&
+          managed.has(name.toLowerCase()));
+      });
       if (unknown.length) {
         report("UNKNOWN_LABEL", labelId, id, kind, "labels",
           "Unknown or ambiguous labels: " + unknown.join(", ") + ".",
