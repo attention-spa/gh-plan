@@ -232,7 +232,7 @@ export function createRestMilestonePostconditionReader(
   async function get(url: string, phase: MilestoneReadPhase): Promise<{ data: unknown; link: string | null }> {
     let response: FetchResponseLike;
     try {
-      response = await fetcher(url, { method: "GET", headers: {
+      response = await fetcher(url, { method: "GET", redirect: "error", headers: {
         Accept: "application/vnd.github+json",
         Authorization: "Bearer " + options.auth,
         "X-GitHub-Api-Version": GITHUB_REST_API_VERSION,
@@ -245,7 +245,15 @@ export function createRestMilestonePostconditionReader(
     if (response.status !== 200) fail(classify(response.status, response.headers), phase);
     let data: unknown;
     try { data = await response.json(); } catch { return fail("INVALID_RESPONSE", phase); }
-    return { data, link: response.headers.get("link") };
+    let link: string | null;
+    try {
+      link = response.headers.get("link");
+      if (link !== null && typeof link !== "string")
+        fail("INVALID_RESPONSE", phase);
+    } catch {
+      return fail("INVALID_RESPONSE", phase);
+    }
+    return { data, link };
   }
 
   async function catalog(spec: ApplyPostconditionSpec, phase: MilestoneReadPhase):
@@ -329,10 +337,11 @@ export function createRestMilestonePostconditionReader(
         fail("INVALID_SPEC", "after");
       const observed = await verify(spec, "after");
       if (!observed) fail("INDETERMINATE_WRITE", "after");
-      if (proof.snapshot && (
-        !sameIdentity(proof.snapshot, observed) ||
-        spec.kind === "milestone.update" && !preservesUnmanaged(spec, proof.snapshot, observed)))
+      if (proof.snapshot && !sameIdentity(proof.snapshot, observed))
         fail("IDENTITY_MISMATCH", "after");
+      if (proof.snapshot && spec.kind === "milestone.update" &&
+          !preservesUnmanaged(spec, proof.snapshot, observed))
+        fail("POSTCONDITION_MISMATCH", "after");
       if (responseIdentity !== undefined) {
         const claim = validateClaim(responseIdentity, "after");
         if (!matchesClaim(observed, claim)) fail("IDENTITY_MISMATCH", "after");
