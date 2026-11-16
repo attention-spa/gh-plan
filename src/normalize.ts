@@ -664,7 +664,7 @@ export function normalizeSchema(schema: object): NormalizationResult {
     ok: true,
     graph: {
       repository: repository!,
-      relationshipMode: relationshipMode === "additive" ? "additive" : "reconcile",
+      ...(relationshipMode === "additive" ? { relationshipMode: "additive" as const } : {}),
       resources,
       relationships: deduped,
     },
