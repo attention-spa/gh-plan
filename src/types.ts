@@ -641,6 +641,8 @@ export type GithubPlanReadiness = "ready" | "ready_with_warnings" | "blocked";
 
 /** Deterministic read-only proposal. Check readiness before executing the topologically ordered steps. */
 export interface GithubPlan {
+  /** Normalized managed-intent manifest, required by future fail-closed apply preflight. */
+  applyIntent?: import("./apply-preflight.ts").ApplyIntentManifest;
   metadata: GithubPlanMetadata;
   repository: RepositoryRef;
   desired: DesiredStateSummary;
