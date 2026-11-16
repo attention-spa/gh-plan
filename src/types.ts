@@ -36,6 +36,8 @@ export interface GithubPlannerConfig {
   mode?: GithubPlannerMode;
   /** Default false; only explicitly opted-in plans may adopt existing issues by title. */
   adoptByTitle?: boolean;
+  /** Per-issue REST enrichment worker count; defaults to four. */
+  enrichConcurrency?: number;
 }
 
 export type LogicalResourceId = string;
@@ -232,7 +234,10 @@ export interface GithubStateSnapshot {
 
 export interface GithubDiscoveryTransport {
   readonly mode: GithubPlannerMode;
+  /** Broad repository data and issue summaries; no per-issue requests. */
   discover(desired: NormalizedDesiredStateGraph): Promise<GithubStateSnapshot>;
+  /** Targeted per-issue detail requests; preserves untargeted summaries. */
+  enrich(snapshot: GithubStateSnapshot, issueNumbers: number[]): Promise<GithubStateSnapshot>;
 }
 
 export type PlanStepStatus = "planned" | "noop" | "blocked" | "unsupported";

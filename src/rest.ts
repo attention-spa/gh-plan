@@ -70,6 +70,8 @@ export class GithubRestTransportError extends Error {
 export interface RestDiscoveryTransportConfig {
   auth: string;
   fetch?: FetchLike;
+  /** Maximum concurrent issue enrichments (default 4). */
+  enrichConcurrency?: number;
 }
 
 type RecordLike = Record<string, unknown>;
@@ -449,9 +451,32 @@ async function enrichIssue(
   };
 }
 
+
+/** Bounded worker pool. Results retain input order, regardless of completion order. */
+async function mapBounded<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  async function run(): Promise<void> {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await worker(items[index]!);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, run));
+  return results;
+}
+
 export function createRestDiscoveryTransport(
   config: RestDiscoveryTransportConfig,
 ): GithubDiscoveryTransport {
+  const limit = config.enrichConcurrency ?? 4;
+  if (!Number.isSafeInteger(limit) || limit < 1) {
+    throw new RangeError("enrichConcurrency must be a positive safe integer.");
+  }
   const fetch = resolveFetch(config.fetch);
   const client = createRestClient(config.auth, fetch);
 
@@ -492,17 +517,37 @@ export function createRestDiscoveryTransport(
         issueFields = sortByNameThenId(rawFields.map(mapIssueField));
       }
 
-      const enrichedIssues: ObservedIssue[] = [];
-      for (const issue of issues) {
-        enrichedIssues.push(await enrichIssue(issue, client, repoPath, organizationOwned));
-      }
-
       return {
         repository,
-        issues: enrichedIssues,
+        issues,
         milestones,
         issueTypes,
         issueFields,
+      };
+    },
+
+    async enrich(snapshot: GithubStateSnapshot, issueNumbers: number[]): Promise<GithubStateSnapshot> {
+      const [owner, repo] = splitRepository(snapshot.repository.fullName);
+      const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+      const selected = [...new Set(issueNumbers)].sort((a, b) => a - b);
+      const byNumber = new Map(snapshot.issues.map((issue) => [issue.number, issue] as const));
+      for (const number of selected) {
+        if (!Number.isSafeInteger(number) || number < 1 || !byNumber.has(number)) {
+          invalidResponse(`${repoPath}/issues/<unknown-issue-number>`);
+        }
+      }
+      // Issue-field metadata is acquired by discover() only for organizations.
+      // If there are no declared fields, per-issue field-value reads add no value.
+      const includeFields = snapshot.issueFields.length > 0;
+      const enriched = await mapBounded(selected, limit, (number) =>
+        enrichIssue(byNumber.get(number)!, client, repoPath, includeFields)
+      );
+      const updated = new Map(enriched.map((issue) => [issue.number, issue] as const));
+      return {
+        ...snapshot,
+        issues: snapshot.issues
+          .map((issue) => updated.get(issue.number) ?? issue)
+          .sort((a, b) => a.number - b.number),
       };
     },
   };

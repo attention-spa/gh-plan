@@ -1,4 +1,6 @@
 export { normalizeSchema } from "./normalize.ts";
+export { discoverAndResolve } from "./discovery.ts";
+export type { DiscoveryResolutionResult } from "./discovery.ts";
 export type { NormalizationResult } from "./normalize.ts";
 
 export {

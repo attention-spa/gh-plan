@@ -31,6 +31,7 @@ const config = {
   octokit: { graphql: async () => ({}) },
   mode: "graphql",
   adoptByTitle: true,
+  enrichConcurrency: 4,
 } satisfies GithubPlannerConfig;
 
 void config;
