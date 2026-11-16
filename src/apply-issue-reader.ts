@@ -207,9 +207,10 @@ function resolve(spec: IssueDescriptor, context: IssueReadContext | undefined,
     : undefined;
   const hint = context?.expectedIdentity === undefined ? undefined :
     identityClaim(context.expectedIdentity, phase, true);
+  const producerBindings = context?.bindings as Readonly<PlanBindings> | undefined;
   const producer = spec.identity.strategy === "issue_number" &&
       !positive(spec.identity.number)
-    ? context?.bindings?.[idFromSpec(spec)] : undefined;
+    ? producerBindings?.[idFromSpec(spec)] : undefined;
   const verifiedProducer = producer === undefined ? undefined :
     identityClaim(producer, phase, true);
   const claim = {
