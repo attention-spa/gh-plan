@@ -123,13 +123,19 @@ function checkSpec(spec: ApplyPostconditionSpec, phase: MilestoneReadPhase): voi
 
   const create = spec.kind === "milestone.create";
   const base = "/repos/" + spec.repository + "/milestones";
-  if (spec.method !== (create ? "POST" : "PATCH") ||
-      spec.path !== (create ? base : base + "/" + spec.identity.number) ||
-      spec.identity.strategy !== (create ? "unique_milestone_title" : "milestone_number") ||
-      create && (typeof spec.identity.title !== "string" || !spec.identity.title.trim()) ||
-      !create && !POSITIVE(spec.identity.number) ||
-      spec.reads.join(",") !== (create ? "milestones.catalog,milestones.byNumber" : "milestones.byNumber"))
-    fail("INVALID_SPEC", phase);
+  if (create) {
+    if (spec.method !== "POST" || spec.path !== base ||
+        spec.identity.strategy !== "unique_milestone_title" ||
+        typeof spec.identity.title !== "string" || !spec.identity.title.trim() ||
+        spec.reads.join(",") !== "milestones.catalog,milestones.byNumber")
+      fail("INVALID_SPEC", phase);
+  } else {
+    if (spec.method !== "PATCH" || spec.identity.strategy !== "milestone_number" ||
+        !POSITIVE(spec.identity.number) ||
+        spec.path !== base + "/" + spec.identity.number ||
+        spec.reads.join(",") !== "milestones.byNumber")
+      fail("INVALID_SPEC", phase);
+  }
 
   const seen = new Set<string>();
   for (const predicate of spec.predicates) {
@@ -150,8 +156,10 @@ function checkSpec(spec: ApplyPostconditionSpec, phase: MilestoneReadPhase): voi
             fromGithubMilestoneDueOn(expected) === undefined))
       fail("INVALID_SPEC", phase);
   }
-  if (create && (!seen.has("title") || spec.predicates.find((p) =>
-    p.field === "title")?.expected !== spec.identity.title)) fail("INVALID_SPEC", phase);
+  if (create && spec.identity.strategy === "unique_milestone_title" &&
+      (!seen.has("title") || spec.predicates.find((p) =>
+        p.field === "title")?.expected !== spec.identity.title))
+    fail("INVALID_SPEC", phase);
 }
 function readSnapshot(raw: unknown, phase: MilestoneReadPhase): MilestoneSnapshot {
   if (!isRecord(raw) || !POSITIVE(raw.number) || !POSITIVE(raw.id) ||
