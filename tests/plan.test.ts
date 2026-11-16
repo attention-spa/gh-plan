@@ -88,7 +88,7 @@ for (const s of plan.steps) {
     check(plan.steps.findIndex((x) => x.id === dep) < plan.steps.indexOf(s),
       "Every dependency must precede consumer " + s.id);
 }
-check(calls.length === 5, "Empty repo discovery must use only five GET requests.");
+check(calls.length === 4, "Empty repo discovery must use only four GET requests.");
 check(plan.steps.every((s) => s.status === "planned" && !!s.request),
   "All pending operations must include actionable request specifications.");
 check(!JSON.stringify(plan).includes("fixture-secret"), "No secret may leak into output.");
@@ -105,7 +105,7 @@ equal(plan.steps, [], "Applied desired state must contain no write steps.");
 check(plan.summary.noops >= 5, "Applied plan should report existing resources and edges as noops.");
 equal(plan.resolutions.map((x) => x.status), ["existing", "existing", "existing"],
   "Identities resolve from canonical markers or milestone title.");
-check(appliedCalls.length === 11, "Applied state only enriches two relevant issues.");
+check(appliedCalls.length === 10, "Applied state only enriches two relevant issues.");
 check(plan.noops.every((s) => s.status === "noop"), "Noops are not executable.");
 
 const badSchema = {
