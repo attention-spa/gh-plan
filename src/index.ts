@@ -1,3 +1,4 @@
+export { planGithub, GITHUB_PLAN_VERSION } from "./plan.ts";
 export { compileRelationshipSteps } from "./relationship-compiler.ts";
 export type { RelationshipCompilationResult } from "./relationship-compiler.ts";
 export { compileIssueFieldSteps } from "./issue-field-compiler.ts";
