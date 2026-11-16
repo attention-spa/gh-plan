@@ -128,7 +128,8 @@ export function compileIssueSteps(
         continue;
       }
     }
-    if (d.issueType && observed.issueTypes.filter((type) => type.name === d.issueType.value).length !== 1) {
+    const requestedType = d.issueType?.value;
+    if (requestedType !== undefined && observed.issueTypes.filter((type) => type.name === requestedType).length !== 1) {
       blockers.push(blocker(id, "Unknown or ambiguous issue type " + d.issueType.value + ".", "UNKNOWN_ISSUE_TYPE"));
       continue;
     }
@@ -163,7 +164,7 @@ export function compileIssueSteps(
           "Close the newly created issue.", [createId],
           {
             protocol: "rest", method: "PATCH",
-            path: [prefix + "/", { $ref: id + ".number" }], body: { state: "closed" },
+            path: [prefix + "/", { $ref: `${id}.number` as `${string}.number` }], body: { state: "closed" },
           }));
       }
       continue;
@@ -194,17 +195,21 @@ export function compileIssueSteps(
       if (diff.status === "noop") continue;
       before[property] = diff.current ?? null;
       if (property === "body") {
-        changed.body = withMarker(operation.op === "set" ? operation.value : "", token);
+        const bodyOp = d.body!;
+        changed.body = withMarker(bodyOp.op === "set" ? bodyOp.value : "", token);
       } else if (property === "milestone") {
-        if (operation.op === "remove") changed.milestone = null;
+        const milestoneOp = d.milestone!;
+        if (milestoneOp.op === "remove") changed.milestone = null;
         else {
-          const target = milestone(id, operation.value.logicalId);
+          const target = milestone(id, milestoneOp.value.logicalId);
           if (!target) { invalid = true; break; }
           changed.milestone = target.value;
           dependsOn.push(...target.dependsOn);
         }
-      } else if (operation.op === "set") {
-        changed[property] = operation.value;
+      } else if (property === "title") {
+        changed.title = d.title!.value;
+      } else {
+        changed.state = d.state!.value;
       }
     }
     if (invalid) continue;
@@ -224,7 +229,7 @@ export function compileIssueSteps(
           "Apply only explicitly changed issue properties.", dependsOn,
         { protocol: "rest", method: "PATCH", path: prefix + "/" + number, body: changed },
         changed.body !== undefined ? "partial" : true));
-    } else {
+    } else if (typeDiff?.status !== "update") {
       noops.push(issueStep("issue.noop:" + id, id, "issue.update", "noop",
         null, null, relevant.length ? "Explicit issue state matches." : "No issue core properties are managed."));
     }
