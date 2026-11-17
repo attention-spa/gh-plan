@@ -13,6 +13,8 @@ import type {
 } from "../src/types.ts";
 import type { SafeApplyLogEntry } from "../src/apply-contract.ts";
 
+
+async function main(): Promise<void> {
 const TARGET = "agent-hachi/gh-plan-acceptance-181-20261117";
 const BASE = "https://api.github.com";
 const ROOT = BASE + "/repos/" + TARGET;
@@ -96,6 +98,13 @@ function step(kind: PlanStep["kind"], id: string, request: PlanRequest,
   };
 }
 const repo = await get("");
+await checkpoint("authenticated_repo_read", {
+  repositoryId: repo.id, repositoryNode: repo.node_id,
+  private: repo.private,
+  permissionsPresent: typeof repo.permissions === "object",
+  push: typeof repo.permissions === "object" && repo.permissions !== null
+    ? (repo.permissions as Record<string, unknown>).push : "missing",
+});
 check(repo.full_name === TARGET && repo.private === true &&
   typeof repo.id === "number" && typeof repo.node_id === "string",
   "wrong or non-private repository identity");
@@ -234,3 +243,29 @@ await checkpoint("complete_initial", {
     .map(x=>({method:x.method,path:x.path,status:x.status})),
 });
 console.log("LIVE #181 initial four-kind A1/B1/C2 apply and zero-resource-write rerun passed.");
+
+}
+try {
+  await main();
+} catch (error) {
+  const row = error && typeof error === "object"
+    ? error as { code?: unknown; phase?: unknown; ownerState?: unknown; name?: unknown;
+        message?: unknown } : {};
+  const safe = typeof row.message === "string" &&
+    /^(181 ACCEPTANCE:|Live #181 refused:)/.test(row.message)
+    ? row.message : undefined;
+  const failure = {
+    issue: 181, result: "failed",
+    kind: typeof row.name === "string" ? row.name : "unknown",
+    ...(typeof row.code === "string" ? { code: row.code } : {}),
+    ...(typeof row.phase === "string" ? { phase: row.phase } : {}),
+    ...(typeof row.ownerState === "string" ? { ownerState: row.ownerState } : {}),
+    ...(safe ? { diagnostic: safe } : {}),
+  };
+  await mkdir("evidence", { recursive: true });
+  await writeFile("evidence/live-181-error.json",
+    JSON.stringify(failure, null, 2) + "\n");
+  console.error("Live #181 stopped:", failure.kind,
+    "code" in failure ? failure.code : "unknown");
+  process.exitCode = 1;
+}
