@@ -129,6 +129,7 @@ class FakeGithub {
   absentHidden = false;
   wrongRepo = false;
   driftDueDate = false;
+  issueCatalogLagReads = 0;
   unknownWrite?: string;
   rateLimit?: (url: string, method: string, count: number) =>
     { status: number; headers: Record<string,string> } | undefined;
@@ -193,8 +194,16 @@ class FakeGithub {
     const isList = method === "GET" && (
       url === ROOT + "/issues?state=all&per_page=100" ||
       url === ROOT + "/milestones?state=all&per_page=100");
-    if (isList) return response(url, url.includes("/issues?") ?
-      this.issues : this.milestones);
+    if (isList) {
+      // GitHub issue catalogs can be briefly stale after a successful POST;
+      // only the list is stale, not the durable created issue/detail.
+      if (url.includes("/issues?") && this.issueCatalogLagReads > 0 &&
+          this.issues.some((row) => row.number === 37)) {
+        this.issueCatalogLagReads--;
+        return response(url, this.issues.filter((row) => row.number !== 37));
+      }
+      return response(url, url.includes("/issues?") ? this.issues : this.milestones);
+    }
     const issuePrefix = ROOT + "/issues/", milestonePrefix = ROOT + "/milestones/";
     if (url.startsWith(issuePrefix) && method === "GET") {
       const row = this.issues.find((i) =>
@@ -413,6 +422,33 @@ equal(dueDrift.resourceWrites().length, 1,
   "No downstream issue is created after due-date drift.");
 assert(dueDrift.ownerOid !== null,
   "Failed due-date verification prohibits CAS release and retries.");
+
+const delayedIssue = new FakeGithub();
+delayedIssue.issueCatalogLagReads = 2;
+const delayedResult = await executeCallbackApplyPlan(delayedIssue.options());
+equal(delayedResult.status, "applied",
+  "Bounded GET-only retry verifies newly created issue after catalog indexing lag.");
+equal(delayedIssue.callsCount.get("POST " + ROOT + "/issues"), 1,
+  "Catalog index lag cannot trigger duplicate issue POST.");
+assert(delayedIssue.sleeps.includes(2000),
+  "Live-like eventual visibility waits with increasing bounded read-only delays.");
+equal(delayedIssue.ownerOid, null,
+  "A1 owner releases only after eventual verified issue readback.");
+
+const invisibleIssue = new FakeGithub();
+invisibleIssue.issueCatalogLagReads = 999;
+const invisibleFailure = await denied(
+  "exhausted issue catalog visibility retains owner without repeating POST",
+  () => executeCallbackApplyPlan(invisibleIssue.options()), "VERIFICATION_FAILED");
+assert(invisibleFailure instanceof ApplyPlanError &&
+  invisibleFailure.ownerState === "retained",
+  "An unverified issue remains unknown despite a successful POST response.");
+equal(invisibleIssue.callsCount.get("POST " + ROOT + "/issues"), 1,
+  "Exhausted GET-only verification never repeats issue create.");
+assert(invisibleIssue.sleeps.includes(8000),
+  "Visibility reconciliation exhausts its bounded backoff and stops.");
+assert(invisibleIssue.ownerOid !== null,
+  "Lock remains held when the created issue cannot be verified.");
 
 const uncertain = new FakeGithub();
 uncertain.unknownWrite="/milestones";
