@@ -371,9 +371,25 @@ equal(otherRepo.calls.length, 0, "Non-B1 path cannot reach network.");
 
 const noPush = new FakeGithub();
 noPush.push=false;
-await denied("milestone-on-issue-create requires push access", () =>
-  executeCallbackApplyPlan(noPush.options()), "OWNER_UNCERTAIN");
-equal(noPush.mutations().length, 0, "Push-access rejection precedes A1 owner writes.");
+const appTokenResult = await executeCallbackApplyPlan(noPush.options());
+equal(appTokenResult.status,"applied",
+  "GitHub App token may write issue+milestone despite permissions.push=false.");
+equal(noPush.resourceWrites().length,5,
+  "Install-token role hint must not incorrectly deny actual authorized writes.");
+const deniedIssueWrite = new FakeGithub();
+deniedIssueWrite.rateLimit=(url,method) =>
+  url === ROOT + "/issues" && method === "POST" ?
+    {status:403,headers:{}} : undefined;
+const permissionFailure = await denied(
+  "real Issues write denial cannot be bypassed after valid A1 ownership",()=>
+    executeCallbackApplyPlan(deniedIssueWrite.options()),"INDETERMINATE_WRITE");
+assert(permissionFailure instanceof ApplyPlanError &&
+  permissionFailure.ownerState==="retained",
+  "A denied possible issue write stops with owner retained.");
+equal(deniedIssueWrite.callsCount.get("POST "+ROOT+"/issues"),1,
+  "Denied issue create is never retried.");
+assert(deniedIssueWrite.ownerOid !== null,
+  "No automatic A1 release after a failed issue create.");
 
 const wrong = new FakeGithub();
 wrong.wrongRepo=true;
