@@ -42,6 +42,7 @@ jobs:
           node-version: 24
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: git diff --exit-code -- package.json package-lock.json
+      - run: npm audit --package-lock-only --audit-level=moderate
       - run: npm run build
       - run: npm run test:dist
       - run: npm run test:consumer
