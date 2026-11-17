@@ -21,6 +21,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: git diff --exit-code -- package.json package-lock.json
       - run: npm run schema:check
       - run: npm run docs:check
       - run: npm test
