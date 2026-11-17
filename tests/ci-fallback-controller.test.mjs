@@ -420,8 +420,29 @@ assert.deepEqual(smoke24.steps.filter((s) => typeof s.run === "string")
   .map((s) => s.run), [
   "npm ci --ignore-scripts --no-audit --no-fund",
   "git diff --exit-code -- package.json package-lock.json",
+  "npm audit --package-lock-only --audit-level=moderate",
   "npm run build", "npm run test:dist", "npm run test:consumer",
 ]);
+// #211: audit is an unconditional, failure-propagating, hosted-only PR+main
+// check against every locked package (including dev dependencies).
+const audit = smoke24.steps.filter((step) => typeof step.run === "string" &&
+  step.run.includes("npm audit"));
+assert.equal(audit.length, 1, "Exactly one hosted audit must be enforced.");
+assert.equal(audit[0].run, "npm audit --package-lock-only --audit-level=moderate");
+assert.equal(audit[0]["continue-on-error"], undefined,
+  "Dependency advisories must not be swallowed by continue-on-error.");
+assert.equal(audit[0].if, undefined,
+  "Hosted dependency audit must execute for PRs and main without condition.");
+assert.equal(audit[0].env, undefined,
+  "Hosted dependency audit must never receive extra registry credentials.");
+for (const job of [ci.jobs.contracts, worker.jobs["contracts-worker"]]) {
+  assert(!job.steps.some((step) => (step.run ?? "").includes("npm audit")),
+    "Security auditing must stay on the hosted Node24 worker.");
+}
+const baseline = readFileSync(new URL("../docs/security-baseline.md", import.meta.url), "utf8");
+for (const needle of ["CodeQL", "secret-scanning", "Dependabot", "#186", "BLOCKED"]) {
+  assert(baseline.includes(needle), "Security policy must document " + needle);
+}
 assert.equal(worker.jobs["contracts-worker"].steps.find(
   (step) => step.uses?.startsWith("actions/setup-node@"))?.with["node-version"], 22,
 "OCI stays on the tested Node 22 trust path; Node 24 is hosted-only.");
