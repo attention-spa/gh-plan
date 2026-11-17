@@ -83,7 +83,7 @@ function resourceBody(kind: "issues" | "milestones", create: boolean,
     if (field === "milestone") return kind === "issues" &&
       (positive(value) || !create && value === null);
     if (field === "due_on") return typeof value === "string" &&
-      /^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/.test(value) ||
+      /^\d{4}-\d{2}-\d{2}T(?:00|12):00:00(?:\.000)?Z$/.test(value) ||
       !create && value === null;
     return false;
   });
