@@ -6,9 +6,8 @@ import type {
 } from "./types.ts";
 
 /**
- * C2 public type contract, with a pure internal preflight staging gate.
- * The executable applyPlan() function is NOT exported until #188–#190 are
- * independently implemented and verified.
+ * C2 public callback contract and strict, pure whole-plan B1 preflight.
+ * Public applyPlan() is explicitly opt-in and caller-injected (#190).
  *
  * All callbacks, including those claiming authoritative reads and A1 CAS
  * ownership, are CALLER-TRUSTED. Types and structural checks cannot prove
@@ -88,8 +87,8 @@ export type ApplyMilestoneCatalogReader = (
 /**
  * Named public TypeScript contract. At runtime the generic C2 executor may
  * validate callback shapes, but it CANNOT establish their authority or
- * whether ownership is a real A1 ref. #189 must provide a separately proven
- * GitHub reference adapter.
+ * whether ownership is a real A1 ref. #189 independently verifies a
+ * reference GitHub adapter, which deliberately stays internal.
  *
  * There is deliberately NO auth/fetch/baseUrl option or ownership bypass.
  */
@@ -165,7 +164,7 @@ export class ApplyPlanError extends Error {
 }
 
 /**
- * Internal handoff to #188's implemented callback lifecycle; no public executor.
+ * Internal validated handoff for the #190 public callback facade.
  * The plan AND typed descriptors are deep-frozen cloned snapshots, preventing
  * caller mutation after preflight from changing what the next unit will use.
  */
@@ -209,10 +208,9 @@ function snapshot(plan: unknown): GithubPlan {
 }
 
 /**
- * PRIVATE to staged implementation. Validates the FULL cloned plan via the
- * #178 B1 allowlist BEFORE reading ANY callback, taking ownership or writing.
- * No caller callback is EVER invoked in this unit. A failed final step means
- * zero callbacks and zero lock attempts, even with valid earlier steps.
+ * INTERNAL preflight for the public C2 applyPlan. Validates the FULL cloned
+ * plan via the strict #178 B1 allowlist BEFORE reading ANY callback, taking
+ * ownership or writing. A failed final step means zero callbacks/lock attempts.
  */
 export function prepareApplyPlan(input: unknown): PreparedApplyPlan {
   try {
@@ -251,7 +249,7 @@ export function prepareApplyPlan(input: unknown): PreparedApplyPlan {
     if (input.signal?.aborted) failure("ABORTED");
 
     const options = input as unknown as ApplyPlanOptions;
-    // Capture exact functions before future callback lifecycle is introduced.
+    // Capture the exact callbacks for this invocation before ownership or writes.
     const owner = Object.freeze({
       acquire: options.ownership.acquire.bind(options.ownership),
       assertOwned: options.ownership.assertOwned.bind(options.ownership),
