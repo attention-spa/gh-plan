@@ -290,10 +290,32 @@ assert.match(worker.jobs["contracts-worker"].steps[1].run, /git merge-base --is-
 assert.match(worker.jobs["contracts-worker"].steps[1].run, /git checkout --detach/);
 assert.deepEqual(worker.on.workflow_dispatch.inputs.backend.options, ["oci", "hosted"]);
 const expectedCommands = [
-  "npm install --ignore-scripts --no-audit --no-fund",
+  "npm ci --ignore-scripts --no-audit --no-fund",
   "npm run schema:check", "npm run docs:check", "npm test",
   "npm run build", "npm run test:dist",
 ];
+// #203: a committed npm lock is the single source for PR and trusted-main CI.
+const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+const locked = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
+assert.equal(locked.lockfileVersion, 3, "npm ci requires a v3 lockfile.");
+assert.equal(locked.name, manifest.name);
+assert.equal(locked.version, manifest.version);
+assert.equal(locked.packages[""].name, manifest.name);
+assert.equal(locked.packages[""].version, manifest.version);
+assert.deepEqual(locked.packages[""].devDependencies, manifest.devDependencies,
+  "Root lock dependencies must equal the unchanged pinned manifest.");
+for (const [name, entry] of Object.entries(locked.packages)) {
+  if (!name) continue;
+  assert.match(entry.integrity ?? "", /^sha512-[A-Za-z0-9+/=]+$/,
+    "Every resolved dependency must have an integrity hash: " + name);
+}
+for (const workflow of [ci, worker]) {
+  const job = workflow.jobs.contracts ?? workflow.jobs["contracts-worker"];
+  const commands = job.steps.filter((step) => typeof step.run === "string")
+    .map((step) => step.run);
+  assert(!commands.some((cmd) => /\\bnpm install\\b|\\bnpm update\\b/.test(cmd)),
+    "CI must not resolve a fresh dependency graph outside the lock.");
+}
 for (const command of expectedCommands) {
   assert.ok(ci.jobs.contracts.steps.some((s) => s.run === command),
     "PR CI still runs " + command);
