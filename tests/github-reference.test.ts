@@ -724,13 +724,18 @@ for (const item of operationCases) {
     item.kind + ": terminal read and matching CAS release complete");
 }
 
-for (const variant of ["unsupported-last", "stale-noop", "invalid-reference"] as const) {
+for (const variant of ["unsupported-last", "unsupported-shape", "stale-noop", "invalid-reference"] as const) {
   const plan = structuredClone(good);
   if (variant === "unsupported-last") {
     plan.steps.push(step("label.create","L",{
       protocol:"rest",method:"POST",path:"/repos/a/b/labels",body:{name:"not B1"},
     }));
     plan.summary.planned++;
+  } else if (variant === "unsupported-shape") {
+    const create = plan.steps.find((x) => x.id === "issue.create:I")!;
+    if (create.request?.protocol !== "rest") throw Error("invalid fixture");
+    create.request.body = { ...create.request.body, labels: ["forbidden"] };
+    create.desired = create.request.body;
   } else if (variant === "stale-noop") {
     plan.noops.push({} as GithubPlan["noops"][number]);
     plan.summary.noops++;
