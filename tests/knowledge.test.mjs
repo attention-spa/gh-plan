@@ -166,8 +166,9 @@ for (const id of ["overview.md", "concepts/index.md", "decisions/index.md",
 const log = paths.get("log.md");
 assert(/^#\s+.+/m.test(log), "Log needs a descriptive heading.");
 const groups = [...log.matchAll(/^##\s+(\d{4}-\d{2}-\d{2})$/gm)].map((x) => x[1]);
-assert(groups.length >= 2 && groups[0] === "2026-11-16",
-  "Log must begin with the current M6.1 date and retain historical groups.");
+assert(groups.length >= 2 && groups[0] >= "2026-11-16" &&
+  groups.includes("2026-11-16"),
+  "Log must retain the historical M6.1 date and allow newer entries.");
 assert(groups.every((x, i) => Number.isFinite(Date.parse(x + "T00:00:00Z")) &&
   (i === 0 || x < groups[i - 1])), "Log dates must be valid, unique and newest first.");
 for (let n = 2; n <= 9; n++) {
