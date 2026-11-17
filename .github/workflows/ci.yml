@@ -20,11 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --ignore-scripts --no-audit --no-fund
-      # Temporary, PR-hosted, unprivileged lockfile bootstrap. Remove in final diff.
-      - name: Generate npm lockfile for checked-in deterministic CI
-        run: |
-          node -e 'const fs=require("node:fs");const x=fs.readFileSync("package-lock.json");console.log("GHPLAN203_LOCK_BEGIN");const s=x.toString("base64");for(let i=0;i<s.length;i+=120)console.log("GHPLAN203_B64 "+s.slice(i,i+120));console.log("GHPLAN203_LOCK_END");'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run schema:check
       - run: npm run docs:check
       - run: npm test
