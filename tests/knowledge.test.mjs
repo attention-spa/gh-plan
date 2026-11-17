@@ -29,7 +29,7 @@ const decisions = [
   "caller-injected-apply-contract",
 ];
 const schema = ["repository","issue","milestone","label","relationship","set-remove-operations","pull-request","projects-v2","prune-duplicates"];
-const api = ["planGithub","normalizeSchema","resolveResourceIdentities","discoverAndResolve","createRestDiscoveryTransport","diffGithubState","compileMilestoneSteps","compileIssueSteps","compileIssueFieldSteps","compileIssueLabelSteps","compileIssueAssigneeSteps","compileRepositoryLabelSteps","compileRelationshipSteps","compilePullRequestSteps","compileProjectItemSteps","compilePruneSteps","requestReferences","validatePlanStepReferences","bindPlanRequest","types-authoring","types-state","types-plan","types-errors","types-transport"];
+const api = ["applyPlan","planGithub","normalizeSchema","resolveResourceIdentities","discoverAndResolve","createRestDiscoveryTransport","diffGithubState","compileMilestoneSteps","compileIssueSteps","compileIssueFieldSteps","compileIssueLabelSteps","compileIssueAssigneeSteps","compileRepositoryLabelSteps","compileRelationshipSteps","compilePullRequestSteps","compileProjectItemSteps","compilePruneSteps","requestReferences","validatePlanStepReferences","bindPlanRequest","types-authoring","types-state","types-plan","types-errors","types-transport"];
 const github = ["rest-discovery","rest-step-operations","token-permissions"];
 const required = [
   "index.md", "log.md", "overview.md", "concepts/index.md", "decisions/index.md",
