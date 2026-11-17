@@ -380,6 +380,38 @@ for (const file of ["ci.yml", "ci-worker.yml"]) {
   const closed = (yamlSource.match(/\$\{\{[^\n]*?\}\}/g) ?? []).length;
   assert.equal(starts, closed, file + " must close every GitHub Actions expression with }}.");
 }
+// #227: immutable GitHub-verified first-party Actions only. Walk ALL workflow
+// jobs, including manually dispatched bootstrap and OCI worker variants.
+const expectedActionPins = new Map([
+  ["actions/checkout", "11d5960a326750d5838078e36cf38b85af677262"],
+  ["actions/setup-node", "49933ea5288caeca8642d1e84afbd3f7d6820020"],
+]);
+for (const file of [
+  "ci.yml", "ci-worker.yml", "bootstrap-dry-run.yml", "bootstrap-worker.yml",
+]) {
+  const source = readFileSync(new URL("../.github/workflows/" + file, import.meta.url), "utf8");
+  const workflow = YAML.parse(source);
+  assert(workflow && typeof workflow.jobs === "object", file + " missing jobs.");
+  let checked = 0;
+  for (const [jobName, job] of Object.entries(workflow.jobs)) {
+    assert(Array.isArray(job.steps), file + " missing steps in " + jobName);
+    for (const [stepIndex, step] of job.steps.entries()) {
+      if (!Object.hasOwn(step, "uses")) continue;
+      const ref = step.uses;
+      const match = typeof ref === "string"
+        ? /^(actions\/(?:checkout|setup-node))@([a-f0-9]{40})$/.exec(ref)
+        : null;
+      assert(match,
+        file + " job " + jobName + " step " + stepIndex +
+        " must use a reviewed first-party 40-hex commit reference, not " + String(ref));
+      assert.equal(match[2], expectedActionPins.get(match[1]),
+        file + " job " + jobName + " action ref differs from reviewed commit.");
+      checked++;
+    }
+  }
+  assert.equal(checked, file === "ci.yml" ? 6 : 2,
+    "Every existing first-party action use must be pinned in " + file);
+}
 const ci = YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"));
 const worker = YAML.parse(readFileSync(new URL("../.github/workflows/ci-worker.yml", import.meta.url), "utf8"));
 assert.deepEqual(ci.on.push.branches, ["main"]);
