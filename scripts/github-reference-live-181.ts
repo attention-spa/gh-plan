@@ -41,6 +41,42 @@ async function checkpoint(name: string, details: Record<string, unknown>) {
   await writeFile(durableDir + "/live-181.json",
     JSON.stringify({ ...evidence, timestamp: new Date().toISOString() }, null, 2) + "\n");
 }
+const diagnosticJournal = durableDir + "/verified-stage-181.ndjson";
+type DiagnosticStage = "dispatch" | "read" | "issue_catalog" | "milestone_catalog";
+type DiagnosticStatus = "started" | "returned" | "failed";
+async function recordDiagnostic(
+  stage: DiagnosticStage, status: DiagnosticStatus,
+  details: { kind?: string; phase?: string; result?: string; code?: string } = {},
+): Promise<void> {
+  // Strictly typed, allowlisted fields. Never persist an arbitrary exception
+  // message, remote response, URL, request body, or bearer/token.
+  const validKind = typeof details.kind === "string" &&
+    /^(issue|milestone)\.(create|update)$/.test(details.kind);
+  const validPhase = details.phase === "before" || details.phase === "after";
+  const validResult = details.result === "satisfied" ||
+    details.result === "unsatisfied" || details.result === "returned";
+  const validCode = typeof details.code === "string" &&
+    /^[A-Z][A-Z0-9_]{2,44}$/.test(details.code);
+  const entry = {
+    stage, status,
+    ...(validKind ? { kind: details.kind } : {}),
+    ...(validPhase ? { phase: details.phase } : {}),
+    ...(validResult ? { result: details.result } : {}),
+    ...(validCode ? { code: details.code } : {}),
+  };
+  const fd = await open(diagnosticJournal, "a");
+  try {
+    await fd.writeFile(JSON.stringify(entry) + "\n");
+    await fd.sync();
+  } finally { await fd.close(); }
+}
+function safeFailureCode(error: unknown): string {
+  if (error && typeof error === "object" && "code" in error &&
+      typeof error.code === "string" &&
+      /^[A-Z][A-Z0-9_]{2,44}$/.test(error.code)) return error.code;
+  return "NON_CODED_ERROR";
+}
+
 const journal = durableDir + "/durable-audit-181.ndjson";
 async function onLog(entry: Readonly<SafeApplyLogEntry>): Promise<void> {
   const fd = await open(journal, "a");
@@ -188,9 +224,76 @@ const plan: GithubPlan = {
   summary:{planned:5,noops:0,warnings:0,blocked:0,unsupported:0},
 };
 function liveOptions(input: GithubPlan = plan) {
-  return createGithubReferenceApplyOptions({
+  const original = createGithubReferenceApplyOptions({
     plan: structuredClone(input), auth, fetch: monitored, onLog,
   });
+  return {
+    ...original,
+    dispatch: async (...args: Parameters<typeof original.dispatch>) => {
+      await recordDiagnostic("dispatch", "started", { kind: args[1].kind });
+      try {
+        const value = await original.dispatch(...args);
+        await recordDiagnostic("dispatch", "returned", {
+          kind: args[1].kind, result: "returned",
+        });
+        return value;
+      } catch (error) {
+        await recordDiagnostic("dispatch", "failed", {
+          kind: args[1].kind, code: safeFailureCode(error),
+        });
+        throw error;
+      }
+    },
+    readPostcondition: async (...args: Parameters<typeof original.readPostcondition>) => {
+      const context = args[0];
+      const kind = context.step.kind;
+      await recordDiagnostic("read", "started", {
+        kind, phase: context.phase,
+      });
+      try {
+        const value = await original.readPostcondition(...args);
+        await recordDiagnostic("read", "returned", {
+          kind, phase: context.phase, result: value.status,
+        });
+        return value;
+      } catch (error) {
+        await recordDiagnostic("read", "failed", {
+          kind, phase: context.phase, code: safeFailureCode(error),
+        });
+        throw error;
+      }
+    },
+    readIssueCatalog: async (...args: Parameters<NonNullable<typeof original.readIssueCatalog>>) => {
+      await recordDiagnostic("issue_catalog", "started");
+      try {
+        const value = await original.readIssueCatalog!(...args);
+        await recordDiagnostic("issue_catalog", "returned", {
+          result: "returned",
+        });
+        return value;
+      } catch (error) {
+        await recordDiagnostic("issue_catalog", "failed", {
+          code: safeFailureCode(error),
+        });
+        throw error;
+      }
+    },
+    readMilestoneCatalog: async (...args: Parameters<NonNullable<typeof original.readMilestoneCatalog>>) => {
+      await recordDiagnostic("milestone_catalog", "started");
+      try {
+        const value = await original.readMilestoneCatalog!(...args);
+        await recordDiagnostic("milestone_catalog", "returned", {
+          result: "returned",
+        });
+        return value;
+      } catch (error) {
+        await recordDiagnostic("milestone_catalog", "failed", {
+          code: safeFailureCode(error),
+        });
+        throw error;
+      }
+    },
+  };
 }
 async function assertRefGone(): Promise<void> {
   const res = await originalFetch(ROOT + "/git/ref/heads/gh-plan/locks/repository",
