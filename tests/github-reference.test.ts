@@ -631,4 +631,121 @@ equal(nodeGuard.calls.length,beforeWrongNode,
   "Foreign GraphQL CAS must be stopped before sending any mutation.");
 
 
+
+// #181: cross every approved operation shape with safety dispositions.
+// Each is synthetic, but the exact 5-step four-kind DAG and zero-write replay
+// were also executed live against disposable private GitHub (workflow evidence).
+type AcceptanceRoute = {
+  kind: string;
+  method: "POST" | "PATCH";
+  url: string;
+  readPath: string;
+  corrupt: (github: FakeGithub) => void;
+};
+const operationCases: AcceptanceRoute[] = [
+  {
+    kind: "milestone.create", method: "POST", url: ROOT + "/milestones",
+    readPath: ROOT + "/milestones?state=all&per_page=100",
+    corrupt: (github) => { github.milestones.find((x) => x.number === 17)!.due_on =
+      "2027-01-02T00:00:00Z"; },
+  },
+  {
+    kind: "issue.create", method: "POST", url: ROOT + "/issues",
+    readPath: ROOT + "/issues?state=all&per_page=100",
+    corrupt: (github) => { github.issues.find((x) => x.number === 37)!.title =
+      "Changed after successful issue POST"; },
+  },
+  {
+    kind: "issue.update", method: "PATCH", url: ROOT + "/issues/37",
+    readPath: ROOT + "/issues?state=all&per_page=100",
+    corrupt: (github) => { github.issues.find((x) => x.number === 37)!.state = "open"; },
+  },
+  {
+    kind: "milestone.update", method: "PATCH", url: ROOT + "/milestones/2",
+    readPath: ROOT + "/milestones/2",
+    corrupt: (github) => { github.milestones.find((x) => x.number === 2)!.description =
+      "Remote drift instead of requested clearing"; },
+  },
+];
+for (const item of operationCases) {
+  const errorRoute = new FakeGithub();
+  errorRoute.unknownWriteExact = { method: item.method, url: item.url };
+  const lost = await denied(item.kind + ": lost write response", () =>
+    executeCallbackApplyPlan(errorRoute.options()), "INDETERMINATE_WRITE");
+  assert(lost instanceof ApplyPlanError && lost.ownerState === "retained",
+    item.kind + ": uncertain mutation must retain ownership");
+  equal(errorRoute.callsCount.get(item.method + " " + item.url), 1,
+    item.kind + ": uncertain POST/PATCH sent exactly once");
+  assert(errorRoute.ownerOid !== null,
+    item.kind + ": no implicit lock release after lost response");
+  await denied(item.kind + ": next run may not steal retained A1 owner", () =>
+    executeCallbackApplyPlan(errorRoute.options()), "OWNER_UNCERTAIN");
+
+  const drift = new FakeGithub();
+  drift.onWrite = (method, url) => {
+    if (method === item.method && url === item.url) item.corrupt(drift);
+  };
+  const driftError = await denied(item.kind + ": post-write field drift", () =>
+    executeCallbackApplyPlan(drift.options()), "VERIFICATION_FAILED");
+  assert(driftError instanceof ApplyPlanError &&
+    driftError.ownerState === "retained",
+    item.kind + ": changed remote postcondition retains owner");
+  equal(drift.callsCount.get(item.method + " " + item.url), 1,
+    item.kind + ": drift cannot cause duplicate POST/PATCH");
+
+  const deniedRead = new FakeGithub();
+  let written = false;
+  deniedRead.onWrite = (method, url) => {
+    if (method === item.method && url === item.url) written = true;
+  };
+  deniedRead.rateLimit = (url, method) =>
+    written && method === "GET" && url === item.readPath
+      ? { status: 403, headers: {} } : undefined;
+  const readError = await denied(item.kind + ": denied authoritative readback", () =>
+    executeCallbackApplyPlan(deniedRead.options()), "VERIFICATION_FAILED");
+  assert(readError instanceof ApplyPlanError &&
+    readError.ownerState === "retained",
+    item.kind + ": permission-denied after-write GET must retain ownership");
+  equal(deniedRead.callsCount.get(item.method + " " + item.url), 1,
+    item.kind + ": denied readback does not repeat the resource mutation");
+
+  const inFlightAbort = new FakeGithub();
+  const controller = new AbortController();
+  inFlightAbort.onWrite = (method, url) => {
+    if (method === item.method && url === item.url) controller.abort();
+  };
+  const stopped = await denied(item.kind + ": abort during a committing request", () =>
+    executeCallbackApplyPlan(inFlightAbort.options(good, controller.signal)), "ABORTED");
+  assert(stopped instanceof ApplyPlanError && stopped.ownerState === "released",
+    item.kind + ": known terminal readback must safely release after abort");
+  equal(inFlightAbort.callsCount.get(item.method + " " + item.url), 1,
+    item.kind + ": canceled in-flight request is not repeated");
+  equal(inFlightAbort.ownerOid, null,
+    item.kind + ": terminal read and matching CAS release complete");
+}
+
+for (const variant of ["unsupported-last", "stale-noop", "invalid-reference"] as const) {
+  const plan = structuredClone(good);
+  if (variant === "unsupported-last") {
+    plan.steps.push(step("label.create","L",{
+      protocol:"rest",method:"POST",path:"/repos/a/b/labels",body:{name:"not B1"},
+    }));
+    plan.summary.planned++;
+  } else if (variant === "stale-noop") {
+    plan.noops.push({} as GithubPlan["noops"][number]);
+    plan.summary.noops++;
+  } else {
+    const final = plan.steps.find((x) => x.id === "issue.update:I")!;
+    if (final.request?.protocol !== "rest") throw Error("invalid fixture");
+    final.request.path = ["/repos/a/b/issues/",{$ref:"OTHER.number"}];
+  }
+  const f = new FakeGithub();
+  await denied("all-plan B1 gate: " + variant, async () => {
+    f.options(plan);
+  }, "INVALID_CONFIG");
+  equal(f.calls.length,0,variant + ": no REST/GraphQL before whole-plan preflight");
+}
+
+console.log("#181 synthetic cross-kind failure matrix: drift, unknown result, denied reads, in-flight abort, retained CAS and whole-plan zero-write gates passed.");
+
 console.log("#189 reference GitHub transport: pinned/allowlisted A1+B1, serial pacing, private-repo guards, full catalog pagination and safe rerun passed.");
