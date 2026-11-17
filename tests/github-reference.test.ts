@@ -131,6 +131,8 @@ class FakeGithub {
   driftDueDate = false;
   issueCatalogLagReads = 0;
   unknownWrite?: string;
+  unknownWriteExact?: { url: string; method: string };
+  onWrite?: (method: string, url: string) => void;
   rateLimit?: (url: string, method: string, count: number) =>
     { status: number; headers: Record<string,string> } | undefined;
   failAudit?: (entry: SafeApplyLogEntry) => boolean;
@@ -215,6 +217,10 @@ class FakeGithub {
         m.number === Number(url.slice(milestonePrefix.length)));
       return row ? response(url, row) : response(url, { message: "hidden" }, 404);
     }
+    if (this.unknownWriteExact?.method === method &&
+        this.unknownWriteExact.url === url) {
+      throw Error("DO_NOT_LOG ambiguous GitHub resource write");
+    }
     if (this.unknownWrite && method !== "GET" &&
         url.includes(this.unknownWrite)) {
       // Model transport loss even when a write may have remotely committed.
@@ -227,6 +233,7 @@ class FakeGithub {
           body.due_on ?? null,
       });
       this.milestones.push(row);
+      this.onWrite?.(method, url);
       return response(url, row, 201);
     }
     if (url === ROOT + "/issues" && method === "POST" && body) {
@@ -235,6 +242,7 @@ class FakeGithub {
           body.milestone ? { number: body.milestone } : null,
       });
       this.issues.push(row);
+      this.onWrite?.(method, url);
       return response(url, row, 201);
     }
     if (url.startsWith(issuePrefix) && method === "PATCH" && body) {
@@ -244,6 +252,7 @@ class FakeGithub {
       Object.assign(row, body);
       if (Object.hasOwn(body, "milestone"))
         row.milestone = body.milestone ? {number:body.milestone} : null;
+      this.onWrite?.(method, url);
       return response(url, row, 200);
     }
     if (url.startsWith(milestonePrefix) && method === "PATCH" && body) {
@@ -251,6 +260,7 @@ class FakeGithub {
         m.number === Number(url.slice(milestonePrefix.length)));
       if (!row) return response(url,{message:"missing"},404);
       Object.assign(row, body);
+      this.onWrite?.(method, url);
       return response(url,row,200);
     }
     throw Error("DO_NOT_LOG unexpected mock route " + method + " " + url);
@@ -260,10 +270,11 @@ class FakeGithub {
     this.sleeps.push(ms);
     this.now += ms;
   };
-  options(plan: GithubPlan = good) {
+  options(plan: GithubPlan = good, signal?: AbortSignal) {
     return createGithubReferenceApplyOptions({
       plan: structuredClone(plan), auth: SECRET, fetch: this.fetch,
       now: () => this.now, sleep: this.sleep,
+      ...(signal === undefined ? {} : { signal }),
       onLog: async (entry) => {
         if (this.failAudit?.(entry)) throw Error("DO_NOT_LOG audit not durable");
         this.auditable.push({ ...entry });
