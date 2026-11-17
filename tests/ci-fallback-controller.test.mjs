@@ -318,7 +318,7 @@ const securityFloors = new Map([
   ["glob", [14, 0, 2]], ["minimatch", [11, 0, 1]],
 ]);
 function semverAtLeast(version, floor) {
-  const parts = /^(\\d+)\\.(\\d+)\\.(\\d+)(?:$|-)/.exec(version ?? "");
+  const parts = /^(\d+)\.(\d+)\.(\d+)(?:$|-)/.exec(version ?? "");
   if (!parts) return false;
   for (let i = 0; i < 3; i++) {
     const current = Number(parts[i + 1]);
