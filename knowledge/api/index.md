@@ -1,5 +1,6 @@
 # Public API Reference
 
+- [applyPlan](/api/applyPlan.md) — Explicitly opted-in caller-injected C2 application facade, limited to four B1 issue/milestone request shapes.
 - [bindPlanRequest](/api/bindPlanRequest.md) — Substitutes externally obtained post-create identities in inert requests.
 - [compileIssueAssigneeSteps](/api/compileIssueAssigneeSteps.md) — Compiles exact and incremental GitHub issue assignee changes.
 - [compileIssueFieldSteps](/api/compileIssueFieldSteps.md) — Compiles explicit organization issue-field changes by field/option name.

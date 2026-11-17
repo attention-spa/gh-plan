@@ -136,8 +136,23 @@ export type {
   RestPlanRequest,
 } from "./types.ts";
 
-// C2 named public TYPES and sanitized error class only (#187).
-// No public applyPlan() function or preflight/dispatch entrypoint until #188–#190.
+/**
+ * Opt-in C2 caller-injected application API (#190).
+ * The caller must explicitly acknowledge callback trust and supply independent
+ * owner, dispatch, authoritative readback, and catalog functions. Importing
+ * this module never executes a plan or contacts GitHub.
+ *
+ * This is NOT an authenticated GitHub writer: the library cannot prove that
+ * supplied callbacks are truthful, fenced, or backed by GitHub. Only the four
+ * strict B1 issue/milestone request shapes may be executed, and the whole plan
+ * is preflighted before any callback or repository mutation.
+ *
+ * The separately validated GitHub reference adapter stays INTERNAL; there
+ * are no public token, generic transport or ownership-bypass exports.
+ */
+export { executeCallbackApplyPlan as applyPlan } from "./apply-lifecycle.ts";
+
+// Named C2 types and sanitized error are part of the same public contract.
 export { ApplyPlanError } from "./apply-contract.ts";
 export type {
   ApplyPlanPhase, ApplyOwnerState, ApplyPlanErrorCode, ApplyPlanErrorDetails,
