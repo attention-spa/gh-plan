@@ -6,10 +6,10 @@ The package currently has `"private": true` and is not published to npm.
 
 ## Install and build
 
-Requires Node.js 22 or newer. From a checkout:
+Requires Node.js 22 or newer. From a checkout, install the exact dependency versions and integrity hashes recorded in the committed `package-lock.json` (instead of resolving a new graph):
 
 ```sh
-npm install --ignore-scripts --no-audit --no-fund
+npm ci --ignore-scripts --no-audit --no-fund
 npm test
 npm run build
 ```
