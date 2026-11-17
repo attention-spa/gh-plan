@@ -444,6 +444,53 @@ try {
 assert(unsafePagination instanceof Error, "foreign pagination URL should throw");
 assert((unsafePagination as { code?: string }).code === "UNSAFE_PAGINATION_URL", "foreign pagination URL classification");
 
+// #215: a host-prefix comparison would falsely approve lookalike domains,
+// userinfo/port tricks or non-canonical pagination URLs. Never forward the token.
+const hostilePagination = [
+  "https://api.github.com.evil.example/repos/acme/widgets/issues?page=2&echo=leak-me",
+  "https://api.github.com@evil.example/repos/acme/widgets/issues?page=2&echo=leak-me",
+  "http://api.github.com/repos/acme/widgets/issues?page=2&echo=leak-me",
+  "https://api.github.com:444/repos/acme/widgets/issues?page=2&echo=leak-me",
+  "https://api.github.com/repos/acme/widgets/issues?page=2#fragment",
+  "https://api.github.com/repos/acme/widgets/../widgets/issues?page=2",
+];
+for (const candidate of hostilePagination) {
+  const routes = baseRoutes();
+  const requests: RequestRecord[] = [];
+  routes["https://api.github.com/repos/acme/widgets/issues?state=all&per_page=100"] =
+    response(200, [], { link: `<${candidate}>; rel="next"` });
+  let caught: unknown;
+  try { await discoverWith(routes, requests); } catch (error) { caught = error; }
+  assert(caught instanceof Error, "Lookalike/ambiguous pagination URL must fail.");
+  assert((caught as { code?: string }).code === "UNSAFE_PAGINATION_URL",
+    "Only canonical, exact GitHub API origin is permitted.");
+  assert(!JSON.stringify(caught).includes("leak-me") &&
+    !String(caught).includes("leak-me"),
+  "Token-like untrusted query strings must not leak into sanitized failures.");
+  assert(!requests.some(({ url }) => url === candidate),
+    "The transport must reject unsafe pagination before any fetch.");
+  assert(requests.every(({ init }) => init?.redirect === "error"),
+    "Every authenticated GET must reject redirects.");
+}
+
+// Native GitHub redirects must never be followed with a bearer credential.
+const redirectRoutes = baseRoutes();
+redirectRoutes["https://api.github.com/repos/acme/widgets/issues?state=all&per_page=100"] =
+  response(302, { message: "redirect denied" }, {
+    location: "https://evil.example/steal-token",
+  });
+const redirectRequests: RequestRecord[] = [];
+let redirectError: unknown;
+try { await discoverWith(redirectRoutes, redirectRequests); }
+catch (error) { redirectError = error; }
+assert(redirectError instanceof Error, "HTTP redirect must not be interpreted as success.");
+assert((redirectError as { code?: string }).code === "REST_FAILURE",
+  "A redirect must fail closed, not become a transport success.");
+assert(redirectRequests.every(({ init }) => init?.redirect === "error"),
+  "Native fetch must have redirect:error even on an HTTP 302.");
+assert(!redirectRequests.some(({ url }) => new URL(url).origin !== "https://api.github.com"),
+  "No authenticated fetch may leave the exact GitHub API origin.");
+
 // Invalid native relationship responses must fail safely rather than emit unsound IDs.
 const invalidRelationsRoutes = baseRoutes();
 invalidRelationsRoutes["https://api.github.com/repos/acme/widgets/issues/1/relates_to?per_page=100"] = response(200, [
