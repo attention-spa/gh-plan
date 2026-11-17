@@ -20,6 +20,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # TEMPORARY PR-only, read-only diagnostic: remove before merge (#206).
+      - name: Temporary reproducible lock generation (#206)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          printf '%s\\n' GH_PLAN_LOCK_BEGIN
+          base64 -w0 package-lock.json
+          printf '\\n%s\\n' GH_PLAN_LOCK_END
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: git diff --exit-code -- package.json package-lock.json
       - run: npm run schema:check
