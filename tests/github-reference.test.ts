@@ -734,8 +734,10 @@ for (const variant of ["unsupported-last", "unsupported-shape", "stale-noop", "i
   } else if (variant === "unsupported-shape") {
     const create = plan.steps.find((x) => x.id === "issue.create:I")!;
     if (create.request?.protocol !== "rest") throw Error("invalid fixture");
-    create.request.body = { ...create.request.body, labels: ["forbidden"] };
-    create.desired = create.request.body;
+    const unsupported = { title:"Ship", body:token("I"),
+      milestone:{$ref:"M.number"}, labels:["forbidden"] };
+    create.request.body = unsupported;
+    create.desired = unsupported;
   } else if (variant === "stale-noop") {
     plan.noops.push({} as GithubPlan["noops"][number]);
     plan.summary.noops++;
