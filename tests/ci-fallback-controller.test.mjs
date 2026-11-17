@@ -399,6 +399,14 @@ assert.match(worker.jobs["contracts-worker"]["runs-on"], /ubuntu-latest/);
 assert.match(worker.jobs["contracts-worker"].steps[1].run, /git merge-base --is-ancestor/);
 assert.match(worker.jobs["contracts-worker"].steps[1].run, /git checkout --detach/);
 assert.deepEqual(worker.on.workflow_dispatch.inputs.backend.options, ["oci", "hosted"]);
+const expectedCommands = [
+  "npm ci --ignore-scripts --no-audit --no-fund",
+  "npm run schema:check", "npm run docs:check", "npm test",
+  "npm run build", "npm run test:dist", "npm run test:consumer",
+];
+// #203: a committed npm lock is the single source for PR and trusted-main CI.
+const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+const locked = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
 // #209: independently install the actual packed tarball on Node 22/24.
 assert.equal(manifest.scripts["test:consumer"], "node tests/tarball-consumer.test.mjs");
 const smoke24 = ci.jobs["consumer-node24"];
@@ -417,14 +425,6 @@ assert.deepEqual(smoke24.steps.filter((s) => typeof s.run === "string")
 assert.equal(worker.jobs["contracts-worker"].steps.find(
   (step) => step.uses?.startsWith("actions/setup-node@"))?.with["node-version"], 22,
 "OCI stays on the tested Node 22 trust path; Node 24 is hosted-only.");
-const expectedCommands = [
-  "npm ci --ignore-scripts --no-audit --no-fund",
-  "npm run schema:check", "npm run docs:check", "npm test",
-  "npm run build", "npm run test:dist", "npm run test:consumer",
-];
-// #203: a committed npm lock is the single source for PR and trusted-main CI.
-const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-const locked = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
 assert.equal(locked.lockfileVersion, 3, "npm ci requires a v3 lockfile.");
 assert.equal(locked.name, manifest.name);
 assert.equal(locked.version, manifest.version);
