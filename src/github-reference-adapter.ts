@@ -114,6 +114,13 @@ export function createGithubReferenceApplyOptions(config: GithubReferenceApplyCo
   if (!preflight.ok) throw new GithubReferenceError("INVALID_CONFIG");
   const fixed = deepFreeze(cloned(plan));
   const auth = config.auth; // Snapshot the runtime token; never reread caller config.
+  // GitHub's issues list can lag a successful issue POST. #181 live trace
+  // proved readAfter() returned INDETERMINATE_WRITE after a successful POST,
+  // while a later independent catalog/detail GET found the correct issue.
+  // Retry *only* full authoritative readback. NEVER repeat the POST.
+  const issueVisibilityDelays = [1000, 2000, 4000, 8000] as const;
+  const readbackSleep = config.sleep ?? ((ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const specs = new Map(preflight.postconditions.map((spec) => [spec.stepId, spec]));
   const steps = new Map(fixed.steps.map((step) => [step.id, step]));
   const transport = createGithubReferenceHttp({
@@ -294,9 +301,30 @@ export function createGithubReferenceApplyOptions(config: GithubReferenceApplyCo
           canonical(pinned.bindings) !== canonical(context.bindings) ||
           !dispatched.has(step.id)) reject();
       if (prior.kind === "issue") {
-        const verified = await issues.readAfter(spec, prior.result,
-          context.responseIdentity);
-        return { status: "satisfied", identity: verified.identity };
+        let attempt = 0;
+        for (;;) {
+          try {
+            const verified = await issues.readAfter(spec, prior.result,
+              context.responseIdentity);
+            return { status: "satisfied", identity: verified.identity };
+          } catch (error) {
+            // The ONLY retryable condition is an issue.create that has not
+            // appeared in the independently paginated issue marker catalog.
+            // Mismatched fields, duplicate markers, invalid identities, 403,
+            // 404, malformed reads and every other error remain terminal.
+            if (spec.kind !== "issue.create" ||
+                !(error instanceof IssueReadError) ||
+                error.code !== "INDETERMINATE_WRITE" ||
+                attempt >= issueVisibilityDelays.length) throw error;
+            const owner = handle;
+            if (!active || !owner) reject();
+            await owner.assertOwned();
+            await readbackSleep(issueVisibilityDelays[attempt]!);
+            if (!active || handle !== owner) reject();
+            await owner.assertOwned();
+            attempt++;
+          }
+        }
       }
       const verified = await milestones.readAfter(spec, prior.result,
         context.responseIdentity);
