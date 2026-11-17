@@ -15,7 +15,7 @@ import type { SafeApplyLogEntry } from "../src/apply-contract.ts";
 
 
 async function main(): Promise<void> {
-const TARGET = "agent-hachi/gh-plan-acceptance-181-20261117";
+const TARGET = "agent-hachi/gh-plan-acceptance-181-20261117-b";
 const BASE = "https://api.github.com";
 const ROOT = BASE + "/repos/" + TARGET;
 const MARK = (id: string) => "<!-- gh-plan:" + id + " -->";
