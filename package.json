@@ -62,7 +62,8 @@
     "test:pr": "node --experimental-strip-types tests/pull-requests.test.ts",
     "test:projects": "node --experimental-strip-types tests/projects.test.ts",
     "test:milestone-due": "node --experimental-strip-types tests/milestone-due-on.test.ts",
-    "test:prune": "node --experimental-strip-types tests/prune.test.ts"
+    "test:prune": "node --experimental-strip-types tests/prune.test.ts",
+    "test:consumer": "node tests/tarball-consumer.test.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3",
