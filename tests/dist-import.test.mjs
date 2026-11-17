@@ -68,8 +68,22 @@ for (const filename of [
 }
 console.log("Public contract comments survive declaration generation without JSDoc tags.");
 
-const direct = await import("../dist/index.js");
-const self = await import("@attention-spa/gh-plan");
+// Import must never discover GitHub or run a write just because this private
+// package is loaded. Explicitly fail any import-time global network attempt.
+const originalFetch = globalThis.fetch;
+let importNetworkCalls = 0;
+globalThis.fetch = async () => {
+  importNetworkCalls++;
+  throw new Error("IMPORT_NETWORK_FORBIDDEN");
+};
+let direct, self;
+try {
+  direct = await import("../dist/index.js");
+  self = await import("@attention-spa/gh-plan");
+} finally {
+  globalThis.fetch = originalFetch;
+}
+assert.equal(importNetworkCalls, 0, "Public imports must perform zero network calls.");
 for (const name of [
   "planGithub",
   "normalizeSchema",
@@ -85,7 +99,7 @@ for (const name of [
   assert.strictEqual(self[name], direct[name], "Package self-export mismatch: " + name);
 }
 
-// #187: named C2 types/declarations are public; executing applyPlan is NOT.
+// #190: named C2 callback applyPlan and existing types/declarations are public.
 const c2Types = readFileSync(new URL("index.d.ts", dist), "utf8");
 for (const name of [
   "ApplyPlanOptions", "ApplyPlanResult", "ApplyOwnershipAdapter",
@@ -100,10 +114,43 @@ assert.equal(typeof direct.ApplyPlanError, "function",
   "Typed sanitized C2 error class must be importable at runtime.");
 assert.strictEqual(self.ApplyPlanError, direct.ApplyPlanError,
   "Package self export must agree on sanitized C2 error class.");
-assert.equal(typeof direct.applyPlan, "undefined",
-  "Public applyPlan execution must NOT be exported before #190.");
-assert.equal(typeof self.applyPlan, "undefined",
-  "Package self-reference must not expose early write facade.");
+assert.equal(typeof direct.applyPlan, "function",
+  "Dist JS must export the explicitly named caller-injected applyPlan.");
+assert.strictEqual(self.applyPlan, direct.applyPlan,
+  "Package self-reference must point to the same guarded callback function.");
+assert.match(c2Types, /executeCallbackApplyPlan\s+as\s+applyPlan/,
+  "Built declaration must bind the named public applyPlan to the tested lifecycle.");
+for (const hidden of [
+  "executeCallbackApplyPlan", "prepareApplyPlan",
+  "createGithubReferenceApplyOptions", "createGithubReferenceHttp",
+  "acquireGithubCasLock", "preflightApplyPlan",
+]) {
+  assert.equal(typeof direct[hidden], "undefined",
+    "Internal GitHub transport/dispatcher/preflight must not be exported: " + hidden);
+}
+assert.deepEqual(Object.keys(packageJson.exports), ["."],
+  "Deep package exports must remain blocked by a single reviewed entrypoint.");
+let caught;
+let invoked = 0;
+try {
+  await direct.applyPlan({
+    plan: { readiness: "blocked", steps: [] },
+    acknowledgeCallbackTrust: true,
+    dispatch: async () => { invoked++; },
+    readPostcondition: async () => { invoked++; },
+    ownership: {
+      acquire: async () => { invoked++; return { ownerId: "FAKE" }; },
+      assertOwned: async () => { invoked++; return true; },
+      release: async () => { invoked++; },
+    },
+  });
+} catch (error) { caught = error; }
+assert(caught instanceof direct.ApplyPlanError,
+  "Built callback facade must return a sanitized typed preflight error.");
+assert.equal(caught.code, "INVALID_PLAN",
+  "Bad complete B1 plan must fail before consulting any callbacks.");
+assert.equal(caught.phase, "preflight");
+assert.equal(invoked, 0, "Invalid public plan must never acquire or mutate GitHub.");
 assert.equal(typeof direct.prepareApplyPlan, "undefined",
   "Internal preflight gate must not be public.");
 const c2Failure = new direct.ApplyPlanError({
@@ -128,6 +175,7 @@ for (const required of ["LICENSE", "dist/index.js", "dist/index.d.ts", "package.
   assert(included.has(required), "Published tarball would omit " + required);
 }
 assert(![...included].some((path) =>
-  path.startsWith("src/") || path.startsWith("tests/") || path.startsWith("node_modules/")),
-  "Published tarball must exclude source, tests, and local dependencies.");
+  path.startsWith("src/") || path.startsWith("tests/") ||
+  path.startsWith("node_modules/") || path.startsWith("scripts/")),
+  "Tarball must exclude source, tests, scripts and local dependencies.");
 console.log("Built ESM import, package self-reference, declarations, and pack manifest passed.");
