@@ -341,7 +341,7 @@ equal(operation.variables.input, {
   }],
 }, "Real adapter enforces exact ref, zero-CAS and force:false");
 await backend.cas(repo.nodeId, firstOid, GITHUB_CAS_ZERO_OID);
-assert(requests.every((q) => q.method !== "DELETE" && q.url.startsWith("https://api.github.com")),
+assert(requests.every((q) => q.method !== "DELETE" && new URL(q.url).origin === "https://api.github.com"),
   "No REST DELETE, external host or unknown method.");
 graphqlError = true;
 await rejects("GraphQL HTTP 200 errors are not success", () =>
