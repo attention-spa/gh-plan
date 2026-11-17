@@ -123,18 +123,34 @@ function isJsonValue(value: unknown): value is JsonValue {
   return Object.values(value).every(isJsonValue);
 }
 
+/** Error metadata never echoes a foreign URL or a server-controlled query. */
 function safePath(urlOrPath: string): string {
-  if (urlOrPath.startsWith(API_BASE)) {
-    const stripped = urlOrPath.slice(API_BASE.length);
-    return stripped.length > 0 ? stripped : "/";
-  }
-  return urlOrPath;
+  const candidate = urlOrPath.startsWith("/") ? API_BASE + urlOrPath : urlOrPath;
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.origin === API_BASE && !parsed.username && !parsed.password) {
+      return parsed.pathname;
+    }
+  } catch { /* Do not echo invalid or untrusted URLs. */ }
+  return "/<unsafe-pagination-url>";
 }
 
+/** Match the parsed authority, not a lookalike hostname or URL prefix. */
 function apiUrl(pathOrUrl: string): string {
-  if (pathOrUrl.startsWith("/")) return `${API_BASE}${pathOrUrl}`;
-  if (pathOrUrl.startsWith(`${API_BASE}/`)) return pathOrUrl;
-  throw new GithubRestTransportError("UNSAFE_PAGINATION_URL", "/<unsafe-pagination-url>");
+  const candidate = pathOrUrl.startsWith("/") ? API_BASE + pathOrUrl : pathOrUrl;
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new GithubRestTransportError("UNSAFE_PAGINATION_URL", "/<unsafe-pagination-url>");
+  }
+  // Reject ambiguous/non-canonical URLs, credentials, fragments and other
+  // origins before attaching a bearer token; never follow server redirects.
+  if (parsed.origin !== API_BASE || parsed.username || parsed.password ||
+      parsed.hash || parsed.href !== candidate) {
+    throw new GithubRestTransportError("UNSAFE_PAGINATION_URL", "/<unsafe-pagination-url>");
+  }
+  return parsed.href;
 }
 
 function resolveFetch(injected?: FetchLike): FetchLike {
@@ -178,6 +194,7 @@ function createRestClient(auth: string, fetch: FetchLike): GithubRestClient {
     try {
       response = await fetch(url, {
         method: "GET",
+        redirect: "error",
         headers: {
           Accept: "application/vnd.github+json",
           Authorization: `Bearer ${auth}`,
@@ -217,6 +234,7 @@ function createRestClient(auth: string, fetch: FetchLike): GithubRestClient {
       try {
         response = await fetch(url, {
           method: "GET",
+          redirect: "error",
           headers: {
             Accept: "application/vnd.github+json",
             Authorization: `Bearer ${auth}`,
