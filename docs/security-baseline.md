@@ -16,7 +16,20 @@
 
 All four committed workflow definitions explicitly limit their own token permissions. Hosted PR `contracts` and `consumer-node24` jobs use `contents:read`; trusted `main` and manually dispatched bootstrap controllers explicitly request **`actions:write`** only to dispatch/check worker runs. The `[self-hosted, Linux, trusted]` workers keep `contents:read` (bootstrap additionally `issues:read`). The controller's explicit grants are not removed by the new repository default. No org-wide setting, Actions policy, default branch, workflow YAML, runner, package publication, or credential was changed.
 
-**Not yet completed under R2:** Public GitHub Free supports branch protections and repository rulesets. `main` remains unprotected; no required PR review/check policy or release tag protection is enabled, and `allowed_actions: all` / `sha_pinning_required:false` remain unchanged. These require a separate, evaluated governance unit, particularly because mandating a human approval would interrupt the current agent PR/CI/merge loop. An appropriate ruleset, exception/review mechanism and stable PR check names must be decided and verified before claiming R2 completion.
+**R2.2 now enforces PRs and hosted checks on `main`** under the active ruleset described below. Mandatory independent human reviews remain **0** pending owner review-policy choice, release tag protections remain undecided, and `allowed_actions:all` / `sha_pinning_required:false` are unchanged. Do not mark full R2 complete until those remaining governance and release-environment requirements are explicitly addressed.
+
+## R2.2 active main-branch PR and hosted-check ruleset (#225)
+
+**Implemented and verified 2026-11-17:** GitHub public-repository Free organization ruleset [`27459624`](https://github.com/attention-spa/gh-plan/rules/27459624) is **active** for **only** `refs/heads/main`. An independent `GET /rules/branches/main` returned all four effective rules and `GET /branches/main` now reports `protected:true` (classic `protection.enabled:false` because this is a **ruleset**, not a classic branch-protection rule).
+
+| Rule | Enforced behavior |
+| --- | --- |
+| `pull_request` | All changes to `main` must arrive through a PR; required approving reviews **0** to preserve the existing agent PR/CI/squash-merge workflow. Existing `merge`, `squash`, and `rebase` options are retained. Zero reviews **does not** imply independent review was performed. |
+| `required_status_checks` | The hosted PR `contracts` and `consumer-node24` GitHub Actions checks must pass; both checks pin `integration_id:15368` (verified GitHub Actions App). A `strict_required_status_checks_policy:false` first-stage rule avoids forcing automatic rebase for every PR; source updates may still require reruns. Do not require GitHub-managed CodeQL default checks on fork-origin PRs, where CodeQL may not run. |
+| `deletion` and `non_fast_forward` | Prevent deletion of or force-push rewriting of `main`. |
+| `bypass_actors: []` | No actor-specific ruleset bypass is granted, including to the agent identity. Ruleset administrators can still modify the ruleset itself; that governance authority should be audited separately. |
+
+**Remaining decisions:** Whether a human/independent approval must be required (which would block autonomous agent merges without another eligible reviewer), stale-branch strictness, Actions third-party allowlists/SHA pinning, release-tag creation/update/deletion protections and release environment gating. **R2 release acceptance remains unchecked.** Existing repository-default `GITHUB_TOKEN:read`, trusted main/OCI runner isolation, CodeQL, secret controls and package publication restrictions are unchanged. Future ruleset edits must verify the effective rule contract and successful normal PR merging before reporting completion.
 
 ## R6 policy — free-first, capability-based security visibility (#219)
 
