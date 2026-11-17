@@ -344,8 +344,15 @@ export function createGithubReferenceHttp(options: ReferenceHttpOptions): Github
         (target.nodeId !== undefined && raw.node_id !== target.nodeId))
       fail("REPOSITORY_MISMATCH");
     verifiedRepo = { id: raw.id, nodeId: raw.node_id };
-    if (requirePush && (!record(raw.permissions) || raw.permissions.push !== true))
-      fail("PERMISSION_DENIED"); // Issue creation with milestone requires push.
+    // GitHub App installation tokens can be authorized for milestone-on-create
+    // even when the repository's user-role permissions.push is false. #181
+    // observed a real pinned-API GITHUB_TOKEN POST /issues?milestone returning
+    // 201 despite that flag being false. Do NOT infer App write capability from
+    // this role field. Verify repository identity here; GitHub enforces actual
+    // Contents:write on A1 CAS and Issues:write on the B1 mutation. A 403 or
+    // hidden 404 still fails closed without repeating a possible write.
+    if (requirePush && !record(raw.permissions))
+      fail("PERMISSION_DENIED"); // Missing authority metadata is uncertain.
   }
   async function paginate(kind: "issues" | "milestones"): Promise<unknown[]> {
     const base = "/repos/" + name + "/" + kind;
