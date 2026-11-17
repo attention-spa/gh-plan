@@ -285,6 +285,15 @@ const success = await executeCallbackApplyPlan(ready);
 equal(success.status, "applied", "Four B1 kinds execute through real A1/B1 interfaces.");
 equal(success.completedStepIds.length, 5, "Five bound steps verified.");
 equal(live.resourceWrites().length, 5, "No duplicate POST/PATCH in first run.");
+const noonPost = live.calls.find((entry) =>
+  entry.method === "POST" && entry.url === ROOT + "/milestones");
+equal((noonPost?.body as Record<string,unknown> | undefined)?.due_on,
+  "2027-01-03T12:00:00Z",
+  "Reference adapter sends noon UTC on wire without changing B1 desired UTC day.");
+equal((ready.plan.steps.find((x)=>x.kind==="milestone.create")?.request as
+  {body:Record<string,unknown>})?.body.due_on,
+  "2027-01-03T00:00:00Z",
+  "Wire normalization must not mutate frozen B1 plan/postcondition.");
 equal(live.ownerOid, null, "Matching-owner CAS releases after confirmed reads.");
 equal(success.bindings.M?.number, 17, "Milestone number only from verified postcondition.");
 equal(success.bindings.I?.number, 37, "Issue number only from verified postcondition.");
