@@ -27,6 +27,24 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run test:dist
+      - run: npm run test:consumer
+
+  consumer-node24:
+    # Small read-only compatibility proof on hosted PR and main.
+    # Never run untrusted PR code on the persistent OCI worker.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: git diff --exit-code -- package.json package-lock.json
+      - run: npm run build
+      - run: npm run test:dist
+      - run: npm run test:consumer
 
   main-controller:
     # Only trusted main pushes can dispatch/cancel a worker workflow.
