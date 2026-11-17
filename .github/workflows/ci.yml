@@ -20,9 +20,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # TEMPORARY PR-only, read-only registry advisory validation (#206).
-      - name: Temporary npm audit (#206)
-        run: npm audit --package-lock-only --audit-level=moderate
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: git diff --exit-code -- package.json package-lock.json
       - run: npm run schema:check
