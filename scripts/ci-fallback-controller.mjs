@@ -84,6 +84,9 @@ export function actionsApi({ token, profile = "ci", fetchImpl = globalThis.fetch
     }
     throw fail("UNKNOWN_DISPATCH");
   }
+  // A positive dispatch ID is provisional; a successful run GET is observed.
+  // Never interpret a later 404 as initial GitHub read-model convergence.
+  const observedRunIds = new Set();
   return {
     async dispatch(expected, parentRunId) {
       const since = now();
@@ -105,11 +108,22 @@ export function actionsApi({ token, profile = "ci", fetchImpl = globalThis.fetch
       if (!int(id)) throw fail("INVALID_RUN_ID");
       const wid = await workflow();
       let run, mismatch = "UNKNOWN";
-      // Dispatch may return an ID before GitHub has populated run-name and
-      // repository fields. Never accept a wrong identity, but allow the new
-      // run's read model a bounded 12-second convergence window.
+      // The API may return a positive run ID before its first GET is visible
+      // (404) or before identity fields are populated (200). Only the initial
+      // 12-second read-model convergence window is eligible for GET-only retry.
+      // Once *any* run GET succeeds, a subsequent 404 is not safe to excuse.
       for (let attempt = 0; attempt < 7; attempt++) {
-        ({ data: run } = await request("GET", "/runs/" + id));
+        try {
+          ({ data: run } = await request("GET", "/runs/" + id));
+        } catch (error) {
+          if (error?.message === "CI_FALLBACK_HTTP_404" &&
+              !observedRunIds.has(id) && attempt < 6) {
+            await sleep(2_000);
+            continue;
+          }
+          throw error;
+        }
+        observedRunIds.add(id);
         mismatch = run?.id !== id ? "ID" :
           run.workflow_id !== wid ? "WORKFLOW" :
           run.event !== "workflow_dispatch" ? "EVENT" :

@@ -254,6 +254,116 @@ assert.equal((await hydrated.inspect(123, expected)).conclusion, "success",
 assert.equal(temporaryRunReads, 3,
   "Run-identity reads must converge before the controller proceeds.");
 
+// #186: a newly dispatched positive ID may briefly return 404 before the
+// run GET exists. This is GET-only convergence, never permission to re-dispatch.
+function visibilityFixture(responses, { jobs404 = false } = {}) {
+  let reads = 0, jobs = 0;
+  const dispatchBackends = [], sleeps = [];
+  const valid = {
+    id: 123, workflow_id: 444, event: "workflow_dispatch",
+    head_branch: "main", run_attempt: 1, display_title: title,
+    repository: { full_name: "attention-spa/gh-plan" },
+    status: "completed", conclusion: "success",
+  };
+  const api = actionsApi({
+    token, sleep: async (ms) => { sleeps.push(ms); },
+    fetchImpl: async (url, opts) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith("/workflows/ci-worker.yml"))
+        return json(200, { id: 444, path: ".github/workflows/ci-worker.yml" });
+      if (path.endsWith("/dispatches")) {
+        const input = JSON.parse(opts.body);
+        dispatchBackends.push(input.inputs.backend);
+        return json(200, { workflow_run_id: 123 });
+      }
+      if (path.endsWith("/runs/123")) {
+        const answer = responses[Math.min(reads++, responses.length - 1)];
+        if (Number.isInteger(answer))
+          return json(answer, { message: "secret-token-never-log" });
+        if (answer === "incomplete")
+          return json(200, { ...valid, repository: null });
+        if (answer === "wrong")
+          return json(200, { ...valid, display_title: "different-run" });
+        assert.equal(answer, "valid", "Unexpected visibility fixture response.");
+        return json(200, valid);
+      }
+      if (path.endsWith("/runs/123/jobs")) {
+        jobs++;
+        if (jobs404) return json(404, { message: "secret-token-never-log" });
+        return json(200, { total_count: 1, jobs: [{
+          run_id: 123, status: "completed",
+          started_at: "2026-11-16T10:00:00Z", conclusion: "success",
+        }] });
+      }
+      throw Error("Unexpected visibility fixture endpoint: " + path);
+    },
+  });
+  return {
+    api, dispatchBackends, sleeps,
+    get reads() { return reads; },
+    get jobs() { return jobs; },
+    run() {
+      return orchestrate({
+        api, sha: SHA, parentRunId: ID, correlation: CORRELATION,
+        now: () => 0, sleep: async () => {},
+        queueMs: 30_000, pollMs: 1_000, totalMs: 100_000,
+      });
+    },
+  };
+}
+
+const delayedVisibility = visibilityFixture([404, 404, "valid"]);
+assert.deepEqual(await delayedVisibility.run(), { backend: "oci", runId: 123 });
+assert.equal(delayedVisibility.reads, 3);
+assert.equal(delayedVisibility.jobs, 1);
+assert.deepEqual(delayedVisibility.sleeps, [2_000, 2_000]);
+assert.deepEqual(delayedVisibility.dispatchBackends, ["oci"],
+  "A delayed GET must not dispatch a second worker.");
+
+const neverVisible = visibilityFixture([404]);
+await assert.rejects(neverVisible.run(), /CI_FALLBACK_HTTP_404/);
+assert.equal(neverVisible.reads, 7, "Bound previsibility GETs to seven requests.");
+assert.deepEqual(neverVisible.sleeps, Array(6).fill(2_000));
+assert.equal(neverVisible.jobs, 0);
+assert.deepEqual(neverVisible.dispatchBackends, ["oci"],
+  "An unresolved 404 must not initiate hosted fallback or a duplicate POST.");
+
+const previouslyObserved = visibilityFixture(["valid", 404]);
+assert.equal(await previouslyObserved.api.dispatch(expected, 51), 123);
+assert.equal((await previouslyObserved.api.inspect(123, expected)).conclusion, "success");
+await assert.rejects(previouslyObserved.api.inspect(123, expected), /CI_FALLBACK_HTTP_404/);
+assert.equal(previouslyObserved.reads, 2);
+assert.deepEqual(previouslyObserved.sleeps, [],
+  "A 404 after a prior 200 must never be retried.");
+
+const partiallyObserved = visibilityFixture(["incomplete", 404, "valid"]);
+assert.equal(await partiallyObserved.api.dispatch(expected, 51), 123);
+await assert.rejects(partiallyObserved.api.inspect(123, expected), /CI_FALLBACK_HTTP_404/);
+assert.equal(partiallyObserved.reads, 2,
+  "A 404 following even a partial HTTP 200 must fail closed.");
+assert.deepEqual(partiallyObserved.dispatchBackends, ["oci"]);
+
+const falseIdentity = visibilityFixture(["wrong"]);
+await assert.rejects(falseIdentity.run(), /CI_FALLBACK_RUN_IDENTITY_TITLE/);
+assert.equal(falseIdentity.reads, 7);
+assert.deepEqual(falseIdentity.dispatchBackends, ["oci"],
+  "A mismatched run must not spawn an alternative worker.");
+
+for (const http of [403, 429, 503]) {
+  const rejected = visibilityFixture([http]);
+  await assert.rejects(rejected.run(), new RegExp("CI_FALLBACK_HTTP_" + http));
+  assert.equal(rejected.reads, 1, "Only a previsibility 404 may retry.");
+  assert.deepEqual(rejected.sleeps, []);
+  assert.deepEqual(rejected.dispatchBackends, ["oci"]);
+}
+const missingJobs = visibilityFixture(["valid"], { jobs404: true });
+await assert.rejects(missingJobs.run(), /CI_FALLBACK_HTTP_404/);
+assert.equal(missingJobs.reads, 1);
+assert.equal(missingJobs.jobs, 1);
+assert.deepEqual(missingJobs.sleeps, [],
+  "404 retries apply only to the run GET, not the jobs endpoint.");
+assert.deepEqual(missingJobs.dispatchBackends, ["oci"]);
+
 const mismatch = actionsApi({
   token, sleep: async () => {}, fetchImpl: async (url) => url.endsWith("/workflows/ci-worker.yml")
     ? json(200, { id: 444, path: ".github/workflows/ci-worker.yml" })
