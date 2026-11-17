@@ -1,5 +1,4 @@
-import { executeCallbackApplyPlan } from "../src/apply-lifecycle.ts";
-import { ApplyPlanError } from "../src/index.ts";
+import { applyPlan, ApplyPlanError } from "../src/index.ts";
 import type {
   ApplyPlanOptions, ApplyPlanResult, ApplyPlanErrorCode,
   ApplyPostconditionContext, SafeApplyLogEntry,
@@ -272,7 +271,7 @@ class Fixture {
 async function denied(name: string, options: ApplyPlanOptions, expected: ApplyPlanErrorCode,
   expectedState?: string): Promise<ApplyPlanError> {
   let caught: unknown;
-  try { await executeCallbackApplyPlan(options); }
+  try { await applyPlan(options); }
   catch (error) { caught = error; }
   assert(caught instanceof ApplyPlanError, name + ": typed safe error expected.");
   equal(caught.code, expected, name + ": exact error code");
@@ -288,7 +287,7 @@ async function denied(name: string, options: ApplyPlanOptions, expected: ApplyPl
 }
 
 const fixture = new Fixture();
-const success = await executeCallbackApplyPlan(fixture.config());
+const success = await applyPlan(fixture.config());
 equal(success.status, "applied", "All four B1 kinds and create-followed-by-close are applied.");
 equal(success.completedStepIds.length, 5, "All steps committed and verified.");
 equal(success.skippedStepIds, [], "No preexisting step was skipped.");
@@ -304,7 +303,7 @@ assert(fixture.logs.every((entry) => entry.runId === success.runId),
 equal(success.log.length, fixture.logs.length,
   "Result only contains acknowledged safe audit events.");
 const precedingWrites = fixture.dispatches;
-const replay = await executeCallbackApplyPlan(fixture.config());
+const replay = await applyPlan(fixture.config());
 equal(replay.status, "already_satisfied", "Fresh verified rerun is a no-op.");
 equal(fixture.dispatches, precedingWrites, "Rerun dispatches ZERO requests.");
 equal(replay.skippedStepIds.length, 5, "All five replay steps are verified skipped.");
@@ -426,7 +425,7 @@ const firstEnteredPromise = new Promise<void>((resolve) => { firstEntered = reso
 const permitFirstPromise = new Promise<void>((resolve) => { permitFirst = resolve; });
 twoContenders.ownerHeld = true; // simulation's external CAS adapter owns the ref
 twoContenders.dispatchHook = async () => { firstEntered(); await permitFirstPromise; };
-const firstRun = executeCallbackApplyPlan({
+const firstRun = applyPlan({
   ...twoContenders.config(), ownership: oneOwner,
 });
 await firstEnteredPromise;
@@ -526,7 +525,7 @@ await denied("aborted POST with unknown outcome", {
 assert(unknown.ownerHeld, "Unknown aborted POST cannot be released.");
 
 const rollback = new Fixture();
-const seeded = await executeCallbackApplyPlan(rollback.config());
+const seeded = await applyPlan(rollback.config());
 assert(seeded.status === "applied", "Seed a verified fake state.");
 rollback.dispatches = 0;
 rollback.extraIssue = {
@@ -559,7 +558,7 @@ createIssue.desired = unboundIssue.body;
 noMilestonePlan.applyIntent!.managed.find((entry) => entry.logicalId === "I")!.fields =
   ["state", "title"];
 const noMilestone = new Fixture();
-const noMilestoneResult = await executeCallbackApplyPlan(noMilestone.config(noMilestonePlan));
+const noMilestoneResult = await applyPlan(noMilestone.config(noMilestonePlan));
 equal(noMilestoneResult.status, "applied",
   "Issue create with omitted milestone must start with GitHub's null milestone.");
 equal(noMilestone.issues.find((i) => i.number === 37)?.milestoneNumber, null,
@@ -576,16 +575,16 @@ equal(wrongImplicit.dispatches, 1,
   "Existing marker with unrelated milestone cannot issue duplicate create.");
 
 const clearedDescription = new Fixture();
-await executeCallbackApplyPlan(clearedDescription.config());
+await applyPlan(clearedDescription.config());
 clearedDescription.dispatches = 0;
 clearedDescription.milestones.find((m) => m.number === 17)!.description =
   null as unknown as string;
 clearedDescription.milestones.find((m) => m.number === 2)!.description =
   null as unknown as string;
-const descriptionReplay = await executeCallbackApplyPlan(clearedDescription.config());
+const descriptionReplay = await applyPlan(clearedDescription.config());
 equal(descriptionReplay.status, "already_satisfied",
   "GitHub null and empty milestone descriptions normalize on reread.");
 equal(clearedDescription.dispatches, 0,
   "Normalized description no-op requires no writes.");
 
-console.log("C2 #188: guarded four-kind callback graph, late binding, verified replay, serial writes, audit prefix, cancellation and uncertain-owner refusal passed.");
+console.log("Public C2 #190 applyPlan: guarded four-kind callback graph, late binding, verified replay, serial writes, audit prefix, cancellation and uncertain-owner refusal passed.");
