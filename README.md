@@ -1,6 +1,6 @@
 # gh-plan
 
-A read-only GitHub desired-state planner. It discovers repository state through REST, resolves identity, computes semantic diffs and returns deterministic, dependency-ordered mutation requests. **It does not execute those requests.**
+A GitHub desired-state planner with a separate, explicitly opted-in callback application facade. `planGithub()` discovers repository state through read-only REST, resolves identity, computes semantic diffs and returns deterministic, dependency-ordered mutation requests. **Planning never executes those requests.** Optional `applyPlan()` can execute only four B1 issue/milestone operation shapes through caller-supplied callbacks; the package does not authenticate, inject GitHub credentials or validate arbitrary callback honesty.
 
 The package currently has `"private": true` and is not published to npm.
 
@@ -32,6 +32,8 @@ const plan = await planGithub({
 console.log(plan.readiness, plan.summary, plan.steps);
 // Nothing is written to GitHub. Never execute steps when readiness is "blocked".
 ```
+
+The separate [`applyPlan()` callback contract](knowledge/api/applyPlan.md) requires `acknowledgeCallbackTrust: true`, explicit dispatch/readback/catalog/ownership callbacks, and whole-plan B1 preflight before any write. **A type-correct callback is not proof of authenticated GitHub reads or locking.** Importing the package or calling `planGithub()` never runs `applyPlan()`; production mutations require independent authorization.
 
 See the [authoring schema](docs/authoring-schema.md), [public contract](docs/public-contract.md), and [OKF knowledge bundle](knowledge/index.md). The JSON Schema is available at [schema/gh-plan.schema.json](schema/gh-plan.schema.json).
 
