@@ -316,7 +316,7 @@ export function createGithubReferenceApplyOptions(config: GithubReferenceApplyCo
                 !(error instanceof IssueReadError) ||
                 error.code !== "INDETERMINATE_WRITE" ||
                 attempt >= issueVisibilityDelays.length) throw error;
-            const owner = handle;
+            const owner: GithubCasLockHandle | undefined = handle;
             if (!active || !owner) reject();
             await owner.assertOwned();
             await readbackSleep(issueVisibilityDelays[attempt]!);
