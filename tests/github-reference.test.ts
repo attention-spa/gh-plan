@@ -140,7 +140,8 @@ class FakeGithub {
   callsCount = new Map<string,number>();
   fetch: FetchLike = async (url, init) => {
     const method = init?.method ?? "GET";
-    assert(url.startsWith(BASE), "No external host requests.");
+    assert(new URL(url).origin === new URL(BASE).origin,
+      "No external or lookalike-host requests.");
     assert(init?.redirect === "error", "No redirect following.");
     assert(init?.headers?.Authorization === "Bearer " + SECRET, "Token stays in runtime headers.");
     assert(init?.headers?.["X-GitHub-Api-Version"] === "2026-03-10", "Pinned API version.");
@@ -359,10 +360,17 @@ equal(isolated.status,"applied",
   "Changes to caller config/plan after construction cannot redirect GitHub writes.");
 equal(immutable.resourceWrites().length,5,
   "Original validated B1 plan remains operative despite external mutation.");
-assert(immutable.calls.every((call) => call.url.startsWith(BASE)),
+assert(immutable.calls.every((call) => new URL(call.url).origin === new URL(BASE).origin),
   "No caller mutation can change canonical target.");
 
 const malicious = new FakeGithub();
+// A host-prefix match alone wrongly accepts this attacker-controlled domain.
+let lookalikeAllowed = false;
+try {
+  await malicious.fetch("https://api.github.com.evil.example/repos/a/b", { method: "GET" });
+  lookalikeAllowed = true;
+} catch { /* Expected: mock refuses other origins before any request. */ }
+assert(!lookalikeAllowed, "Reference adapter test must reject a GitHub-lookalike origin.");
 const options = malicious.options();
 await denied("dispatch directly before owner/pre-read", () =>
   options.dispatch({protocol:"rest",method:"POST",
