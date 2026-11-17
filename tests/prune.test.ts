@@ -77,7 +77,10 @@ check(!orphan.destructive && orphan.reversible === true,
 const comment = closer.steps.find((s) => s.kind === "issue.duplicate.comment")!;
 const duplicate = closer.steps.find((s) => s.kind === "issue.duplicate.close")!;
 check(comment.request?.protocol === "rest" &&
-  JSON.stringify(comment.request.body).includes("https://github.com/alice/plan/issues/1"),
+  JSON.stringify(comment.request.body) === JSON.stringify({
+    body: "Issue #2 duplicates canonical [#1](https://github.com/alice/plan/issues/1); " +
+      "shared verified gh-plan marker X.",
+  }),
   "Duplicate comment must retain canonical link and reason.");
 equal(duplicate.request, {
   protocol: "rest", method: "PATCH", path: "/repos/alice/plan/issues/2",
