@@ -309,6 +309,34 @@ for (const [name, entry] of Object.entries(locked.packages)) {
   assert.match(entry.integrity ?? "", /^sha512-[A-Za-z0-9+/=]+$/,
     "Every resolved dependency must have an integrity hash: " + name);
 }
+// #206: fail deterministic CI if the known reviewed dev-only advisories return.
+// Upstream ts-json-schema-generator currently requests glob ^13, so this narrow
+// override is intentional until the schema generator supports a patched major.
+assert.deepEqual(manifest.overrides, { "ts-json-schema-generator": { glob: "14.0.2" } });
+const securityFloors = new Map([
+  ["ajv", [8, 18, 0]], ["yaml", [2, 8, 3]],
+  ["glob", [14, 0, 2]], ["minimatch", [11, 0, 1]],
+]);
+function semverAtLeast(version, floor) {
+  const parts = /^(\\d+)\\.(\\d+)\\.(\\d+)(?:$|-)/.exec(version ?? "");
+  if (!parts) return false;
+  for (let i = 0; i < 3; i++) {
+    const current = Number(parts[i + 1]);
+    if (current !== floor[i]) return current > floor[i];
+  }
+  return true;
+}
+for (const [name, floor] of securityFloors) {
+  const matches = Object.entries(locked.packages).filter(([path]) =>
+    path.endsWith("node_modules/" + name));
+  assert(matches.length, "Missing reviewed package: " + name);
+  for (const [path, entry] of matches) {
+    assert(semverAtLeast(entry.version, floor),
+      "Reviewed security floor violated at " + path + "@" + entry.version);
+  }
+}
+assert.equal(manifest.devDependencies.ajv, locked.packages["node_modules/ajv"].version);
+assert.equal(manifest.devDependencies.yaml, locked.packages["node_modules/yaml"].version);
 for (const workflow of [ci, worker]) {
   const job = workflow.jobs.contracts ?? workflow.jobs["contracts-worker"];
   const commands = job.steps.filter((step) => typeof step.run === "string")
