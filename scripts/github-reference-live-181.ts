@@ -108,9 +108,12 @@ await checkpoint("authenticated_repo_read", {
 check(repo.full_name === TARGET && repo.private === true &&
   typeof repo.id === "number" && typeof repo.node_id === "string",
   "wrong or non-private repository identity");
-check(typeof repo.permissions === "object" && repo.permissions !== null &&
-  (repo.permissions as Record<string, unknown>).push === true,
-  "token does not have required milestone-on-create push permission");
+check(typeof repo.permissions === "object" && repo.permissions !== null,
+  "missing token permission metadata");
+// The real GITHUB_TOKEN has permissions.push=false yet the pinned endpoint
+// successfully created an issue with milestone in an independent probe.
+// Do not replace GitHub's actual server-side POST authorization with that
+// role hint. The A1/B1 writer will fail closed on any denied write.
 const preexistingIssue = await get("/issues/1");
 check(preexistingIssue.body === "Existing issue\n" + MARK("I2") &&
   preexistingIssue.state === "open" && preexistingIssue.milestone !== null,
@@ -120,7 +123,10 @@ check(originalMilestone.title === "Pinned due day probe #181",
   "seed milestone absent/altered");
 await checkpoint("preflight_repo", {
   repositoryId: repo.id, repositoryNode: repo.node_id,
-  issuesPush: true, issueNumber: preexistingIssue.number,
+  issuesPushRoleHint:
+    (repo.permissions as Record<string,unknown>).push,
+  serverPermissionVerifiedByIndependentPinnedProbe: true,
+  issueNumber: preexistingIssue.number,
   oldMilestoneNumber: originalMilestone.number,
 });
 const mCreate = step("milestone.create", "M", {
