@@ -388,6 +388,7 @@ const expectedActionPins = new Map([
 ]);
 for (const file of [
   "ci.yml", "ci-worker.yml", "bootstrap-dry-run.yml", "bootstrap-worker.yml",
+  "npm-release-preflight.yml",
 ]) {
   const source = readFileSync(new URL("../.github/workflows/" + file, import.meta.url), "utf8");
   const workflow = YAML.parse(source);
@@ -411,6 +412,40 @@ for (const file of [
   }
   assert.equal(checked, file === "ci.yml" ? 6 : 2,
     "Every existing first-party action use must be pinned in " + file);
+}
+// #235: manually dispatched prerelease preview cannot request registry-write
+// credentials, create a tag or stage/publish. Never run release input on OCI.
+const preflightSource = readFileSync(
+  new URL("../.github/workflows/npm-release-preflight.yml", import.meta.url), "utf8");
+const preflight = YAML.parse(preflightSource);
+assert.deepEqual(Object.keys(preflight.on), ["workflow_dispatch"],
+  "Release preflight must not run on push, PR, tags or privilege-bearing events.");
+assert.deepEqual(preflight.on.workflow_dispatch.inputs.version.options, ["0.1.0-beta.1"]);
+assert.equal(preflight.on.workflow_dispatch.inputs.version.type, "choice");
+assert.deepEqual(preflight.permissions, { contents: "read" });
+assert.deepEqual(Object.keys(preflight.jobs), ["preflight"]);
+const previewJob = preflight.jobs.preflight;
+assert.equal(previewJob["runs-on"], "ubuntu-latest",
+  "Release preflight must never run on a persistent self-hosted OCI runner.");
+assert.deepEqual(previewJob.permissions, { contents: "read" },
+  "Preflight must not receive OIDC, actions-write or registry capabilities.");
+assert(previewJob.steps.length >= 8);
+assert.deepEqual(previewJob.steps.filter(step => typeof step.run === "string")
+  .map(step => step.run).slice(0, 2),
+  ["node scripts/release-preflight.mjs",
+    "npm ci --ignore-scripts --no-audit --no-fund"]);
+const previewStep = previewJob.steps.find(step => step.run === "node scripts/release-preflight.mjs");
+assert.equal(previewStep.env.RELEASE_TARGET_TAG, "v0.1.0-beta.1");
+assert.match(previewStep.env.RELEASE_TARGET_VERSION, /inputs.version/);
+assert(previewJob.steps.some(step => step.run === "npm run test:consumer"));
+assert(previewJob.steps.some(step =>
+  step.run === "npm pack --dry-run --json --ignore-scripts"));
+assert(!preflightSource.includes("id-token") && !preflightSource.includes("secrets."),
+  "Preflight must not request an OIDC publishing token or access secrets.");
+for (const step of previewJob.steps) {
+  const run = step.run ?? "";
+  assert(!/\\bnpm\\s+(?:stage|publish|trust|dist-tag|version|login)\\b|\\bgit\\s+tag\\b|\\bgh\\s+release\\b/.test(run),
+    "No release or registry mutation is authorized in this workflow.");
 }
 const ci = YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"));
 const worker = YAML.parse(readFileSync(new URL("../.github/workflows/ci-worker.yml", import.meta.url), "utf8"));
