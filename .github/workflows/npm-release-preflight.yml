@@ -1,0 +1,43 @@
+name: npm release preflight (no publish)
+
+# Manually validate proposed release metadata on protected main only.
+# This is NOT a staging or publishing workflow; it cannot request OIDC.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Approved future prerelease version (no publication)
+        type: choice
+        required: true
+        options: [0.1.0-beta.1]
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify approved candidate, trusted main and unpublished manifest
+        run: node scripts/release-preflight.mjs
+        env:
+          RELEASE_TARGET_VERSION: ${{ inputs.version }}
+          RELEASE_TARGET_TAG: v0.1.0-beta.1
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: git diff --exit-code -- package.json package-lock.json
+      - run: npm audit --package-lock-only --audit-level=moderate
+      - run: npm run schema:check
+      - run: npm run docs:check
+      - run: npm test
+      - run: npm run build
+      - run: npm run test:dist
+      - run: npm run test:consumer
+      - name: Verify local pack preview without publishing or uploading
+        run: npm pack --dry-run --json --ignore-scripts
