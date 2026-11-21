@@ -41,7 +41,7 @@ assert(guide.includes("applyPlan()"));
 assert(guide.includes("read-only"));
 for (const term of [
   "2FA", "OIDC", "stage-only", "provenance", "0.0.0-stage",
-  "deprecation", "unpublish", "immutable", "no published",
+  "deprecation", "unpublish", "immutable", "not published",
 ]) {
   assert(guide.toLowerCase().includes(term.toLowerCase()),
     "Guide must document the release and recovery constraint: " + term);
