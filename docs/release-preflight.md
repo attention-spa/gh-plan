@@ -38,19 +38,21 @@ CI; it never handles npm OIDC publishing.
 
 ## What is still blocked
 
-- Authenticate the intended npm maintainer's `@attention-spa` organization
-  publishing permissions and 2FA, and establish whether this is a first
-  package publication. The owner has attested ownership; no authenticated
-  readback is available here.
+- The owner has confirmed npm `attention-spa` **Owner**, account **2FA
+  enabled**, and the **package does not yet exist**. These are owner-reported
+  checks; no authenticated npm API is connected. The first package will
+  require the separately gated automated stage-only token bootstrap, as
+  described in the [bootstrap preview guide](npm-bootstrap-preview.md).
 - Confirm the trusted release tag creator, immutable tag protection, the
   **future separate stage-only workflow filename** and optional GitHub
   environment. Do not grant an exception that makes release tags mutable.
 - In a later **explicitly authorized release window**, update the package
   version and lock in one controlled PR, remove the `private` publication
-  block, configure npm's exact OIDC trusted publisher and confirm its
-  short first-use validity window, then stage only with GitHub-hosted
-  credentials. A maintainer would approve the staged version separately
-  using interactive npm 2FA.
+  block, and use a separately approved **automated hosted first-package
+  bootstrap** with a temporary stage-only npm token; then configure npm's
+  exact OIDC trusted publisher and stage the **real** prerelease through
+  GitHub-hosted OIDC. A maintainer still approves the real stage with 2FA.
+  No bootstrap or OIDC staging is performed by this read-only preflight.
 
 An initial `npm stage publish` can create the publicly visible
 `0.0.0-stage` placeholder. It is not an invisible smoke test. Newly
@@ -60,6 +62,10 @@ No long-lived publishing token is recommended.
 
 A successful preflight does **not** satisfy the remaining R1/R2/R4 release
 acceptance criteria, establish authenticated ownership or authorize release.
+
+The [standalone bootstrap preview](npm-bootstrap-preview.md) is a distinct
+manual dry-run with no credentials. Do **not** treat either preflight as a
+registry release or an authorization for live staging.
 
 ## References
 
