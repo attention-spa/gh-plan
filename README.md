@@ -4,6 +4,12 @@ A GitHub desired-state planner with a separate, explicitly opted-in callback app
 
 The package currently has `"private": true` and is not published to npm.
 
+The proposed first public npm prerelease is **`0.1.0-beta.1`**, but it is
+**not yet available**. See the [draft distribution, compatibility and rollback
+guidance](docs/npm-distribution.md), [unreleased changelog](CHANGELOG.md), and
+[manual read-only release preflight](docs/release-preflight.md). No registry
+publication, tag or trusted publisher has been authorized.
+
 ## Install and build
 
 Requires Node.js 22 or newer. From a checkout, install the exact dependency versions and integrity hashes recorded in the committed `package-lock.json` (instead of resolving a new graph):
