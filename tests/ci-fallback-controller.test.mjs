@@ -388,7 +388,7 @@ const expectedActionPins = new Map([
 ]);
 for (const file of [
   "ci.yml", "ci-worker.yml", "bootstrap-dry-run.yml", "bootstrap-worker.yml",
-  "npm-release-preflight.yml",
+  "npm-release-preflight.yml", "npm-bootstrap-preview.yml",
 ]) {
   const source = readFileSync(new URL("../.github/workflows/" + file, import.meta.url), "utf8");
   const workflow = YAML.parse(source);
@@ -447,6 +447,36 @@ for (const step of previewJob.steps) {
   assert(!/\\bnpm\\s+(?:stage|publish|trust|dist-tag|version|login)\\b|\\bgit\\s+tag\\b|\\bgh\\s+release\\b/.test(run),
     "No release or registry mutation is authorized in this workflow.");
 }
+// #240: first-package bootstrap preview is an OFFLINE test, never a stage.
+// Inspect parsed commands, token permissions, events and trusted hosted runner.
+const bootstrapPreviewText = readFileSync(
+  new URL("../.github/workflows/npm-bootstrap-preview.yml", import.meta.url), "utf8");
+const bootstrapPreview = YAML.parse(bootstrapPreviewText);
+assert.deepEqual(Object.keys(bootstrapPreview.on), ["workflow_dispatch"]);
+assert.deepEqual(bootstrapPreview.on.workflow_dispatch.inputs.version.options,
+  ["0.0.0-bootstrap.0"]);
+assert.equal(bootstrapPreview.on.workflow_dispatch.inputs.version.type, "choice");
+assert.deepEqual(bootstrapPreview.permissions, { contents: "read" });
+assert.deepEqual(Object.keys(bootstrapPreview.jobs), ["bootstrap-preview"]);
+const bootstrapJob = bootstrapPreview.jobs["bootstrap-preview"];
+assert.equal(bootstrapJob["runs-on"], "ubuntu-latest",
+  "Bootstrap preview must use ephemeral hosted infrastructure.");
+assert.deepEqual(bootstrapJob.permissions, { contents: "read" },
+  "Bootstrap preview MUST NOT receive npm/OIDC/Actions write permissions.");
+assert.equal(bootstrapJob.steps.length, 7);
+assert.equal(bootstrapJob.steps[2].run, "node scripts/npm-bootstrap-preview.mjs");
+assert.equal(bootstrapJob.steps[2].env.BOOTSTRAP_PREVIEW_TAG, "bootstrap");
+assert.match(bootstrapJob.steps[2].env.BOOTSTRAP_PREVIEW_VERSION, /inputs.version/);
+assert(bootstrapJob.steps.some(step => step.run === "npm run test:bootstrap-preview"));
+assert(bootstrapJob.steps.some(step => step.run === "npm run test:ci-fallback"));
+assert(!/id-token|secrets\.|NODE_AUTH_TOKEN|NPM_TOKEN|NODE_OPTIONS/.test(bootstrapPreviewText),
+  "Bootstrap preview MUST NOT receive an authentication mechanism.");
+for (const step of bootstrapJob.steps) {
+  const cmd = step.run ?? "";
+  assert(!/\bnpm\s+(?:stage|publish|trust|dist-tag|token|version|login)\b|\bgit\s+tag\b|\bgh\s+release\b/.test(cmd),
+    "Bootstrap preview MUST NOT mutate npm registry, Git tags, or release identity.");
+}
+
 const ci = YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"));
 const worker = YAML.parse(readFileSync(new URL("../.github/workflows/ci-worker.yml", import.meta.url), "utf8"));
 assert.deepEqual(ci.on.push.branches, ["main"]);
