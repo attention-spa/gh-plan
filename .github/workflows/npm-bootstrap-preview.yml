@@ -1,0 +1,35 @@
+name: npm bootstrap preview (no stage or publish)
+
+# Dry-run ONLY: never give this workflow an npm token, OIDC, or deployment env.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Nonfunctional bootstrap fixture for future staged creation
+        type: choice
+        required: true
+        options: [0.0.0-bootstrap.0]
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify main-only bootstrap and pack in a temporary folder, offline
+        run: node scripts/npm-bootstrap-preview.mjs
+        env:
+          BOOTSTRAP_PREVIEW_VERSION: ${{ inputs.version }}
+          BOOTSTRAP_PREVIEW_TAG: bootstrap
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run test:bootstrap-preview
+      - run: npm run test:ci-fallback
+      - run: git diff --exit-code -- package.json package-lock.json

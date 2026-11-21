@@ -6,7 +6,10 @@ version `0.0.0`. The planned first public npm prerelease is
 **`0.1.0-beta.1`**, with intended Git tag **`v0.1.0-beta.1`**; neither a
 release tag nor a publishable prerelease artifact exists yet. The npm
 organization owner has confirmed control of the intended `attention-spa`
-scope, but authenticated publisher-account access and 2FA remain unverified.
+scope, reports **Owner** role and **2FA enabled**, and confirms the package
+**does not yet exist**. These are owner-reported facts, not an independent
+npm API readback. The first package must be bootstrapped before OIDC trust
+can be added.
 
 ## Installation and requirements — after an approved release
 
@@ -77,7 +80,11 @@ It is not a claim that the package/version is already on the registry.
 The release owner chose a future **GitHub-hosted OIDC trusted publisher** with
 **stage-only** npm rights (`npm stage publish`), **no direct publish rights**,
 and **npm maintainer 2FA approval**.
-Publishing directly or with long-lived npm tokens is not approved.
+Direct npm publication or long-lived npm tokens are not approved. The owner
+selected **automated first-package creation**: a separately authorized,
+short-lived, stage-only token used by a hosted bootstrap job to create the
+package namespace without publishing the real prerelease. See the
+[no-write bootstrap preview](npm-bootstrap-preview.md) and [issue #239](https://github.com/attention-spa/gh-plan/issues/239).
 
 The current [read-only release preflight](release-preflight.md) already
 succeeded using `ubuntu-latest`, `contents:read` only and **no** OIDC,
@@ -91,11 +98,17 @@ tests before invoking `npm stage publish` on a hosted runner. Only the
 specific approved staging workflow may eventually request
 `id-token:write`; it must not be enabled in PR or OCI jobs.
 
-**Initial-stage side effect:** staging a package that does not yet exist on
-npm creates a **public `0.0.0-stage` placeholder**, even while the candidate
-tarball stays hidden until approval. Newly configured npm trusted-publisher
-connections must be used successfully within **two days**. Configure those
-grants only during an explicitly approved first-release window.
+**Automated initial-package bootstrap:** a temporary, nonfunctional
+`0.0.0-bootstrap.0` fixture will be **staged** from GitHub Actions using
+a short-lived stage-only npm token (never directly published). This creates
+the package namespace and a **publicly available `0.0.0-stage`
+placeholder**. The bootstrap stage must never be approved as a real release.
+Once the package exists, configure the real stage-only OIDC workflow and
+stage the actual `0.1.0-beta.1` separately; npm supports multiple pending
+stages. Newly configured trusted-publisher grants must be used successfully
+within **two days**. The initial staging side effect and any grant must be
+separately approved before execution; the [bootstrap preview](npm-bootstrap-preview.md)
+**does not** stage anything.
 
 A maintainer must independently inspect the staged package and approve it
 using interactive npm **2FA** before it is published. Following approval,
