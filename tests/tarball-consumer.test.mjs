@@ -10,6 +10,18 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const metadata = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 assert.equal(metadata.private, true, "No npm publication is authorized.");
 assert.equal(metadata.name, "@attention-spa/gh-plan");
+assert.equal(metadata.version, "0.0.0", "Initial prerelease version is not approved.");
+assert.equal(metadata.publishConfig, undefined, "No npm access/publishing config approved.");
+const expectedRepository = {
+  type: "git",
+  url: "git+https://github.com/attention-spa/gh-plan.git",
+};
+const expectedHomepage = "https://github.com/attention-spa/gh-plan#readme";
+const expectedBugs = { url: "https://github.com/attention-spa/gh-plan/issues" };
+assert.deepEqual(metadata.repository, expectedRepository,
+  "Source repository identity must match the future npm trusted publisher.");
+assert.equal(metadata.homepage, expectedHomepage);
+assert.deepEqual(metadata.bugs, expectedBugs);
 assert.deepEqual(Object.keys(metadata.exports), ["."]);
 
 const temp = mkdtempSync(join(tmpdir(), "gh-plan-packed-consumer-"));
@@ -69,6 +81,12 @@ try {
   const installedMetadata = JSON.parse(readFileSync(join(installed, "package.json"), "utf8"));
   assert.equal(installedMetadata.name, metadata.name);
   assert.equal(installedMetadata.version, metadata.version);
+  assert.equal(installedMetadata.private, true, "Packed artifact must remain release-blocked.");
+  assert.equal(installedMetadata.publishConfig, undefined);
+  assert.deepEqual(installedMetadata.repository, expectedRepository,
+    "Offline-installed tarball must preserve GitHub trusted-publisher source.");
+  assert.equal(installedMetadata.homepage, expectedHomepage);
+  assert.deepEqual(installedMetadata.bugs, expectedBugs);
   assert.deepEqual(Object.keys(installedMetadata.exports), ["."]);
   assert(!existsSync(join(installed, "src")));
   assert(!existsSync(join(installed, "tests")));
