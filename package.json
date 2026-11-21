@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/attention-spa/gh-plan.git"
+  },
+  "homepage": "https://github.com/attention-spa/gh-plan#readme",
+  "bugs": {
+    "url": "https://github.com/attention-spa/gh-plan/issues"
+  },
   "engines": {
     "node": ">=22"
   },
