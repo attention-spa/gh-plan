@@ -75,7 +75,8 @@ It is not a claim that the package/version is already on the registry.
 ## Release authorization, provenance, and approvals
 
 The release owner chose a future **GitHub-hosted OIDC trusted publisher** with
-only **npm stage-publish permission** and **npm maintainer 2FA approval**.
+**stage-only** npm rights (`npm stage publish`), **no direct publish rights**,
+and **npm maintainer 2FA approval**.
 Publishing directly or with long-lived npm tokens is not approved.
 
 The current [read-only release preflight](release-preflight.md) already
