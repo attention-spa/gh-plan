@@ -52,7 +52,10 @@ assert(change.includes("Unreleased — proposed " + PREVIEW_VERSION));
 assert(change.includes(PREVIEW_TAG));
 assert(change.includes("DRAFT; not published"));
 assert(change.includes("private:true"));
-assert(change.includes("no") && change.includes("OIDC"));
+assert(change.includes("No publishable prerelease artifact"),
+  "Changelog must not claim a publishable tarball exists.");
+assert(change.includes("trusted-publisher"),
+  "Draft must not claim an npm trust relationship already exists.");
 assert(!/## \[[0-9]+\.[0-9]+\.[0-9]+/.test(change),
   "Do not add a dated released-version changelog heading before publication.");
 
