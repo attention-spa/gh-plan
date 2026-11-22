@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { readFileSync as read } from "node:fs";
 import { BOOTSTRAP_VERSION, BOOTSTRAP_TAG } from "../scripts/npm-bootstrap-preview.mjs";
+import { diagnoseBootstrapNpm, assertBootstrapDiagnosticContext } from "../scripts/npm-bootstrap-auth-diagnose.mjs";
 import {
   assertStageCliVersion, readBootstrapLocalSha, runAuthorizedFirstStage,
   validateFirstStageAuthorization,
@@ -196,5 +197,87 @@ await assert.rejects(runAuthorizedFirstStage({
   return true;
 });
 assert.equal(stageCalls, 1);
+
+// Read-only post-failure credential diagnosis: no npm writes, no raw
+// stdout/stderr, no credential propagation beyond the bounded CLI child.
+const diagGithub = {
+  ...github,
+  GITHUB_WORKFLOW_REF:
+    "attention-spa/gh-plan/.github/workflows/npm-bootstrap-diagnose.yml@refs/heads/main",
+};
+const diagBase = {
+  github: diagGithub, expectedSha: sha, token,
+  env: {
+    PATH: "/usr/bin", HOME: "/home/runner", TMPDIR: "/tmp",
+    GH_TOKEN: "DO_NOT_PROPAGATE_GH", NODE_AUTH_TOKEN: "DO_NOT_PROPAGATE_NODE",
+  },
+};
+let readCalls = 0;
+let diagConfig = null;
+const diag = diagnoseBootstrapNpm({
+  ...diagBase,
+  spawnImpl: (cmd, args, options) => {
+    readCalls++;
+    assert.equal(cmd, "npm");
+    assert.equal(options.env.GH_TOKEN, undefined);
+    assert.equal(options.env.NODE_AUTH_TOKEN, undefined);
+    assert(!JSON.stringify(options.env).includes(token));
+    diagConfig = options.env.npm_config_userconfig;
+    assert.equal(statSync(diagConfig).mode & 0o777, 0o600);
+    assert(readFileSync(diagConfig, "utf8").includes(token));
+    if (args[0] === "whoami") {
+      assert.deepEqual(args, ["whoami", "--registry", "https://registry.npmjs.org/"]);
+      return { status: 0, stdout: "test-npm-user\n" };
+    }
+    assert.deepEqual(args, [
+      "stage", "list", "@attention-spa/gh-plan", "--json",
+      "--registry", "https://registry.npmjs.org/",
+    ]);
+    return { status: 0, stdout: JSON.stringify([
+      { name: "@attention-spa/gh-plan", version: "0.0.0-bootstrap.0" },
+    ]) };
+  },
+});
+assert.deepEqual(diag, {
+  type: "npm-bootstrap-readonly-diagnostic",
+  npmAuthenticated: true, whoamiFailure: null,
+  stagedPackageListReadable: true, bootstrapStageVisible: true,
+  stageListFailure: null, registryWriteAttempted: false,
+});
+assert.equal(readCalls, 2);
+assert.equal(existsSync(diagConfig), false);
+assert(!JSON.stringify(diag).includes(token));
+let failedCalls = 0;
+const invalid = diagnoseBootstrapNpm({
+  ...diagBase,
+  spawnImpl: (cmd, args) => {
+    failedCalls++;
+    assert.equal(args[0], "whoami");
+    return { status: 1, stdout: token, stderr: "npm error code E401\n" + token };
+  },
+});
+assert.equal(failedCalls, 1, "Invalid authentication cannot reach stage list.");
+assert.equal(invalid.npmAuthenticated, false);
+assert.equal(invalid.whoamiFailure, "E401");
+assert.equal(invalid.stageListFailure, "SKIPPED_NOT_AUTHENTICATED");
+assert.equal(invalid.registryWriteAttempted, false);
+assert(!JSON.stringify(invalid).includes(token));
+const badList = diagnoseBootstrapNpm({
+  ...diagBase,
+  spawnImpl: (cmd, args) => args[0] === "whoami"
+    ? { status: 0, stdout: "some-user" }
+    : { status: 1, stdout: token, stderr: "npm error code E404\n" + token },
+});
+assert.equal(badList.npmAuthenticated, true);
+assert.equal(badList.stagedPackageListReadable, false);
+assert.equal(badList.bootstrapStageVisible, false);
+assert.equal(badList.stageListFailure, "E404");
+assert(!JSON.stringify(badList).includes(token));
+assert.throws(() => assertBootstrapDiagnosticContext({
+  ...diagBase, token: "",
+}), /DIAG_TOKEN_ABSENT/);
+assert.throws(() => assertBootstrapDiagnosticContext({
+  ...diagBase, github: { ...diagGithub, GITHUB_ACTOR: "untrusted" },
+}), /DIAG_ACTOR/);
 
 console.log("First-stage single-write contract and hostile-context tests passed.");
