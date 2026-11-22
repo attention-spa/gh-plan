@@ -11,6 +11,7 @@ import {
 const REPO = "attention-spa/gh-plan";
 const PACKAGE = "@attention-spa/gh-plan";
 const WORKFLOW = REPO + "/.github/workflows/npm-bootstrap-stage.yml@refs/heads/main";
+const FIRST_STAGE_WORKFLOW = REPO + "/.github/workflows/npm-bootstrap-first-stage.yml@refs/heads/main";
 const REGISTRY_URL = "https://registry.npmjs.org/@attention-spa%2fgh-plan";
 const MAIN_URL = "https://api.github.com/repos/" + REPO + "/branches/main";
 
@@ -23,13 +24,16 @@ export const BOOTSTRAP_STAGE_ARGS = Object.freeze([
 
 export function validateStageContext({
   version, tag, github, manifest, lock, localSha, mainSha,
-  mainProtected, registryStatus,
+  mainProtected, registryStatus, mode = "preflight",
 }) {
   const preview = validateBootstrapContext({ version, tag, github, manifest, lock });
   assert.equal(github.GITHUB_ACTOR, "agent-hachi", "BOOTSTRAP_STAGE_ACTOR");
   assert.equal(github.GITHUB_TRIGGERING_ACTOR, "agent-hachi",
     "BOOTSTRAP_STAGE_TRIGGERING_ACTOR");
-  assert.equal(github.GITHUB_WORKFLOW_REF, WORKFLOW, "BOOTSTRAP_STAGE_WORKFLOW");
+  assert(["preflight", "first-stage"].includes(mode), "BOOTSTRAP_STAGE_MODE");
+  assert.equal(github.GITHUB_WORKFLOW_REF,
+    mode === "first-stage" ? FIRST_STAGE_WORKFLOW : WORKFLOW,
+    "BOOTSTRAP_STAGE_WORKFLOW");
   assert.equal(localSha, github.GITHUB_SHA, "BOOTSTRAP_STAGE_LOCAL_SHA");
   assert.equal(mainSha, github.GITHUB_SHA, "BOOTSTRAP_STAGE_MAIN_SHA");
   assert.equal(mainProtected, true, "BOOTSTRAP_STAGE_PROTECTED_MAIN");
@@ -55,7 +59,7 @@ function safeReadOnlyResponse(response, status, code) {
 
 export async function inspectBootstrapRemotes({
   token, fetchImpl = fetch, github, manifest, lock,
-  version, tag, localSha,
+  version, tag, localSha, mode = "preflight",
 }) {
   // Authenticate ONLY the GitHub read. Never pass its token to npm or npmjs.
   assert(typeof token === "string" && token.length > 0,
@@ -88,7 +92,7 @@ export async function inspectBootstrapRemotes({
 
   return validateStageContext({
     version, tag, github, manifest, lock, localSha, mainSha,
-    mainProtected: main?.protected, registryStatus: registryResponse.status,
+    mainProtected: main?.protected, registryStatus: registryResponse.status, mode,
   });
 }
 
