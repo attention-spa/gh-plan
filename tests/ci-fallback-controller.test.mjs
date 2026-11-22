@@ -390,6 +390,7 @@ for (const file of [
   "ci.yml", "ci-worker.yml", "bootstrap-dry-run.yml", "bootstrap-worker.yml",
   "npm-release-preflight.yml", "npm-bootstrap-preview.yml",
   "npm-bootstrap-stage.yml",
+  "npm-bootstrap-first-stage.yml",
 ]) {
   const source = readFileSync(new URL("../.github/workflows/" + file, import.meta.url), "utf8");
   const workflow = YAML.parse(source);
@@ -514,6 +515,57 @@ assert(!/id-token|secrets\.|NODE_AUTH_TOKEN|NPM_TOKEN|npm_config_\/\/_authToken/
 for (const step of stageJob.steps) {
   assert(!/\bnpm\s+(?:stage|publish|trust|dist-tag|token|version|login)\b|\bgit\s+tag\b|\bgh\s+release\b/.test(step.run ?? ""),
     "No stage, registry or tag write permitted in bootstrap preflight.");
+}
+
+// #243 authorized first-stage lane: a single manual, SHA-pinned and
+// expressly confirmed public-placeholder write. Only the final step can
+// access the dedicated temporary npm token in npm-bootstrap environment.
+const firstStageText = readFileSync(
+  new URL("../.github/workflows/npm-bootstrap-first-stage.yml", import.meta.url),
+  "utf8");
+const firstStage = YAML.parse(firstStageText);
+assert.deepEqual(Object.keys(firstStage.on), ["workflow_dispatch"]);
+assert.deepEqual(firstStage.on.workflow_dispatch.inputs.version.options,
+  ["0.0.0-bootstrap.0"]);
+assert.equal(firstStage.on.workflow_dispatch.inputs.expected_sha.required, true);
+assert.equal(firstStage.on.workflow_dispatch.inputs.confirm_public_placeholder.type, "boolean");
+assert.equal(firstStage.on.workflow_dispatch.inputs.confirm_public_placeholder.default, false);
+assert.equal(firstStage.on.workflow_dispatch.inputs.confirm_public_placeholder.required, true);
+assert.deepEqual(firstStage.permissions, { contents: "read" });
+assert.deepEqual(Object.keys(firstStage.jobs), ["first-stage"]);
+assert.equal(firstStage.concurrency["cancel-in-progress"], false);
+const oneWrite = firstStage.jobs["first-stage"];
+assert.equal(oneWrite["runs-on"], "ubuntu-latest");
+assert.equal(oneWrite.environment, "npm-bootstrap");
+assert.deepEqual(oneWrite.permissions, { contents: "read" });
+assert(oneWrite.if.includes("github.actor == 'agent-hachi'"));
+assert(oneWrite.if.includes("github.triggering_actor == 'agent-hachi'"));
+assert(oneWrite.if.includes("github.ref == 'refs/heads/main'"));
+assert(oneWrite.if.includes("inputs.confirm_public_placeholder == true"));
+assert(oneWrite.if.includes("inputs.expected_sha == github.sha"));
+assert.equal(oneWrite.steps[0].with["persist-credentials"], false);
+assert.equal(oneWrite.steps[1].with["node-version"], 24);
+assert(oneWrite.steps.some(step =>
+  step.run === "npm install --global npm@11.15.0 --ignore-scripts --no-audit --no-fund"));
+for (const name of ["test:bootstrap-preview", "test:bootstrap-stage",
+  "test:first-stage", "test:ci-fallback"]) {
+  assert(oneWrite.steps.some(step => step.run === "npm run " + name));
+}
+assert.equal(oneWrite.steps.at(-1).run, "node scripts/npm-bootstrap-first-stage.mjs");
+const stageCredential = oneWrite.steps.at(-1).env;
+assert.equal(stageCredential.BOOTSTRAP_NPM_STAGE_TOKEN,
+  "${{ secrets.NPM_BOOTSTRAP_STAGE_TOKEN }}");
+assert.equal(stageCredential.BOOTSTRAP_GITHUB_READ_TOKEN, "${{ github.token }}");
+assert.equal(stageCredential.BOOTSTRAP_APPROVED_SHA, "${{ inputs.expected_sha }}");
+assert.equal(stageCredential.BOOTSTRAP_PLACEHOLDER_APPROVED,
+  "${{ inputs.confirm_public_placeholder }}");
+assert(firstStageText.includes("npm-bootstrap"));
+assert(!/id-token|pull_request_target|npm publish|npm trust|npm dist-tag|gh release/.test(firstStageText));
+assert.equal((firstStageText.match(/secrets\./g) ?? []).length, 1,
+  "A single stage step in a hosted main-only environment can access the npm secret.");
+for (const step of oneWrite.steps.slice(0, -1)) {
+  assert(!JSON.stringify(step).includes("secrets."),
+    "No test, install or preflight step may access the temporary npm token.");
 }
 
 const ci = YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"));

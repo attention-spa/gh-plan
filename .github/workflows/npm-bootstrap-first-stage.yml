@@ -1,0 +1,67 @@
+name: npm first-package bootstrap stage (OWNER-AUTHORIZED WRITE)
+
+# Creates a PUBLIC 0.0.0-stage placeholder once; never promotes a version.
+# Restricted to agent-hachi manual dispatch at reviewed protected main SHA.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Temporary nonfunctional package version
+        required: true
+        type: choice
+        options: [0.0.0-bootstrap.0]
+      expected_sha:
+        description: Exact reviewed 40-character main commit to stage from
+        required: true
+        type: string
+      confirm_public_placeholder:
+        description: Approve creation of public 0.0.0-stage placeholder (NO real release)
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gh-plan-npm-first-package-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  first-stage:
+    if: >-
+      github.actor == 'agent-hachi' &&
+      github.triggering_actor == 'agent-hachi' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.version == '0.0.0-bootstrap.0' &&
+      inputs.confirm_public_placeholder == true &&
+      inputs.expected_sha == github.sha
+    runs-on: ubuntu-latest
+    environment: npm-bootstrap
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install exact npm CLI with staged publishing support (no secrets)
+        run: npm install --global npm@11.15.0 --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run test:bootstrap-preview
+      - run: npm run test:bootstrap-stage
+      - run: npm run test:first-stage
+      - run: npm run test:ci-fallback
+      - run: git diff --exit-code -- package.json package-lock.json
+      - name: Stage temporary namespace bootstrap ONCE (never approve or publish)
+        run: node scripts/npm-bootstrap-first-stage.mjs
+        env:
+          BOOTSTRAP_STAGE_VERSION: ${{ inputs.version }}
+          BOOTSTRAP_STAGE_TAG: bootstrap
+          BOOTSTRAP_PLACEHOLDER_APPROVED: ${{ inputs.confirm_public_placeholder }}
+          BOOTSTRAP_APPROVED_SHA: ${{ inputs.expected_sha }}
+          BOOTSTRAP_GITHUB_READ_TOKEN: ${{ github.token }}
+          BOOTSTRAP_NPM_STAGE_TOKEN: ${{ secrets.NPM_BOOTSTRAP_STAGE_TOKEN }}
