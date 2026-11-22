@@ -97,7 +97,7 @@ for (const required of [
   "password and 2FA/OTP",
   "NPMJS_TOKEN_NIKI",
   "npm-bootstrap",
-  "GitHub Raw API can store an existing encrypted",
+  "GitHub does not expose the token value",
   "deleting the `npm-bootstrap` environment",
   "0.0.0-stage",
   "private:true",
