@@ -83,7 +83,10 @@ and **npm maintainer 2FA approval**.
 Direct npm publication or long-lived npm tokens are not approved. The owner
 selected **automated first-package creation**: a separately authorized,
 short-lived, stage-only token used by a hosted bootstrap job to create the
-package namespace without publishing the real prerelease. See the
+package namespace without publishing the real prerelease. Immutable release
+creation/modification rules and the tag-restricted `npm-stage` hosted
+environment are now configured; see [release governance](release-governance.md).
+No release tag, npm trusted-publisher binding, or live staging exists. See the
 [no-write bootstrap preview](npm-bootstrap-preview.md) and [issue #239](https://github.com/attention-spa/gh-plan/issues/239).
 
 The current [read-only release preflight](release-preflight.md) already
