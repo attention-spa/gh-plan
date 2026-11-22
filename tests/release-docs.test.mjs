@@ -74,10 +74,19 @@ assert(bootstrapGuide.includes("wider scope or direct-publish permission are acc
   "Any valid npm stage-capable credential must work, even if it has unrelated privileges.");
 assert(bootstrapGuide.includes("only `npm stage publish`"),
   "Reusing a broad token must not widen the workflow's command.");
-assert(bootstrapGuide.includes("do **not** revoke a pre-existing"),
-  "Do not destroy credentials used by unrelated workflows.");
+assert(bootstrapGuide.includes("leave the **shared organization secret"),
+  "Keep the existing organization npm secret untouched after bootstrap.");
 assert(bootstrapGuide.includes("GitHub PAT or an unidentified secret"),
   "Unidentified GitHub/org tokens cannot be assumed to be npm credentials.");
+assert(bootstrapGuide.includes("existing **`NPMJS_TOKEN_NIKI` organization Actions secret"),
+  "Use the owner-identified, Doppler-synced GitHub org secret.");
+assert(bootstrapGuide.includes("does not expose the token value"),
+  "Documentation must not suggest retrieving GitHub secret values.");
+assert(bootstrapGuide.includes("There is **no temporary environment"),
+  "No duplicate environment credential should be created.");
+assert(bootstrapGuide.includes("Disable the one-use first-stage workflow before"),
+  "Disable the workflow before removing its deployment environment.");
+
 
 for (const required of [
   "--expires=1",
@@ -86,10 +95,10 @@ for (const required of [
   "--orgs-permission=no-access",
   "--bypass-2fa=false",
   "password and 2FA/OTP",
-  "NPM_BOOTSTRAP_STAGE_TOKEN",
+  "NPMJS_TOKEN_NIKI",
   "npm-bootstrap",
   "GitHub Raw API can store an existing encrypted",
-  "delete the `npm-bootstrap` GitHub environment",
+  "deleting the `npm-bootstrap` environment",
   "0.0.0-stage",
   "private:true",
 ]) {
