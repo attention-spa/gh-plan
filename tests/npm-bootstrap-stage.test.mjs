@@ -31,6 +31,17 @@ const base = {
 assert.deepEqual(BOOTSTRAP_STAGE_ARGS, [
   "stage", "publish", "--tag", "bootstrap", "--access", "public", "--ignore-scripts",
 ]);
+const validFirstStage = validateStageContext({
+  ...base,
+  mode: "first-stage",
+  github: { ...github, GITHUB_WORKFLOW_REF:
+    "attention-spa/gh-plan/.github/workflows/npm-bootstrap-first-stage.yml@refs/heads/main" },
+});
+assert.equal(validFirstStage.registryWritesAuthorized, false,
+  "Shared remote preflight does not authorize writes by itself.");
+assert.throws(() => validateStageContext({ ...base, mode: "first-stage" }),
+  /BOOTSTRAP_STAGE_WORKFLOW/,
+  "Read-only preflight identity must not impersonate authorized writer.");
 const valid = validateStageContext(base);
 assert.equal(valid.trustedMain, true);
 assert.equal(valid.npmPackageAbsentAtCheck, true);
