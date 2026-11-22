@@ -89,7 +89,7 @@ for (const required of [
   "NPM_BOOTSTRAP_STAGE_TOKEN",
   "npm-bootstrap",
   "GitHub Raw API can store an existing encrypted",
-  "already revoked and the GitHub environment secret deleted",
+  "delete the `npm-bootstrap` GitHub environment",
   "0.0.0-stage",
   "private:true",
 ]) {
