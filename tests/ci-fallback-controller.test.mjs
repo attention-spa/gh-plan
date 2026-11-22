@@ -494,9 +494,9 @@ assert.deepEqual(stage.concurrency, {
 const stageJob = stage.jobs["bootstrap-stage-preflight"];
 assert.equal(stageJob["runs-on"], "ubuntu-latest");
 assert.deepEqual(stageJob.permissions, { contents: "read" });
-assert.match(stageJob.if, /github.actor == 'agent-hachi'/);
-assert.match(stageJob.if, /github.triggering_actor == 'agent-hachi'/);
-assert.match(stageJob.if, /github.ref == 'refs\\/heads\\/main'/);
+assert(stageJob.if.includes("github.actor == 'agent-hachi'"));
+assert(stageJob.if.includes("github.triggering_actor == 'agent-hachi'"));
+assert(stageJob.if.includes("github.ref == 'refs/heads/main'"));
 assert.equal(stageJob.environment, undefined,
   "The real npm-stage environment is reserved for the separate OIDC release job.");
 assert.equal(stageJob.steps[0].with["persist-credentials"], false);
@@ -509,10 +509,10 @@ assert(stageJob.steps.some(step => step.run === "npm run test:bootstrap-stage"))
 assert(stageJob.steps.some(step => step.run === "npm run test:ci-fallback"));
 assert(stageJob.steps.some(step =>
   step.run === "git diff --exit-code -- package.json package-lock.json"));
-assert(!/id-token|secrets\\.|NODE_AUTH_TOKEN|NPM_TOKEN|npm_config_\\/\\/_authToken/.test(stageText),
+assert(!/id-token|secrets\.|NODE_AUTH_TOKEN|NPM_TOKEN|npm_config_\/\/_authToken/.test(stageText),
   "Unapproved bootstrap preflight must not receive npm credentials or OIDC.");
 for (const step of stageJob.steps) {
-  assert(!/\\bnpm\\s+(?:stage|publish|trust|dist-tag|token|version|login)\\b|\\bgit\\s+tag\\b|\\bgh\\s+release\\b/.test(step.run ?? ""),
+  assert(!/\bnpm\s+(?:stage|publish|trust|dist-tag|token|version|login)\b|\bgit\s+tag\b|\bgh\s+release\b/.test(step.run ?? ""),
     "No stage, registry or tag write permitted in bootstrap preflight.");
 }
 
