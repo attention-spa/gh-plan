@@ -64,4 +64,5 @@ jobs:
           BOOTSTRAP_PLACEHOLDER_APPROVED: ${{ inputs.confirm_public_placeholder }}
           BOOTSTRAP_APPROVED_SHA: ${{ inputs.expected_sha }}
           BOOTSTRAP_GITHUB_READ_TOKEN: ${{ github.token }}
-          BOOTSTRAP_NPM_STAGE_TOKEN: ${{ secrets.NPM_BOOTSTRAP_STAGE_TOKEN }}
+          # Existing npm token synced from Doppler to org Actions secrets; do not duplicate it.
+          BOOTSTRAP_NPM_STAGE_TOKEN: ${{ secrets.NPMJS_TOKEN_NIKI }}
