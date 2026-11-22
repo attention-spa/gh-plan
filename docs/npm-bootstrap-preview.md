@@ -76,7 +76,76 @@ The real first version remains a separate stage-only OIDC workflow
 as decided by [#242](https://github.com/attention-spa/gh-plan/issues/242).
 It will run from the immutable release tag, **not** this `main` preflight.
 
-## Future fully automated first-package creation — not active
+## Owner-authorized first registry stage — prepared, NOT yet executed
+
+On November 22, 2026, the owner separately authorized the **first**
+package namespace registry write, accepting that npm will immediately
+publish the publicly installable `0.0.0-stage` placeholder. This is
+**not** authorization to promote the nonfunctional bootstrap fixture,
+publish the real `0.1.0-beta.1`, register OIDC trust, or create a Git
+release tag. The isolated real-version process stays #244.
+
+The [dedicated first-stage workflow](../.github/workflows/npm-bootstrap-first-stage.yml)
+is manually dispatched, hosted on `ubuntu-latest`, Node 24, with
+only `contents:read`. Its GitHub `npm-bootstrap` environment permits
+deployments from **main only**, not branches/tags generally, and is
+completely separate from the future `npm-stage` OIDC environment.
+No npm token exists in that environment yet.
+
+**One-time owner setup (the sole credential blocker):**
+
+1. On npmjs.com, while signed in as the already-confirmed owner of
+   `@attention-spa` with 2FA enabled, create a **granular access token**
+   with *Packages and scopes → Read and write (stage only)* for the
+   `@attention-spa` scope. Set **Bypass 2FA OFF**, grant **no
+   organization-management permissions**, and use the shortest practical
+   expiry. Do not create a token with direct-publish rights. Stage-only
+   still permits dist-tag/deprecation writes, so treat it as sensitive.
+2. In the `gh-plan` repository's **Settings → Environments →
+   npm-bootstrap → Environment secrets**, create exactly one
+   `NPM_BOOTSTRAP_STAGE_TOKEN` containing that token. Do **not** place
+   it in a repository-wide secret, commit, issue, chat, or logs.
+   Only the final stage step reads it; other workflows/CI/OCI cannot
+   access environment-scoped secrets outside their environment.
+3. Before dispatch, ensure protected `main` is the reviewed,
+   green commit, the npm package is still absent, and the temporary
+   secret exists. The workflow accepts only `0.0.0-bootstrap.0`,
+   requires an exact **40-hex `expected_sha`** equal to that Actions
+   run's checked-out SHA, and requires
+   `confirm_public_placeholder=true`. It runs only when
+   **`agent-hachi` is both actor and triggering actor**.
+4. Dispatch **npm first-package bootstrap stage
+   (OWNER-AUTHORIZED WRITE)** once on `main`. The final step repeats
+   the GitHub API protected-main SHA and unauthenticated npm registry
+   404 checks **immediately before** staging a vetted, isolated,
+   scriptless `0.0.0-bootstrap.0` fixture through one
+   `npm stage publish --tag bootstrap --access public --ignore-scripts`
+   invocation. The temporary auth config has mode 0600 and is removed.
+   **Never retry an uncertain or failed write automatically.**
+5. Independently verify the public `@attention-spa/gh-plan` namespace
+   and `0.0.0-stage` placeholder on npmjs.com, then in the
+   authenticated account's **Staged Packages** view confirm a pending
+   *`0.0.0-bootstrap.0`* under tag `bootstrap`, **without approving
+   it**. If the workflow fails or times out after attempting stage,
+   inspect these states before any other command. No success may be
+   inferred solely from an exit code or public placeholder.
+6. After verified bootstrap, revoke the temporary npm token, delete
+   the `npm-bootstrap` environment secret, and verify cleanup.
+   Retain the pending stage unapproved until the separately authorized
+   #244 OIDC first-real-version workflow is ready. The bootstrap stage
+   must eventually be **rejected using authenticated maintainer 2FA**,
+   not approved. A public placeholder may remain visible afterward.
+
+**This workflow must not be dispatched until the temporary token is
+available and npm's first namespace creation is still intended.**
+The earlier [read-only stage preflight](../.github/workflows/npm-bootstrap-stage.yml)
+remains available for nonpublishing checks without any secret.
+Any package already present or uncertain registry response makes
+the one-write workflow fail closed. The root manifest remains
+`private:true`, `0.0.0`; the only non-private object constructed is
+the throw-on-import temporary fixture.
+
+## Automated first-package architecture and follow-on OIDC path
 
 After a separate explicit authorization of the **public staging
 side effect**, the proposed production sequence is:
@@ -91,7 +160,7 @@ side effect**, the proposed production sequence is:
    issues, code, PR output or chat.
 2. Store it only as a narrowly named GitHub Actions secret (e.g.
    `NPM_BOOTSTRAP_STAGE_TOKEN`) with authorized visibility. The **separate
-   not-yet-implemented** first-write workflow must run only from reviewed
+   owner-authorized** first-write workflow must run only from reviewed
    protected `main`, on an ephemeral GitHub-hosted runner, verify the
    exact bootstrap fixture/SHAs, and perform **only** `npm stage publish
    --tag bootstrap --access public`. It must not call `npm publish`,
@@ -130,7 +199,7 @@ side effect**, the proposed production sequence is:
 
 **Separate approval gates** still apply to creating a Git release tag,
 changing the real package's `private:true`/`0.0.0` release blockers,
-adding production stage workflow privileges, npm trusted-publisher
+adding production OIDC stage workflow privileges, npm trusted-publisher
 registration, staging the bootstrap (public placeholder), staging
 `0.1.0-beta.1`, and final maintainer 2FA approval.
 
