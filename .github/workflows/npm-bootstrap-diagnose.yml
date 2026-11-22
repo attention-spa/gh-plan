@@ -1,0 +1,40 @@
+name: npm bootstrap authentication diagnosis (READ ONLY)
+
+# For investigating a failed or ambiguous first stage. Never writes to npm.
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact reviewed protected main SHA
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    if: >-
+      github.actor == 'agent-hachi' &&
+      github.triggering_actor == 'agent-hachi' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.expected_sha == github.sha
+    runs-on: ubuntu-latest
+    environment: npm-bootstrap
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install npm CLI (no secret)
+        run: npm install --global npm@11.15.0 --ignore-scripts --no-audit --no-fund
+      - name: Read-only npm whoami and stage list; NEVER print npm output
+        run: node scripts/npm-bootstrap-auth-diagnose.mjs
+        env:
+          DIAG_EXPECTED_SHA: ${{ inputs.expected_sha }}
+          DIAG_NPM_TOKEN: ${{ secrets.NPMJS_TOKEN_NIKI }}
