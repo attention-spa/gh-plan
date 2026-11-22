@@ -67,10 +67,13 @@ The code includes a pure description of the *separately authorized* single stage
 that command is **never executed** by this workflow or its script.
 The owner approved that one registry write on November 22, 2026,
 but the read-only preflight remains incapable of performing it.
-The separate write workflow still requires a temporary npm credential,
-which has not been configured. The bootstrap token requires npm **stage-only**
-permission under `@attention-spa`, Bypass 2FA OFF, no org-governance
-rights, shortest feasible expiry; revoke promptly after the stage.
+The separate write workflow still requires an **npm-issued token that can
+stage** `@attention-spa/gh-plan`, which has not been configured. The owner
+approved **reusing any existing npm token with that permission**, even if
+it has broader scope, organization privileges, or direct-publish rights.
+The workflow still executes only `npm stage publish` and never invokes
+`npm publish`. Additional token privileges increase exposure if the
+credential is compromised; they are **not required** for this operation.
 
 The real first version remains a separate stage-only OIDC workflow
 (`.github/workflows/npm-stage.yml` / environment `npm-stage`),
@@ -96,20 +99,25 @@ in that environment. GitHub Raw API can store an existing encrypted
 npm credential but **cannot issue npm tokens** or authenticate to an
 npm account using a GitHub access token.
 
-**One-time owner setup (the sole credential blocker):**
+**Existing-token handoff (the sole credential blocker):**
 
-1. On npmjs.com, while signed in as the already-confirmed owner of
-   `@attention-spa` with 2FA enabled, create a **granular access token**
-   with *Packages and scopes → Read and write (stage only)* for the
-   `@attention-spa` scope. Set **Bypass 2FA OFF**, grant **no
-   organization-management permissions**, and use the shortest practical
-   expiry. Do not create a token with direct-publish rights. Stage-only
-   still permits dist-tag/deprecation writes, so treat it as sensitive.
-   As an alternative to the website, the **current npm 11 CLI** can
-   create a scope-limited granular token interactively. Run this only
-   in an npm-authenticated local terminal; it requires account
-   password and 2FA/OTP and **prints a secret token** that must be
-   transferred securely to the environment secret in step 2:
+1. **Reuse an existing npm access token** if one is available and has
+   permission to stage a new package under `@attention-spa`. Do **not**
+   require a narrowly scoped, newly created, stage-only token. npm tokens
+   with wider scope or direct-publish permission are acceptable to this
+   owner-approved first-stage operation. The command invoked is still
+   **only `npm stage publish`**, never `npm publish`, but a broad token
+   can grant other authority outside this workflow. Do not mistake a
+   GitHub PAT or an unidentified secret for npm authentication; do not
+   forward unrelated service tokens to the npm registry. If no npm
+   token exists, create one on npmjs.com after authenticating to npm;
+   stage-only and narrower scope remain optional rather than mandatory.
+   If a token must be created, the **current npm 11 CLI** supports
+   creating a granular token interactively. The command below is an
+   **optional minimally privileged example**, not a requirement to
+   replace an already usable npm token. Run it only in an npm-authenticated
+   local terminal; it requires account password and 2FA/OTP and prints
+   a secret token that must be transferred securely to step 2:
 
    ```sh
    npm token create --name=gh-plan-bootstrap-once --expires=1 --scopes=attention-spa --packages-and-scopes-permission=read-write-stage-only --orgs-permission=no-access --bypass-2fa=false
@@ -149,10 +157,11 @@ npm account using a GitHub access token.
    it**. If the workflow fails or times out after attempting stage,
    inspect these states before any other command. No success may be
    inferred solely from an exit code or public placeholder.
-6. After verified bootstrap, revoke the temporary npm token, delete
-   the `npm-bootstrap` environment secret, and verify cleanup.
-   Retain the pending stage unapproved until the separately authorized
-   #244 OIDC first-real-version workflow is ready. The bootstrap stage
+6. After verified bootstrap, **delete the `npm-bootstrap` GitHub environment
+   secret and verify cleanup**. Revoke a token **only if it was created
+   specifically for this bootstrap**; do **not** revoke a pre-existing
+   shared npm token used elsewhere. Retain the pending bootstrap stage
+   unapproved until separately authorized #244. The bootstrap stage
    must eventually be **rejected using authenticated maintainer 2FA**,
    not approved. A public placeholder may remain visible afterward.
 
@@ -171,14 +180,13 @@ The owner **already approved** the first public-placeholder staging side
 effect. These are the operational and follow-on steps; authorization
 is not evidence that the first stage actually ran:
 
-1. **One-time npm account setup:** From the npm account owner, generate a
-   short-lived **granular access token** with **Packages and scopes →
-   Read and write (stage only)**, restricted to `@attention-spa`.
-   **Bypass 2FA OFF**. Grant **no organization-management permission**;
-   that setting does not grant scoped package publishing. Avoid broad
-   package rights or IP restrictions incompatible with GitHub-hosted
-   runners. Set the shortest suitable expiry. Never put the token in
-   issues, code, PR output or chat.
+1. **npm authentication:** Prefer an **existing valid npm token** that
+   can stage a new `@attention-spa/gh-plan` package. No new token,
+   narrow scope, stage-only restriction, Bypass-2FA setting, or shortened
+   expiry is mandatory under the owner's revised authorization. If
+   no compatible token exists, the npm account owner must create one
+   through npm-authenticated account UI or CLI; a GitHub token cannot
+   substitute. Do not send any token in issues, code, PR output or chat.
 2. Store it **only** as the GitHub Actions environment secret
    `NPM_BOOTSTRAP_STAGE_TOKEN` in the `npm-bootstrap` environment,
    never as a repository-level or organization-level secret. The **separate
@@ -187,9 +195,10 @@ is not evidence that the first stage actually ran:
    exact bootstrap fixture/SHAs, and perform **only** `npm stage publish
    --tag bootstrap --access public`. It must not call `npm publish`,
    `npm dist-tag`, `npm trust`, or read any other npm credentials.
-   Stage-only tokens also permit **dist-tag changes/deprecations**; treat
-   the secret as sensitive write access despite the direct-publish
-   restriction.
+   Even stage-only tokens permit **dist-tag changes/deprecations**;
+   broader tokens can also directly publish and manage other packages.
+   The workflow cannot limit privileges inherent in the chosen token,
+   but calls only the approved staging command.
 3. npm then creates the package and a **publicly available
    `0.0.0-stage` placeholder**, even though the temporary
    `0.0.0-bootstrap.0` tarball remains pending **and must never be
@@ -214,10 +223,11 @@ is not evidence that the first stage actually ran:
    a manual *first-package publish* command, and cannot be silently
    bypassed by the automation.
 7. Reject the **temporary bootstrap stage** using authenticated maintainer
-   2FA; verify which staged versions remain. Check that the granular
-   token was **already revoked and the GitHub environment secret deleted
-   after #243's verified bootstrap**, rather than keeping the temporary
-   credential alive through #244. Inspect the published real version,
+   2FA; verify which staged versions remain. Check that the `npm-bootstrap`
+   **GitHub environment secret was already deleted** after #243's
+   verified bootstrap, and that any **dedicated one-off npm token** was
+   revoked. A reused shared npm token must remain untouched rather than
+   being revoked unexpectedly. Inspect the published real version,
    provenance, dist-tag and any residual placeholder.
    Do not assert that the temporary placeholder is automatically removed.
 
