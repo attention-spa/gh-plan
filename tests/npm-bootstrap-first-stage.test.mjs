@@ -4,7 +4,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { readFileSync as read } from "node:fs";
 import { BOOTSTRAP_VERSION, BOOTSTRAP_TAG } from "../scripts/npm-bootstrap-preview.mjs";
 import {
-  assertStageCliVersion, runAuthorizedFirstStage,
+  assertStageCliVersion, readBootstrapLocalSha, runAuthorizedFirstStage,
   validateFirstStageAuthorization,
 } from "../scripts/npm-bootstrap-first-stage.mjs";
 
@@ -35,6 +35,47 @@ const approved = validateFirstStageAuthorization({
 assert.equal(approved.publicPlaceholderAuthorized, true);
 assert.equal(approved.version, "0.0.0-bootstrap.0");
 assert.equal(approved.tag, "bootstrap");
+// Credential-bearing workflow entrypoint must scrub all tokens from the
+// git child process. The real Git HEAD check runs before registry inspection.
+const parentEnv = {
+  PATH: "/trusted/bin", HOME: "/home/runner",
+  BOOTSTRAP_NPM_STAGE_TOKEN: token,
+  BOOTSTRAP_GITHUB_READ_TOKEN: base.githubReadToken,
+  NODE_AUTH_TOKEN: "node-secret",
+  GH_TOKEN: "github-secret",
+  GIT_CONFIG_COUNT: "1",
+  GIT_CONFIG_KEY_0: "credential.helper",
+  GIT_CONFIG_VALUE_0: "malicious-helper",
+};
+let gitCalls = 0;
+const localHead = readBootstrapLocalSha({
+  env: parentEnv,
+  spawnImpl: (command, args, options) => {
+    gitCalls++;
+    assert.equal(command, "git");
+    assert.deepEqual(args, ["rev-parse", "HEAD"]);
+    assert.equal(options.timeout, 10_000);
+    assert.deepEqual(options.env, { PATH: parentEnv.PATH, HOME: parentEnv.HOME });
+    assert(!JSON.stringify(options).includes(token));
+    assert(!JSON.stringify(options).includes(base.githubReadToken));
+    return { status: 0, stdout: sha + "\n" };
+  },
+});
+assert.equal(localHead, sha);
+assert.equal(gitCalls, 1);
+assert.throws(() => readBootstrapLocalSha({
+  env: parentEnv,
+  spawnImpl: () => ({ status: 0, stdout: "not-a-git-sha" }),
+}), /FIRST_STAGE_GIT_SHA_FORMAT/);
+assert.throws(() => readBootstrapLocalSha({
+  env: parentEnv,
+  spawnImpl: () => ({ status: 1, stdout: "", stderr: token }),
+}), error => {
+  assert.match(error.message, /FIRST_STAGE_GIT_READ/);
+  assert(!error.message.includes(token));
+  return true;
+});
+
 assertStageCliVersion("11.15.0", "24.0.0");
 assertStageCliVersion("12.0.0", "24.0.0");
 assert.throws(() => assertStageCliVersion("11.14.9", "24.0.0"),
