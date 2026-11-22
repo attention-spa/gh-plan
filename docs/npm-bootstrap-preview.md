@@ -34,6 +34,48 @@ Neither the root package nor the lockfile is altered. A preview success is
 **not proof that npm accepted or created the package**, and does not
 authorize staging.
 
+## New #243 hosted preparation — still NO registry write
+
+The separately reviewable [npm bootstrap stage preparation workflow](../.github/workflows/npm-bootstrap-stage.yml)
+is now a **manual, read-only preflight**. This is distinct from the older offline
+fixture preview and is **not a live first-package staging workflow**.
+
+It accepts only `0.0.0-bootstrap.0` and only runs when both the dispatch
+actor and triggering actor are `agent-hachi` on `refs/heads/main`.
+Its [validator](../scripts/npm-bootstrap-stage.mjs) checks:
+
+- exact repository, Actions event, workflow filename/ref, manifest/lock
+  still at private `0.0.0`, and local Git HEAD matching the run's immutable SHA;
+- GitHub API's current `main` SHA matches that SHA and the branch is protected;
+- an unauthenticated GET of the canonical npm registry package endpoint
+  returns exactly **HTTP 404**, failing closed on existing packages,
+  redirects, auth failures, 429, registry errors, or network uncertainty;
+- the reviewed temporary nonfunctional fixture still packs offline with only
+  its expected three files, and has a SHA-512 integrity result.
+
+GitHub authentication, when used, is only the workflow's default
+`contents:read` token, supplied to the GitHub API GET; it is never sent
+to the npm registry or the isolated npm pack subprocess. The job has
+**no npm token, environment, `id-token:write`, tag creation, package
+upload, or `npm stage publish` invocation**. A `404` now is only a
+snapshot: real first staging must check package absence **again directly
+before a separately authorized write**, and must fail closed if it changed.
+
+The code includes a pure description of the *future* single allowed command,
+`npm stage publish --tag bootstrap --access public --ignore-scripts`;
+that command is **never executed** by this workflow or its script.
+Credentials and activation of a real registry-write step remain gated by
+explicit owner approval of the visible `0.0.0-stage` placeholder. No
+bootstrap token or repository secret is requested until that approval.
+The intended future bootstrap token requires npm **stage-only**
+permission under `@attention-spa`, Bypass 2FA OFF, no org-governance
+rights, shortest feasible expiry; revoke promptly after the stage.
+
+The real first version remains a separate stage-only OIDC workflow
+(`.github/workflows/npm-stage.yml` / environment `npm-stage`),
+as decided by [#242](https://github.com/attention-spa/gh-plan/issues/242).
+It will run from the immutable release tag, **not** this `main` preflight.
+
 ## Future fully automated first-package creation — not active
 
 After a separate explicit authorization of the **public staging
