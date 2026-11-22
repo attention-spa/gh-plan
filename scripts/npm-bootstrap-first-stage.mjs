@@ -52,7 +52,7 @@ export function assertStageCliVersion(version, nodeVersion = process.versions.no
 export async function runAuthorizedFirstStage({
   github, manifest, lock, version, tag, approvedSha, consent,
   localSha, githubReadToken, npmStageToken, fetchImpl = fetch,
-  spawnImpl = spawnSync,
+  spawnImpl = spawnSync, nodeVersion = process.versions.node,
 }) {
   const authorized = validateFirstStageAuthorization({
     github, manifest, lock, version, tag, approvedSha, consent, localSha,
@@ -71,7 +71,7 @@ export async function runAuthorizedFirstStage({
     env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
   });
   assert.equal(cli.status, 0, "FIRST_STAGE_NPM_NOT_AVAILABLE");
-  assertStageCliVersion((cli.stdout ?? "").trim());
+  assertStageCliVersion((cli.stdout ?? "").trim(), nodeVersion);
 
   // Reuse the previously verified, no-network fixture and immutable contents.
   const packed = previewBootstrapPackage({ version, tag, github, manifest, lock });
