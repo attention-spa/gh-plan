@@ -389,6 +389,7 @@ const expectedActionPins = new Map([
 for (const file of [
   "ci.yml", "ci-worker.yml", "bootstrap-dry-run.yml", "bootstrap-worker.yml",
   "npm-release-preflight.yml", "npm-bootstrap-preview.yml",
+  "npm-bootstrap-stage.yml",
 ]) {
   const source = readFileSync(new URL("../.github/workflows/" + file, import.meta.url), "utf8");
   const workflow = YAML.parse(source);
@@ -475,6 +476,44 @@ for (const step of bootstrapJob.steps) {
   const cmd = step.run ?? "";
   assert(!/\bnpm\s+(?:stage|publish|trust|dist-tag|token|version|login)\b|\bgit\s+tag\b|\bgh\s+release\b/.test(cmd),
     "Bootstrap preview MUST NOT mutate npm registry, Git tags, or release identity.");
+}
+
+// #243: manual bootstrap staging preflight is a READ-ONLY contract, not a
+// registry operation. No npm credential, OIDC, deployment env, or writes.
+const stageText = readFileSync(
+  new URL("../.github/workflows/npm-bootstrap-stage.yml", import.meta.url), "utf8");
+const stage = YAML.parse(stageText);
+assert.deepEqual(Object.keys(stage.on), ["workflow_dispatch"]);
+assert.deepEqual(stage.on.workflow_dispatch.inputs.version.options,
+  ["0.0.0-bootstrap.0"]);
+assert.deepEqual(stage.permissions, { contents: "read" });
+assert.deepEqual(Object.keys(stage.jobs), ["bootstrap-stage-preflight"]);
+assert.deepEqual(stage.concurrency, {
+  group: "npm-bootstrap-preparation", "cancel-in-progress": false,
+});
+const stageJob = stage.jobs["bootstrap-stage-preflight"];
+assert.equal(stageJob["runs-on"], "ubuntu-latest");
+assert.deepEqual(stageJob.permissions, { contents: "read" });
+assert.match(stageJob.if, /github.actor == 'agent-hachi'/);
+assert.match(stageJob.if, /github.triggering_actor == 'agent-hachi'/);
+assert.match(stageJob.if, /github.ref == 'refs\\/heads\\/main'/);
+assert.equal(stageJob.environment, undefined,
+  "The real npm-stage environment is reserved for the separate OIDC release job.");
+assert.equal(stageJob.steps[0].with["persist-credentials"], false);
+assert.equal(stageJob.steps[1].with["node-version"], 24);
+assert.equal(stageJob.steps[2].run, "node scripts/npm-bootstrap-stage.mjs");
+assert.equal(stageJob.steps[2].env.BOOTSTRAP_STAGE_TAG, "bootstrap");
+assert.match(stageJob.steps[2].env.BOOTSTRAP_STAGE_VERSION, /inputs.version/);
+assert.match(stageJob.steps[2].env.BOOTSTRAP_GITHUB_READ_TOKEN, /github.token/);
+assert(stageJob.steps.some(step => step.run === "npm run test:bootstrap-stage"));
+assert(stageJob.steps.some(step => step.run === "npm run test:ci-fallback"));
+assert(stageJob.steps.some(step =>
+  step.run === "git diff --exit-code -- package.json package-lock.json"));
+assert(!/id-token|secrets\\.|NODE_AUTH_TOKEN|NPM_TOKEN|npm_config_\\/\\/_authToken/.test(stageText),
+  "Unapproved bootstrap preflight must not receive npm credentials or OIDC.");
+for (const step of stageJob.steps) {
+  assert(!/\\bnpm\\s+(?:stage|publish|trust|dist-tag|token|version|login)\\b|\\bgit\\s+tag\\b|\\bgh\\s+release\\b/.test(step.run ?? ""),
+    "No stage, registry or tag write permitted in bootstrap preflight.");
 }
 
 const ci = YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"));
