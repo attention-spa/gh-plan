@@ -35,6 +35,16 @@ GitHub Free public repositories support tag rulesets and deployment environments
 
 ## Evidence and limits
 
-The two rulesets and the environment/ref policy were each created through authenticated GitHub REST and independently **GET-read back**. Their conditions, active status, actor-specific creation bypass, and no-bypass modification/deletion semantics match the intended configuration. The current repository has **zero Git tags and zero GitHub releases**; no release tag or registry write was created to exercise enforcement. A live negative create/rewrite/delete test on a real release tag was intentionally **not** performed, because a matching tag would become immutable and would violate the unapproved release-tag creation gate. Any such behavioral test must use an explicitly authorized disposable repository/ref setup, not a production release tag. The future workflow and npm OIDC binding are not yet implemented.
+The two rulesets and the environment/ref policy were each created through authenticated GitHub REST and independently **GET-read back**. Their conditions, active status, actor-specific creation bypass, and no-bypass modification/deletion semantics match the intended configuration.
+
+**Real GitHub behavior proven in a disposable public organization repository** (`attention-spa/gh-plan-r2-4-acceptance-20261122`, since deleted) with the same two rulesets applied to `refs/tags/v*`:
+
+1. Creation of `v0.0.0-r2-test` at `45f773004510ae63498031590a210d58dfc6eb7a` by the other organization owner (`dddominikk`) returned **HTTP 422** and did not create the ref.
+2. The matching creation by authorized `agent-hachi` returned **HTTP 201** and the expected exact target SHA.
+3. After a different commit `fe804cb29264f7a522401dcbad2f2af30896b1f7` existed, **forced tag update attempts by both accounts returned HTTP 422** with GitHub's `Cannot update this protected ref` ruleset rejection.
+4. The `agent-hachi` deletion attempt returned **HTTP 422** (`Cannot delete this tag`); independent tag GET remained at the original SHA.
+5. The disposable repository itself was deleted (**HTTP 204**), and independent GET returned **404**. The production `gh-plan` repository was **not used** for these ref mutations.
+
+This verifies creation, nonrewrite and nondeletion behavior with live GitHub enforcement without compromising real release-tag immutability. The production repository still has **zero Git tags and zero GitHub releases**, and no npm staging/publishing occurred. The future workflow and npm OIDC binding are not yet implemented.
 
 See [#239](https://github.com/attention-spa/gh-plan/issues/239), [#243](https://github.com/attention-spa/gh-plan/issues/243), [#244](https://github.com/attention-spa/gh-plan/issues/244), and the [blocked release gate #202](https://github.com/attention-spa/gh-plan/issues/202).
