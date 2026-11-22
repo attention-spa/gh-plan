@@ -68,6 +68,17 @@ assert(!bootstrapGuide.includes("No npm registry staging or publication authoriz
   "Owner already authorized the single temporary bootstrap stage, NOT the real release.");
 assert(bootstrapGuide.includes("npm token create --name=gh-plan-bootstrap-once"),
   "npm CLI now supports scoped granular token creation as an optional local path.");
+assert(bootstrapGuide.includes("Reuse an existing npm access token"),
+  "Do not require a newly created or minimally scoped npm token.");
+assert(bootstrapGuide.includes("wider scope or direct-publish permission are acceptable"),
+  "Any valid npm stage-capable credential must work, even if it has unrelated privileges.");
+assert(bootstrapGuide.includes("only `npm stage publish`"),
+  "Reusing a broad token must not widen the workflow's command.");
+assert(bootstrapGuide.includes("do **not** revoke a pre-existing"),
+  "Do not destroy credentials used by unrelated workflows.");
+assert(bootstrapGuide.includes("GitHub PAT or an unidentified secret"),
+  "Unidentified GitHub/org tokens cannot be assumed to be npm credentials.");
+
 for (const required of [
   "--expires=1",
   "--scopes=attention-spa",
@@ -83,7 +94,7 @@ for (const required of [
   "private:true",
 ]) {
   assert(bootstrapGuide.includes(required),
-    "Bootstrap documentation must preserve least-privilege scope and live-stage gate: " + required);
+    "Optional npm token creation must remain documented and live-stage gate preserved: " + required);
 }
 
 console.log("Draft npm release docs, future install, rollback, and private gate verified.");
