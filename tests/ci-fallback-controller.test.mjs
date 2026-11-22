@@ -519,7 +519,8 @@ for (const step of stageJob.steps) {
 
 // #243 authorized first-stage lane: a single manual, SHA-pinned and
 // expressly confirmed public-placeholder write. Only the final step can
-// access the dedicated temporary npm token in npm-bootstrap environment.
+// read the existing Doppler-synced organization npm token; the main-only
+// npm-bootstrap environment still gates this authorized one-time write.
 const firstStageText = readFileSync(
   new URL("../.github/workflows/npm-bootstrap-first-stage.yml", import.meta.url),
   "utf8");
@@ -554,7 +555,7 @@ for (const name of ["test:bootstrap-preview", "test:bootstrap-stage",
 assert.equal(oneWrite.steps.at(-1).run, "node scripts/npm-bootstrap-first-stage.mjs");
 const stageCredential = oneWrite.steps.at(-1).env;
 assert.equal(stageCredential.BOOTSTRAP_NPM_STAGE_TOKEN,
-  "${{ secrets.NPM_BOOTSTRAP_STAGE_TOKEN }}");
+  "${{ secrets.NPMJS_TOKEN_NIKI }}");
 assert.equal(stageCredential.BOOTSTRAP_GITHUB_READ_TOKEN, "${{ github.token }}");
 assert.equal(stageCredential.BOOTSTRAP_APPROVED_SHA, "${{ inputs.expected_sha }}");
 assert.equal(stageCredential.BOOTSTRAP_PLACEHOLDER_APPROVED,
@@ -562,7 +563,7 @@ assert.equal(stageCredential.BOOTSTRAP_PLACEHOLDER_APPROVED,
 assert(firstStageText.includes("npm-bootstrap"));
 assert(!/id-token|pull_request_target|npm publish|npm trust|npm dist-tag|gh release/.test(firstStageText));
 assert.equal((firstStageText.match(/secrets\./g) ?? []).length, 1,
-  "A single stage step in a hosted main-only environment can access the npm secret.");
+  "Only the final stage step may access the existing npm org secret.");
 for (const step of oneWrite.steps.slice(0, -1)) {
   assert(!JSON.stringify(step).includes("secrets."),
     "No test, install or preflight step may access the temporary npm token.");

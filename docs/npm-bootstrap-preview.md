@@ -94,12 +94,17 @@ is manually dispatched, hosted on `ubuntu-latest`, Node 24, with
 only `contents:read`. Its GitHub `npm-bootstrap` environment permits
 deployments from **main only**, not branches/tags generally, and is
 completely separate from the future `npm-stage` OIDC environment.
-Authenticated GitHub readback on November 22, 2026 found **zero secrets**
-in that environment. GitHub Raw API can store an existing encrypted
-npm credential but **cannot issue npm tokens** or authenticate to an
-npm account using a GitHub access token.
+GitHub readback confirmed **zero environment secrets** but found the
+existing **`NPMJS_TOKEN_NIKI` organization Actions secret**, added
+November 22, 2026 with visibility `all`, which includes this repository.
+The owner identified its source as Doppler project `attention-spa`,
+config `dev` or `prd`. GitHub does not expose the token value;
+the one-time workflow reads it directly in its final stage step.
+**Do not create a duplicate GitHub environment secret, print the token,
+or revoke the shared organization secret.** The environment's `main`-only
+branch gate still applies to the job.
 
-**Existing-token handoff (the sole credential blocker):**
+**Existing organization npm credential — ready for one authorized stage:**
 
 1. **Reuse an existing npm access token** if one is available and has
    permission to stage a new package under `@attention-spa`. Do **not**
@@ -129,15 +134,19 @@ npm account using a GitHub access token.
    publicly logged CI job or paste the token into a shell command line,
    chat message, commit, or issue. For the current options, see
    [npm token create](https://docs.npmjs.com/cli/v11/commands/npm-token/).
-2. In the `gh-plan` repository's **Settings → Environments →
-   npm-bootstrap → Environment secrets**, create exactly one
-   `NPM_BOOTSTRAP_STAGE_TOKEN` containing that token. Do **not** place
-   it in a repository-wide secret, commit, issue, chat, or logs.
-   Only the final stage step reads it; other workflows/CI/OCI cannot
-   access environment-scoped secrets outside their environment.
+2. The existing GitHub Actions **organization secret**
+   `NPMJS_TOKEN_NIKI` is already visible to `gh-plan`. The first-stage
+   workflow passes it only to the last step as
+   `BOOTSTRAP_NPM_STAGE_TOKEN: ${{ secrets.NPMJS_TOKEN_NIKI }}`.
+   It is **not** copied into an environment/repository secret.
+   Organization-wide visibility is broader than environment-scoped
+   access; that risk is inherent in the existing shared secret and is
+   not extended by this change. The `npm-bootstrap` environment gates
+   execution on protected `main` only.
 3. Before dispatch, ensure protected `main` is the reviewed,
-   green commit, the npm package is still absent, and the temporary
-   secret exists. The workflow accepts only `0.0.0-bootstrap.0`,
+   green commit, the npm package is still absent, and the existing
+   `NPMJS_TOKEN_NIKI` org secret remains available. GitHub secret
+   metadata proves presence, **not** npm authentication or package rights. The workflow accepts only `0.0.0-bootstrap.0`,
    requires an exact **40-hex `expected_sha`** equal to that Actions
    run's checked-out SHA, and requires
    `confirm_public_placeholder=true`. It runs only when
@@ -160,16 +169,19 @@ npm account using a GitHub access token.
    it**. If the workflow fails or times out after attempting stage,
    inspect these states before any other command. No success may be
    inferred solely from an exit code or public placeholder.
-6. After verified bootstrap, **delete the `npm-bootstrap` GitHub environment
-   secret and verify cleanup**. Revoke a token **only if it was created
-   specifically for this bootstrap**; do **not** revoke a pre-existing
-   shared npm token used elsewhere. Retain the pending bootstrap stage
-   unapproved until separately authorized #244. The bootstrap stage
-   must eventually be **rejected using authenticated maintainer 2FA**,
-   not approved. A public placeholder may remain visible afterward.
+6. After verified bootstrap, leave the **shared organization secret
+   `NPMJS_TOKEN_NIKI` untouched**. There is **no temporary environment
+   secret** to delete. Disable the one-use first-stage workflow before
+   deleting the `npm-bootstrap` environment, to avoid GitHub silently
+   recreating an unprotected environment if the workflow is dispatched.
+   Independently verify that both are removed/disabled. Retain the
+   pending bootstrap stage unapproved until separately authorized #244.
+   The bootstrap stage must eventually be **rejected using authenticated
+   maintainer 2FA**, not approved. A public placeholder may remain visible.
 
-**This workflow must not be dispatched until the temporary token is
-available and npm's first namespace creation is still intended.**
+**The existing organization secret is now configured; dispatch the
+owner-approved first stage exactly once only after current protected-main,
+CI and registry-absence checks succeed.**
 The earlier [read-only stage preflight](../.github/workflows/npm-bootstrap-stage.yml)
 remains available for nonpublishing checks without any secret.
 Any package already present or uncertain registry response makes
@@ -190,18 +202,16 @@ is not evidence that the first stage actually ran:
    no compatible token exists, the npm account owner must create one
    through npm-authenticated account UI or CLI; a GitHub token cannot
    substitute. Do not send any token in issues, code, PR output or chat.
-2. Store it **only** as the GitHub Actions environment secret
-   `NPM_BOOTSTRAP_STAGE_TOKEN` in the `npm-bootstrap` environment,
-   never as a repository-level or organization-level secret. The **separate
-   owner-authorized** first-write workflow must run only from reviewed
-   protected `main`, on an ephemeral GitHub-hosted runner, verify the
-   exact bootstrap fixture/SHAs, and perform **only** `npm stage publish
-   --tag bootstrap --access public`. It must not call `npm publish`,
-   `npm dist-tag`, `npm trust`, or read any other npm credentials.
-   Even stage-only tokens permit **dist-tag changes/deprecations**;
-   broader tokens can also directly publish and manage other packages.
-   The workflow cannot limit privileges inherent in the chosen token,
-   but calls only the approved staging command.
+2. Consume the already-synced `NPMJS_TOKEN_NIKI` GitHub organization
+   Actions secret **only in the final step** of the protected-`main`
+   `npm-bootstrap` job, without duplicating its value. The workflow
+   runs on an ephemeral GitHub-hosted runner, verifies exact bootstrap
+   fixture/SHAs, and performs **only** `npm stage publish --tag bootstrap
+   --access public`. It must not call `npm publish`, `npm dist-tag`
+   or `npm trust`, or read other npm credentials. Broad npm tokens
+   can directly publish and manage other packages: the workflow
+   cannot limit privileges inherent in the shared token, but calls
+   only the approved command.
 3. npm then creates the package and a **publicly available
    `0.0.0-stage` placeholder**, even though the temporary
    `0.0.0-bootstrap.0` tarball remains pending **and must never be
@@ -226,11 +236,10 @@ is not evidence that the first stage actually ran:
    a manual *first-package publish* command, and cannot be silently
    bypassed by the automation.
 7. Reject the **temporary bootstrap stage** using authenticated maintainer
-   2FA; verify which staged versions remain. Check that the `npm-bootstrap`
-   **GitHub environment secret was already deleted** after #243's
-   verified bootstrap, and that any **dedicated one-off npm token** was
-   revoked. A reused shared npm token must remain untouched rather than
-   being revoked unexpectedly. Inspect the published real version,
+   2FA; verify which staged versions remain. Check that the one-time
+   bootstrap workflow was disabled and its `npm-bootstrap` environment
+   deleted after #243, while the **shared `NPMJS_TOKEN_NIKI` organization
+   secret remains untouched**. Inspect the real published version,
    provenance, dist-tag and any residual placeholder.
    Do not assert that the temporary placeholder is automatically removed.
 
@@ -239,9 +248,10 @@ changing the real package's `private:true`/`0.0.0` release blockers,
 adding production OIDC stage workflow privileges, npm trusted-publisher
 registration, staging
 `0.1.0-beta.1`, and final maintainer 2FA approval. The first temporary
-bootstrap stage/public placeholder is **already approved but still blocked
-on account-authenticated token provisioning**; it must not be mistaken
-for approval to stage the real version.
+bootstrap stage/public placeholder is **already approved** and the
+organization-level secret is available. The actual stage has not yet been
+executed; availability is not proof the token can authenticate or stage.
+Do not mistake this for approval to stage the real version.
 
 ## References
 
