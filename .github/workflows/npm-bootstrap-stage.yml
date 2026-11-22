@@ -1,0 +1,44 @@
+name: npm bootstrap stage preparation (NO REGISTRY WRITE)
+
+# Owner-gated: no stage/publish implementation and no npm token access.
+# Public 0.0.0-stage placeholder requires separate explicit authorization.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Nonfunctional namespace fixture — READ-ONLY checks only
+        required: true
+        type: choice
+        options: [0.0.0-bootstrap.0]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-bootstrap-preparation
+  cancel-in-progress: false
+
+jobs:
+  bootstrap-stage-preflight:
+    if: github.actor == 'agent-hachi' && github.triggering_actor == 'agent-hachi' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify protected main, package absence and offline fixture; do not stage
+        run: node scripts/npm-bootstrap-stage.mjs
+        env:
+          BOOTSTRAP_STAGE_VERSION: ${{ inputs.version }}
+          BOOTSTRAP_STAGE_TAG: bootstrap
+          BOOTSTRAP_GITHUB_READ_TOKEN: ${{ github.token }}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run test:bootstrap-stage
+      - run: npm run test:ci-fallback
+      - run: git diff --exit-code -- package.json package-lock.json
