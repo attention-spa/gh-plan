@@ -27,6 +27,7 @@ const base = {
   version: BOOTSTRAP_VERSION, tag: BOOTSTRAP_TAG,
   localSha: sha, approvedSha: sha, consent: "true",
   githubReadToken: "read-only-GitHub-token", npmStageToken: token,
+  nodeVersion: "24.0.0",
 };
 const approved = validateFirstStageAuthorization({
   ...base, npmTokenPresent: true, githubReadTokenPresent: true,
