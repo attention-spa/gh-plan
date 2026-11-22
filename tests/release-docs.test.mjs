@@ -9,6 +9,7 @@ const readme = read("README.md");
 const guide = read("docs/npm-distribution.md");
 const change = read("CHANGELOG.md");
 const preflightGuide = read("docs/release-preflight.md");
+const bootstrapGuide = read("docs/npm-bootstrap-preview.md");
 
 assert.equal(PREVIEW_VERSION, "0.1.0-beta.1");
 assert.equal(PREVIEW_TAG, "v0.1.0-beta.1");
@@ -58,5 +59,31 @@ assert(change.includes("trusted-publisher"),
   "Draft must not claim an npm trust relationship already exists.");
 assert(!/## \[[0-9]+\.[0-9]+\.[0-9]+/.test(change),
   "Do not add a dated released-version changelog heading before publication.");
+
+// #243: Authorization and credential setup are separate facts. Do not
+// regress to the obsolete website-only token-creation instructions.
+assert(bootstrapGuide.includes("owner-authorized but has NOT been executed"));
+assert(bootstrapGuide.includes("The real prerelease and final publication remain separately gated"));
+assert(!bootstrapGuide.includes("No npm registry staging or publication authorized."),
+  "Owner already authorized the single temporary bootstrap stage, NOT the real release.");
+assert(bootstrapGuide.includes("npm token create --name=gh-plan-bootstrap-once"),
+  "npm CLI now supports scoped granular token creation as an optional local path.");
+for (const required of [
+  "--expires=1",
+  "--scopes=attention-spa",
+  "--packages-and-scopes-permission=read-write-stage-only",
+  "--orgs-permission=no-access",
+  "--bypass-2fa=false",
+  "password and 2FA/OTP",
+  "NPM_BOOTSTRAP_STAGE_TOKEN",
+  "npm-bootstrap",
+  "GitHub Raw API can store an existing encrypted",
+  "already revoked and the GitHub environment secret deleted",
+  "0.0.0-stage",
+  "private:true",
+]) {
+  assert(bootstrapGuide.includes(required),
+    "Bootstrap documentation must preserve least-privilege scope and live-stage gate: " + required);
+}
 
 console.log("Draft npm release docs, future install, rollback, and private gate verified.");
