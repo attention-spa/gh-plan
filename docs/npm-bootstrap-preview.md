@@ -1,6 +1,6 @@
-# Automated first-package bootstrap — dry-run only
+# Automated first-package bootstrap — authorized, credential-gated
 
-**Status: No npm registry staging or publication authorized.**
+**Status: The one-time first-package bootstrap stage is owner-authorized but has NOT been executed. The real prerelease and final publication remain separately gated.**
 The owner selected **automated initial package creation** for
 `@attention-spa/gh-plan` on November 22, 2026. A local/manual first
 publication has been rejected. The intended **first real prerelease** is
@@ -31,10 +31,11 @@ constructs an **isolated temporary package**:
 The preview verifies the exact pack contents and integrity; it automatically
 removes its temporary directory. It has no registry-write operation.
 Neither the root package nor the lockfile is altered. A preview success is
-**not proof that npm accepted or created the package**, and does not
-authorize staging.
+**not proof that npm accepted or created the package**. The later owner
+approval for one bootstrap stage is recorded below; this preview alone
+is never evidence of a registry write.
 
-## New #243 hosted preparation — still NO registry write
+## #243 hosted read-only preflight — no registry write
 
 The separately reviewable [npm bootstrap stage preparation workflow](../.github/workflows/npm-bootstrap-stage.yml)
 is now a **manual, read-only preflight**. This is distinct from the older offline
@@ -61,13 +62,13 @@ upload, or `npm stage publish` invocation**. A `404` now is only a
 snapshot: real first staging must check package absence **again directly
 before a separately authorized write**, and must fail closed if it changed.
 
-The code includes a pure description of the *future* single allowed command,
+The code includes a pure description of the *separately authorized* single stage command,
 `npm stage publish --tag bootstrap --access public --ignore-scripts`;
 that command is **never executed** by this workflow or its script.
-Credentials and activation of a real registry-write step remain gated by
-explicit owner approval of the visible `0.0.0-stage` placeholder. No
-bootstrap token or repository secret is requested until that approval.
-The intended future bootstrap token requires npm **stage-only**
+The owner approved that one registry write on November 22, 2026,
+but the read-only preflight remains incapable of performing it.
+The separate write workflow still requires a temporary npm credential,
+which has not been configured. The bootstrap token requires npm **stage-only**
 permission under `@attention-spa`, Bypass 2FA OFF, no org-governance
 rights, shortest feasible expiry; revoke promptly after the stage.
 
@@ -90,7 +91,10 @@ is manually dispatched, hosted on `ubuntu-latest`, Node 24, with
 only `contents:read`. Its GitHub `npm-bootstrap` environment permits
 deployments from **main only**, not branches/tags generally, and is
 completely separate from the future `npm-stage` OIDC environment.
-No npm token exists in that environment yet.
+Authenticated GitHub readback on November 22, 2026 found **zero secrets**
+in that environment. GitHub Raw API can store an existing encrypted
+npm credential but **cannot issue npm tokens** or authenticate to an
+npm account using a GitHub access token.
 
 **One-time owner setup (the sole credential blocker):**
 
@@ -101,6 +105,22 @@ No npm token exists in that environment yet.
    organization-management permissions**, and use the shortest practical
    expiry. Do not create a token with direct-publish rights. Stage-only
    still permits dist-tag/deprecation writes, so treat it as sensitive.
+   As an alternative to the website, the **current npm 11 CLI** can
+   create a scope-limited granular token interactively. Run this only
+   in an npm-authenticated local terminal; it requires account
+   password and 2FA/OTP and **prints a secret token** that must be
+   transferred securely to the environment secret in step 2:
+
+   ```sh
+   npm token create --name=gh-plan-bootstrap-once --expires=1 --scopes=attention-spa --packages-and-scopes-permission=read-write-stage-only --orgs-permission=no-access --bypass-2fa=false
+   ```
+
+   The CLI route is **token provisioning, not a manual package publish**;
+   it does not bypass npm authentication or 2FA. No npm session is
+   available to the GitHub Raw API integration. Do not run it in a
+   publicly logged CI job or paste the token into a shell command line,
+   chat message, commit, or issue. For the current options, see
+   [npm token create](https://docs.npmjs.com/cli/v11/commands/npm-token/).
 2. In the `gh-plan` repository's **Settings → Environments →
    npm-bootstrap → Environment secrets**, create exactly one
    `NPM_BOOTSTRAP_STAGE_TOKEN` containing that token. Do **not** place
@@ -147,8 +167,9 @@ the throw-on-import temporary fixture.
 
 ## Automated first-package architecture and follow-on OIDC path
 
-After a separate explicit authorization of the **public staging
-side effect**, the proposed production sequence is:
+The owner **already approved** the first public-placeholder staging side
+effect. These are the operational and follow-on steps; authorization
+is not evidence that the first stage actually ran:
 
 1. **One-time npm account setup:** From the npm account owner, generate a
    short-lived **granular access token** with **Packages and scopes →
@@ -158,8 +179,9 @@ side effect**, the proposed production sequence is:
    package rights or IP restrictions incompatible with GitHub-hosted
    runners. Set the shortest suitable expiry. Never put the token in
    issues, code, PR output or chat.
-2. Store it only as a narrowly named GitHub Actions secret (e.g.
-   `NPM_BOOTSTRAP_STAGE_TOKEN`) with authorized visibility. The **separate
+2. Store it **only** as the GitHub Actions environment secret
+   `NPM_BOOTSTRAP_STAGE_TOKEN` in the `npm-bootstrap` environment,
+   never as a repository-level or organization-level secret. The **separate
    owner-authorized** first-write workflow must run only from reviewed
    protected `main`, on an ephemeral GitHub-hosted runner, verify the
    exact bootstrap fixture/SHAs, and perform **only** `npm stage publish
@@ -192,16 +214,21 @@ side effect**, the proposed production sequence is:
    a manual *first-package publish* command, and cannot be silently
    bypassed by the automation.
 7. Reject the **temporary bootstrap stage** using authenticated maintainer
-   2FA; verify which staged versions remain. Revoke the granular token
-   in npm account settings, remove the GitHub secret, and check the
-   published version, provenance, dist-tag and any residual placeholder.
+   2FA; verify which staged versions remain. Check that the granular
+   token was **already revoked and the GitHub environment secret deleted
+   after #243's verified bootstrap**, rather than keeping the temporary
+   credential alive through #244. Inspect the published real version,
+   provenance, dist-tag and any residual placeholder.
    Do not assert that the temporary placeholder is automatically removed.
 
 **Separate approval gates** still apply to creating a Git release tag,
 changing the real package's `private:true`/`0.0.0` release blockers,
 adding production OIDC stage workflow privileges, npm trusted-publisher
-registration, staging the bootstrap (public placeholder), staging
-`0.1.0-beta.1`, and final maintainer 2FA approval.
+registration, staging
+`0.1.0-beta.1`, and final maintainer 2FA approval. The first temporary
+bootstrap stage/public placeholder is **already approved but still blocked
+on account-authenticated token provisioning**; it must not be mistaken
+for approval to stage the real version.
 
 ## References
 
@@ -212,4 +239,5 @@ registration, staging the bootstrap (public placeholder), staging
 - [GitHub October 2, 2026: automated new-package staged creation](https://github.blog/changelog/2026-10-02-npm-staged-publishing-now-supports-creating-new-packages/)
 - [npm stage command](https://docs.npmjs.com/cli/v11/commands/npm-stage/)
 - [npm token capabilities](https://docs.npmjs.com/about-access-tokens/)
+- [npm token CLI scoped granular creation](https://docs.npmjs.com/cli/v11/commands/npm-token/)
 - [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/)
