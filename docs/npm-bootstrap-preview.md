@@ -149,6 +149,9 @@ npm account using a GitHub access token.
    scriptless `0.0.0-bootstrap.0` fixture through one
    `npm stage publish --tag bootstrap --access public --ignore-scripts`
    invocation. The temporary auth config has mode 0600 and is removed.
+   The preliminary `git rev-parse HEAD` process gets only whitelisted
+   `PATH`/`HOME` variables, **not** the npm credential or GitHub read
+   token, even if either is present in the parent workflow environment.
    **Never retry an uncertain or failed write automatically.**
 5. Independently verify the public `@attention-spa/gh-plan` namespace
    and `0.0.0-stage` placeholder on npmjs.com, then in the
