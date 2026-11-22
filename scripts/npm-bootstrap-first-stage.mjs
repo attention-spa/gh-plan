@@ -40,6 +40,22 @@ export function validateFirstStageAuthorization({
     tag: BOOTSTRAP_TAG, approvedSha, publicPlaceholderAuthorized: true });
 }
 
+// The authorized workflow injects both npm and GitHub read tokens into the
+// parent Node process. Git metadata inspection needs neither credential.
+// Never let git inherit BOOTSTRAP_NPM_STAGE_TOKEN or other workflow secrets.
+export function readBootstrapLocalSha({
+  env = process.env, spawnImpl = spawnSync,
+} = {}) {
+  const git = spawnImpl("git", ["rev-parse", "HEAD"], {
+    encoding: "utf8", timeout: 10_000,
+    env: { PATH: env.PATH ?? "", HOME: env.HOME ?? "" },
+  });
+  assert.equal(git.status, 0, "FIRST_STAGE_GIT_READ");
+  const sha = (git.stdout ?? "").trim();
+  assert.match(sha, /^[a-f0-9]{40}$/, "FIRST_STAGE_GIT_SHA_FORMAT");
+  return sha;
+}
+
 export function assertStageCliVersion(version, nodeVersion = process.versions.node) {
   const parts = /^(?<maj>\d+)\.(?<min>\d+)\.\d+$/.exec(version ?? "");
   assert(parts, "FIRST_STAGE_NPM_VERSION_UNKNOWN");
@@ -134,12 +150,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   });
   assert.equal(github.BOOTSTRAP_PLACEHOLDER_APPROVED, "true",
     "FIRST_STAGE_PLACEHOLDER_APPROVAL");
-  const git = spawnSync("git", ["rev-parse", "HEAD"], {
-    encoding: "utf8", timeout: 10_000,
-  });
-  assert.equal(git.status, 0, "FIRST_STAGE_GIT_READ");
+  const localSha = readBootstrapLocalSha();
   const result = await runAuthorizedFirstStage({
-    github, manifest, lock, localSha: git.stdout.trim(),
+    github, manifest, lock, localSha,
     version: github.BOOTSTRAP_STAGE_VERSION, tag: github.BOOTSTRAP_STAGE_TAG,
     consent: github.BOOTSTRAP_PLACEHOLDER_APPROVED,
     approvedSha: github.BOOTSTRAP_APPROVED_SHA,
