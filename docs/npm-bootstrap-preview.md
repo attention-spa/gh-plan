@@ -189,6 +189,38 @@ the one-write workflow fail closed. The root manifest remains
 `private:true`, `0.0.0`; the only non-private object constructed is
 the throw-on-import temporary fixture.
 
+## First authorized attempt failed — read-only diagnosis
+
+The one authorized first-stage [GitHub Actions run #44990728908](https://github.com/attention-spa/gh-plan/actions/runs/44990728908)
+reached `npm stage publish`, then returned exit status **1** on
+November 22, 2026. As designed, the runner **did not print npm's
+untrusted stdout/stderr**, so the registry cause is unknown. Its result
+was not an approval or a successful stage.
+
+The independent [post-failure read-only preflight #44990787521](https://github.com/attention-spa/gh-plan/actions/runs/44990787521)
+passed, including the public registry's HTTP 404 for
+`@attention-spa/gh-plan` on the unchanged protected main commit.
+That establishes the **public namespace is still absent**. Do not infer
+that the shared organization npm token is valid from its presence in
+GitHub Actions alone.
+
+Use the separate [npm bootstrap authentication diagnosis](../.github/workflows/npm-bootstrap-diagnose.yml)
+workflow to **only** run `npm whoami` and `npm stage list` for the
+package under the existing `NPMJS_TOKEN_NIKI` organization secret.
+This workflow requires `agent-hachi`, protected main with exact SHA,
+the main-only `npm-bootstrap` environment, and `contents:read`.
+It never stages, publishes, approves, rejects, tags, or changes npm
+packages. Its script prints only safe booleans and known CLI error codes,
+**never npm's raw responses or credentials**, and removes its mode-0600
+temporary auth configuration. An authenticated stage listing can
+independently detect a pending candidate if one exists.
+
+**Do not dispatch the first-stage writer again automatically, even if
+the public package remains absent.** First determine whether npm
+authentication, permissions, CLI command or another condition caused
+the one attempted write to fail; record the finding and obtain separate
+authorization for any new registry-write attempt.
+
 ## Automated first-package architecture and follow-on OIDC path
 
 The owner **already approved** the first public-placeholder staging side

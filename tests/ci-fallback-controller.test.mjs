@@ -390,7 +390,7 @@ for (const file of [
   "ci.yml", "ci-worker.yml", "bootstrap-dry-run.yml", "bootstrap-worker.yml",
   "npm-release-preflight.yml", "npm-bootstrap-preview.yml",
   "npm-bootstrap-stage.yml",
-  "npm-bootstrap-first-stage.yml",
+  "npm-bootstrap-first-stage.yml", "npm-bootstrap-diagnose.yml",
 ]) {
   const source = readFileSync(new URL("../.github/workflows/" + file, import.meta.url), "utf8");
   const workflow = YAML.parse(source);
@@ -567,6 +567,35 @@ assert.equal((firstStageText.match(/secrets\./g) ?? []).length, 1,
 for (const step of oneWrite.steps.slice(0, -1)) {
   assert(!JSON.stringify(step).includes("secrets."),
     "No test, install or preflight step may access the temporary npm token.");
+}
+
+// #243: diagnostics of the ambiguous one-stage attempt are READ ONLY.
+// Only agent-hachi on protected main can access the existing org secret
+// inside the main-only npm-bootstrap environment, and only in the last step.
+const diagnosticText = readFileSync(
+  new URL("../.github/workflows/npm-bootstrap-diagnose.yml", import.meta.url),
+  "utf8");
+const diagnosticWorkflow = YAML.parse(diagnosticText);
+assert.deepEqual(Object.keys(diagnosticWorkflow.on), ["workflow_dispatch"]);
+assert.equal(diagnosticWorkflow.permissions.contents, "read");
+assert.deepEqual(Object.keys(diagnosticWorkflow.jobs), ["diagnostic"]);
+const diagnosticJob = diagnosticWorkflow.jobs.diagnostic;
+assert.equal(diagnosticJob.environment, "npm-bootstrap");
+assert.equal(diagnosticJob["runs-on"], "ubuntu-latest");
+assert.deepEqual(diagnosticJob.permissions, { contents: "read" });
+assert(diagnosticJob.if.includes("github.actor == 'agent-hachi'"));
+assert(diagnosticJob.if.includes("github.triggering_actor == 'agent-hachi'"));
+assert(diagnosticJob.if.includes("github.ref == 'refs/heads/main'"));
+assert(diagnosticJob.if.includes("inputs.expected_sha == github.sha"));
+assert.equal(diagnosticJob.steps[0].with["persist-credentials"], false);
+assert.equal(diagnosticJob.steps.at(-1).run,
+  "node scripts/npm-bootstrap-auth-diagnose.mjs");
+assert.equal(diagnosticJob.steps.at(-1).env.DIAG_NPM_TOKEN,
+  "${{ secrets.NPMJS_TOKEN_NIKI }}");
+assert.equal((diagnosticText.match(/secrets\./g) ?? []).length, 1);
+assert(!/id-token|pull_request_target|npm stage publish|npm publish|npm trust|npm dist-tag/.test(diagnosticText));
+for (const step of diagnosticJob.steps.slice(0, -1)) {
+  assert(!JSON.stringify(step).includes("secrets."));
 }
 
 const ci = YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"));
